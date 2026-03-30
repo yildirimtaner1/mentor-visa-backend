@@ -151,6 +151,90 @@
   text-decoration: none;
 }
 
+/* Trust Badges */
+.hero-trust-badges {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  align-items: center;
+  margin-bottom: 56px;
+  animation: fadeInUp 0.6s ease-out 0.4s both;
+}
+
+.trust-badge {
+  display: flex;
+  align-items: center;
+  background: white;
+  border: 1px solid var(--border-color);
+  padding: 10px 20px;
+  border-radius: 9999px;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03);
+  gap: 12px;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
+.trust-avatars {
+  display: flex;
+  align-items: center;
+}
+
+.trust-avatars img {
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  border: 2px solid white;
+  margin-left: -10px;
+  background: #E2E8F0;
+  object-fit: cover;
+}
+
+.trust-avatars img:first-child {
+  margin-left: 0;
+}
+
+.trust-stars {
+  color: #F59E0B;
+  font-size: 1.1rem;
+  letter-spacing: 2px;
+}
+
+.trust-icon-check {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  background: transparent;
+  border: 2px solid #10B981;
+  color: #10B981;
+  border-radius: 50%;
+  font-size: 0.9rem;
+  font-weight: bold;
+}
+
+.trust-text {
+  font-size: 0.95rem;
+  color: var(--text-main);
+}
+
+.trust-text strong {
+  font-weight: 700;
+  color: var(--gradient-start);
+}
+
+@media (max-width: 600px) {
+  .trust-badge {
+    border-radius: 12px;
+    padding: 14px;
+  }
+}
+
+.btn-ghost:hover {
+  color: var(--primary-color);
+  text-decoration: none;
+}
+
 .hero-stats {
   display: flex;
   align-items: center;
