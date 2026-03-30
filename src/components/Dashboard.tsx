@@ -1,4 +1,4 @@
-import { type FC, useState, useEffect } from 'react';
+import { type FC, useEffect } from 'react';
 import { useUser, SignInButton } from '@clerk/clerk-react';
 import { usePDF } from 'react-to-pdf';
 import type { AnalysisResponse, Risk } from '../types';
@@ -11,15 +11,15 @@ interface DashboardProps {
 export const Dashboard: FC<DashboardProps> = ({ data, onReset }) => {
   const { isSignedIn } = useUser();
   const { toPDF, targetRef } = usePDF({filename: 'MentorVisa-AuditReport.pdf', page: { margin: 15 }});
-  const [downloadPending, setDownloadPending] = useState(false);
+
 
   useEffect(() => {
-    if (isSignedIn && downloadPending) {
+    if (isSignedIn && sessionStorage.getItem('pendingPdfDownload') === 'true') {
       // Small delay ensures UI has rendered the logged-in state completely before snapshotting
-      setTimeout(() => toPDF(), 500);
-      setDownloadPending(false);
+      sessionStorage.removeItem('pendingPdfDownload');
+      setTimeout(() => toPDF(), 1000);
     }
-  }, [isSignedIn, downloadPending, toPDF]);
+  }, [isSignedIn, toPDF]);
 
   const renderBadge = (status: string) => {
     switch (status) {
@@ -47,7 +47,7 @@ export const Dashboard: FC<DashboardProps> = ({ data, onReset }) => {
               📥 Download PDF Report
             </button>
           ) : (
-            <div onClick={() => setDownloadPending(true)}>
+            <div onClickCapture={() => sessionStorage.setItem('pendingPdfDownload', 'true')}>
               <SignInButton mode="modal" forceRedirectUrl={window.location.href}>
                 <button className="btn" style={{ background: '#4285F4', borderColor: '#4285F4', color: 'white' }}>
                   <svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" style={{ marginRight: '8px', verticalAlign: 'middle', display: 'inline' }}>
