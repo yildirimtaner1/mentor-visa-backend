@@ -40,6 +40,16 @@ export const LandingPage: FC<LandingPageProps> = ({ onGetStarted }) => {
               See How It Works ↓
             </a>
           </div>
+          
+          <div style={{ marginTop: '40px', background: 'rgba(34, 197, 94, 0.1)', border: '1px solid var(--success-color)', padding: '20px', borderRadius: '12px', textAlign: 'left', maxWidth: '650px', margin: '40px auto 0', boxShadow: '0 4px 6px rgba(0,0,0,0.02)' }}>
+             <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
+               <span style={{ fontSize: '1.2rem' }}>📄</span>
+               <strong style={{ color: 'var(--success-color)', fontSize: '1.1rem' }}>Generates an IRCC-Ready NOC Alignment Sheet</strong>
+             </div>
+             <p style={{ fontSize: '0.95rem', color: 'var(--text-main)', lineHeight: '1.6', margin: 0 }}>
+               Print and attach this page to your proof of employment or Letter of Explanation (LOE). It provides the IRCC officer with a clear, verified mapping of your duties against the official NOC 2021 database. This directly reduces ambiguity and <strong>expedites your application review process.</strong>
+             </p>
+          </div>
           <div className="hero-stats">
             <div className="hero-stat">
               <div className="hero-stat-number">516</div>
