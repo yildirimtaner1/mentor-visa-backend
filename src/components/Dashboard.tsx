@@ -1,4 +1,6 @@
 import type { FC } from 'react';
+import { useUser, SignInButton } from '@clerk/clerk-react';
+import { usePDF } from 'react-to-pdf';
 import type { AnalysisResponse, Risk } from '../types';
 
 interface DashboardProps {
@@ -7,6 +9,8 @@ interface DashboardProps {
 }
 
 export const Dashboard: FC<DashboardProps> = ({ data, onReset }) => {
+  const { isSignedIn } = useUser();
+  const { toPDF, targetRef } = usePDF({filename: 'MentorVisa-AuditReport.pdf'});
 
   const renderBadge = (status: string) => {
     switch (status) {
@@ -26,15 +30,35 @@ export const Dashboard: FC<DashboardProps> = ({ data, onReset }) => {
 
   return (
     <div>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px', flexWrap: 'wrap', gap: '10px' }}>
         <h2 style={{ fontSize: '1.5rem', fontWeight: 'bold' }}>Analysis Result: <span style={{ color: 'var(--primary-light)' }}>{data.document_type}</span></h2>
-        <button className="btn btn-outline" onClick={onReset}>Upload New Document</button>
+        <div style={{ display: 'flex', gap: '10px' }}>
+          {isSignedIn ? (
+            <button onClick={() => toPDF()} className="btn" style={{ background: 'var(--success-color)', borderColor: 'var(--success-color)', color: 'white' }}>
+              📥 Download PDF Report
+            </button>
+          ) : (
+            <SignInButton mode="modal" forceRedirectUrl={window.location.href}>
+              <button className="btn" style={{ background: '#4285F4', borderColor: '#4285F4', color: 'white' }}>
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" style={{ marginRight: '8px', verticalAlign: 'middle', display: 'inline' }}>
+                   <path fill="currentColor" fillRule="evenodd" clipRule="evenodd" d="M23.04 12.2614C23.04 11.4459 22.9668 10.662 22.8339 9.91016H12V14.3575H18.1891C17.9224 15.7949 17.1114 17.006 15.8943 17.8202V20.7135H19.6105C21.7855 18.7118 23.04 15.7618 23.04 12.2614Z" fill="white"/>
+                   <path fill="currentColor" fillRule="evenodd" clipRule="evenodd" d="M12 24C15.105 24 17.7082 22.9705 19.6105 20.7135L15.8943 17.8202C14.8643 18.5109 13.5457 18.9255 12 18.9255C9.00477 18.9255 6.46955 16.9016 5.56432 14.185H1.7225V17.1636C3.615 20.9232 7.50455 24 12 24Z" fill="white"/>
+                   <path fill="currentColor" fillRule="evenodd" clipRule="evenodd" d="M5.56432 14.1851C5.33318 13.4944 5.20364 12.7584 5.20364 12.0001C5.20364 11.2418 5.33318 10.5058 5.56432 9.81514V6.83655H1.7225C0.942727 8.38973 0.5 10.1424 0.5 12.0001C0.5 13.8578 0.942727 15.6106 1.7225 17.1638L5.56432 14.1851Z" fill="white"/>
+                   <path fill="currentColor" fillRule="evenodd" clipRule="evenodd" d="M12 5.07455C13.6909 5.07455 15.2082 5.65727 16.4027 6.79364L20.0168 3.17955C17.7082 1.02955 15.105 0 12 0C7.50455 0 3.615 3.07682 1.7225 6.83636L5.56432 9.81495C6.46955 7.09841 9.00477 5.07455 12 5.07455Z" fill="white"/>
+                </svg>
+                Sign in to Download PDF
+              </button>
+            </SignInButton>
+          )}
+          <button className="btn btn-outline" onClick={onReset}>Upload New</button>
+        </div>
       </div>
       
-      <div className="dashboard">
-        {/* Left Column */}
-        <div>
-          <div className="card">
+      <div ref={targetRef} style={{ background: 'var(--bg-color)', padding: '20px', borderRadius: '8px' }}>
+        <div className="dashboard">
+          {/* Left Column */}
+          <div>
+            <div className="card">
             <h3 className="card-title">Overall Assessment {renderBadge(data.compliance_status)}</h3>
             <p>{data.summary}</p>
             {data.strengths.length > 0 && (
@@ -215,6 +239,7 @@ export const Dashboard: FC<DashboardProps> = ({ data, onReset }) => {
             </div>
          </div>
       )}
+      </div>
     </div>
   );
 };
