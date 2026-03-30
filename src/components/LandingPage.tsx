@@ -23,14 +23,15 @@ export const LandingPage: FC<LandingPageProps> = ({ onGetStarted }) => {
       {/* Hero Section */}
       <section className="hero">
         <div className="hero-content">
-          <div className="hero-badge">🤖 Powered by AI &amp; Official NOC 2021 Database</div>
+          <div className="hero-badge">⚠️ Catch Issues Before IRCC Does</div>
           <h1 className="hero-title">
-            Get Your Employment Letter<br />
-            <span className="hero-highlight">Audited Before IRCC Does</span>
+            Don't Let a Small Mistake<br />
+            <span className="hero-highlight">Cost You Your PR</span>
           </h1>
           <p className="hero-subtitle">
-            Upload your employment reference letter and get an instant, AI-powered compliance check against 
-            official IRCC requirements and all 516 NOC 2021 codes — before you submit your Express Entry application.
+            A missing element or duty mismatch in your employment letter can delay or even derail your Express Entry application.
+            <br/><br/>
+            Upload your letter and get an instant, AI-powered compliance check against official IRCC requirements and all 516 NOC 2021 codes.
           </p>
           <div className="hero-actions">
             <button className="btn btn-primary btn-lg" onClick={onGetStarted}>
@@ -39,16 +40,6 @@ export const LandingPage: FC<LandingPageProps> = ({ onGetStarted }) => {
             <a href="#how-it-works" className="btn btn-ghost btn-lg">
               See How It Works ↓
             </a>
-          </div>
-          
-          <div style={{ marginTop: '40px', background: 'rgba(34, 197, 94, 0.1)', border: '1px solid var(--success-color)', padding: '20px', borderRadius: '12px', textAlign: 'left', maxWidth: '650px', margin: '40px auto 0', boxShadow: '0 4px 6px rgba(0,0,0,0.02)' }}>
-             <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
-               <span style={{ fontSize: '1.2rem' }}>📄</span>
-               <strong style={{ color: 'var(--success-color)', fontSize: '1.1rem' }}>Generates an IRCC-Ready NOC Alignment Sheet</strong>
-             </div>
-             <p style={{ fontSize: '0.95rem', color: 'var(--text-main)', lineHeight: '1.6', margin: 0 }}>
-               Print and attach this page to your proof of employment or Letter of Explanation (LOE). It provides the IRCC officer with a clear, verified mapping of your duties against the official NOC 2021 database. This directly reduces ambiguity and <strong>expedites your application review process.</strong>
-             </p>
           </div>
           <div className="hero-stats">
             <div className="hero-stat">
