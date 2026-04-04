@@ -1,5 +1,5 @@
-import { type FC, useEffect } from 'react';
-import { useUser, SignInButton } from '@clerk/clerk-react';
+import { type FC, useEffect, useState, useRef } from 'react';
+import { useUser, SignInButton, useAuth } from '@clerk/clerk-react';
 import { usePDF } from 'react-to-pdf';
 import type { AnalysisResponse, Risk } from '../types';
 
@@ -10,16 +10,103 @@ interface DashboardProps {
 
 export const Dashboard: FC<DashboardProps> = ({ data, onReset }) => {
   const { isSignedIn } = useUser();
-  const { toPDF, targetRef } = usePDF({filename: 'MentorVisa-AuditReport.pdf', page: { margin: 15 }});
+  const { getToken } = useAuth();
+  const { toPDF: toFullPDF, targetRef: fullTargetRef } = usePDF({filename: 'MentorVisa-AuditReport.pdf', page: { margin: 15 }});
+  const { toPDF: toNocPDF, targetRef: nocTargetRef } = usePDF({filename: 'MentorVisa-NOC-Alignment-Sheet.pdf', page: { margin: 15 }});
+  const [showToast, setShowToast] = useState(false);
+  const [toastDismissed, setToastDismissed] = useState(false);
+  const breakSpacerRef = useRef<HTMLDivElement>(null);
+
+  const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
+
+  const handleDownloadOriginal = async () => {
+    if (!data.stored_file_id) return;
+    try {
+      const token = await getToken();
+      if (!token) return;
+      const response = await fetch(`${API_BASE_URL}/api/v1/documents/${data.stored_file_id}`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      if (!response.ok) throw new Error('Download failed');
+      const blob = await response.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = data.original_filename || 'document.pdf';
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      console.error('Failed to download original document:', err);
+    }
+  };
+
+  const handleDownloadFull = async () => {
+    if (fullTargetRef.current && breakSpacerRef.current) {
+      const fullBounds = fullTargetRef.current.getBoundingClientRect();
+      const spacerBounds = breakSpacerRef.current.getBoundingClientRect();
+      const offset = spacerBounds.top - fullBounds.top;
+      
+      const width = fullTargetRef.current.clientWidth;
+      // react-to-pdf uses A4 (210x297mm). With 15mm margin, printable is 180x267mm.
+      const pageHeight = width * (267 / 180); 
+      
+      const remainder = offset % pageHeight;
+      // Add a small 2px overflow to guarantee it breaks exactly onto the next page
+      const paddingNeeded = pageHeight - remainder + 2; 
+      
+      breakSpacerRef.current.style.height = `${paddingNeeded}px`;
+    }
+    
+    // Yield to browser to paint new layout
+    await new Promise(resolve => setTimeout(resolve, 100));
+    toFullPDF();
+    
+    // Clean up
+    setTimeout(() => {
+      if (breakSpacerRef.current) breakSpacerRef.current.style.height = '0px';
+    }, 500);
+  };
 
 
   useEffect(() => {
-    if (isSignedIn && sessionStorage.getItem('pendingPdfDownload') === 'true') {
-      // Small delay ensures UI has rendered the logged-in state completely before snapshotting
-      sessionStorage.removeItem('pendingPdfDownload');
-      setTimeout(() => toPDF(), 1000);
+    if (isSignedIn) {
+      const pending = sessionStorage.getItem('pendingPdfDownload');
+      if (pending) {
+        sessionStorage.removeItem('pendingPdfDownload');
+        
+        // Silently claim the document for the user
+        getToken().then((token: string | null) => {
+           if (token) {
+              import('../services/api').then(({ saveEvaluation }) => {
+                 saveEvaluation(data, token).catch(console.error);
+              });
+           }
+        });
+
+        if (pending === 'noc') {
+          setTimeout(() => toNocPDF(), 1000);
+        } else {
+          setTimeout(() => handleDownloadFull(), 1000);
+        }
+      }
     }
-  }, [isSignedIn, toPDF]);
+  }, [isSignedIn, toFullPDF, toNocPDF, getToken, data]);
+
+  useEffect(() => {
+    const handleScroll = () => {
+      const scrolled = window.scrollY;
+      const total = document.documentElement.scrollHeight - window.innerHeight;
+      if (total > 0 && scrolled / total > 0.25 && !toastDismissed) {
+        setShowToast(true);
+      } else {
+        setShowToast(false);
+      }
+    };
+    window.addEventListener('scroll', handleScroll);
+    return () => window.removeEventListener('scroll', handleScroll);
+  }, [toastDismissed]);
 
   const renderBadge = (status: string) => {
     switch (status) {
@@ -40,14 +127,30 @@ export const Dashboard: FC<DashboardProps> = ({ data, onReset }) => {
   return (
     <div>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px', flexWrap: 'wrap', gap: '10px' }}>
-        <h2 style={{ fontSize: '1.5rem', fontWeight: 'bold' }}>Analysis Result: <span style={{ color: 'var(--primary-light)' }}>{data.document_type}</span></h2>
+        <h2 style={{ fontSize: '1.5rem', fontWeight: 'bold' }}>
+          Analysis Result: <span style={{ color: 'var(--primary-light)' }}>
+            {data.role_name && data.company_name && data.role_name !== "Unknown Role" && data.company_name !== "Unknown Company" 
+              ? `${data.role_name} - ${data.company_name}` 
+              : data.document_type}
+          </span>
+        </h2>
         <div style={{ display: 'flex', gap: '10px' }}>
           {isSignedIn ? (
-            <button onClick={() => toPDF()} className="btn" style={{ background: 'var(--success-color)', borderColor: 'var(--success-color)', color: 'white' }}>
-              📥 Download PDF Report
-            </button>
+            <>
+              <button onClick={() => toNocPDF()} className="btn" style={{ background: 'var(--primary-color)', borderColor: 'var(--primary-color)', color: 'white' }}>
+                📄 Download NOC Sheet
+              </button>
+              <button onClick={() => handleDownloadFull()} className="btn btn-outline" style={{ borderColor: 'var(--text-muted)' }}>
+                📥 Download Full Audit
+              </button>
+              {data.stored_file_id && (
+                <button onClick={handleDownloadOriginal} className="btn btn-outline" style={{ borderColor: '#10b981', color: '#10b981' }}>
+                  📎 Original Letter
+                </button>
+              )}
+            </>
           ) : (
-            <div onClickCapture={() => sessionStorage.setItem('pendingPdfDownload', 'true')}>
+            <div onClickCapture={() => sessionStorage.setItem('pendingPdfDownload', 'full')}>
               <SignInButton mode="modal" forceRedirectUrl={window.location.href}>
                 <button className="btn" style={{ background: '#4285F4', borderColor: '#4285F4', color: 'white' }}>
                   <svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" style={{ marginRight: '8px', verticalAlign: 'middle', display: 'inline' }}>
@@ -56,7 +159,7 @@ export const Dashboard: FC<DashboardProps> = ({ data, onReset }) => {
                      <path fill="white" fillRule="evenodd" clipRule="evenodd" d="M5.56432 14.1851C5.33318 13.4944 5.20364 12.7584 5.20364 12.0001C5.20364 11.2418 5.33318 10.5058 5.56432 9.81514V6.83655H1.7225C0.942727 8.38973 0.5 10.1424 0.5 12.0001C0.5 13.8578 0.942727 15.6106 1.7225 17.1638L5.56432 14.1851Z" />
                      <path fill="white" fillRule="evenodd" clipRule="evenodd" d="M12 5.07455C13.6909 5.07455 15.2082 5.65727 16.4027 6.79364L20.0168 3.17955C17.7082 1.02955 15.105 0 12 0C7.50455 0 3.615 3.07682 1.7225 6.83636L5.56432 9.81495C6.46955 7.09841 9.00477 5.07455 12 5.07455Z" />
                   </svg>
-                  Sign in to Download PDF
+                  Sign in to Download Info
                 </button>
               </SignInButton>
             </div>
@@ -65,7 +168,7 @@ export const Dashboard: FC<DashboardProps> = ({ data, onReset }) => {
         </div>
       </div>
       
-      <div ref={targetRef} style={{ background: 'var(--bg-color)', padding: '20px', borderRadius: '8px' }}>
+      <div ref={fullTargetRef} style={{ background: 'var(--bg-color)', padding: '20px', borderRadius: '8px' }}>
         <div className="dashboard">
           {/* Left Column */}
           <div>
@@ -164,14 +267,12 @@ export const Dashboard: FC<DashboardProps> = ({ data, onReset }) => {
       {/* New Section: NOC Alignment Sheet */}
       {data.noc_analysis?.duties_match && data.noc_analysis.duties_match.length > 0 && (
          <>
-         <div className="html2pdf__page-break"></div>
-         <div className="card" style={{ marginTop: '30px' }}>
+         <div ref={breakSpacerRef} style={{ transition: 'height 0.1s ease-in-out' }}></div>
+         <div style={{ pageBreakBefore: 'always', margin: '40px 0 0 0' }} className="html2pdf__page-break"></div>
+         <div ref={nocTargetRef} className="card" style={{ marginTop: '0' }}>
             <h2 style={{ fontSize: '1.5rem', fontWeight: 'bold', marginBottom: '16px', borderBottom: '2px solid var(--primary-light)', paddingBottom: '8px' }}>
               NOC Alignment Sheet (For IRCC Officer)
             </h2>
-            <div style={{ marginBottom: '20px', color: 'var(--text-main)', background: 'var(--bg-color)', padding: '16px', borderRadius: '8px', borderLeft: '4px solid var(--success-color)' }}>
-              <strong>Tip for Applicant:</strong> Print and attach this page to your proof of employment or Letter of Explanation (LOE). It provides the IRCC officer with a clear, verified mapping of your duties against the official NOC 2021 database for <strong>{data.noc_analysis.detected_code} - {data.noc_analysis.detected_title}</strong>. This directly reduces ambiguity and expedites your application review process.
-            </div>
             
             {/* Lead Statement Table */}
             <h3 style={{ fontSize: '1.2rem', marginTop: '20px', marginBottom: '12px', color: 'var(--primary-dark)' }}>1. Lead Statement Alignment</h3>
@@ -254,6 +355,74 @@ export const Dashboard: FC<DashboardProps> = ({ data, onReset }) => {
          </>
       )}
       </div>
+
+      {/* Contextual CTA (Option 2) */}
+      <div data-html2canvas-ignore="true" style={{ marginTop: '40px', background: 'var(--surface-color)', padding: '40px 30px', borderRadius: '12px', border: '1px solid var(--border-color)', textAlign: 'center', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.1)' }}>
+        <h3 style={{ fontSize: '1.75rem', marginBottom: '12px', color: 'var(--primary-dark)', fontWeight: 'bold' }}>Ready to submit?</h3>
+        
+        <div style={{ background: '#EFF6FF', border: '1px solid #BFDBFE', padding: '16px', borderRadius: '8px', maxWidth: '700px', margin: '0 auto 24px auto', textAlign: 'left' }}>
+          <p style={{ color: '#1E3A8A', margin: 0, fontSize: '0.95rem', lineHeight: '1.5' }}>
+            💡 <strong>Pro Tip for Application:</strong> We strongly recommend submitting the <strong>"NOC Sheet Only"</strong> completely separately as the very first page of your employment records. IRCC officers process hundreds of records a week and they absolutely love seeing clear, structured alignment sheets. It drastically reduces processing time and ambiguity!
+          </p>
+        </div>
+        <div style={{ display: 'flex', gap: '16px', justifyContent: 'center', flexWrap: 'wrap' }}>
+           {isSignedIn ? (
+              <>
+                <button onClick={() => toNocPDF()} className="btn btn-lg" style={{ background: 'var(--primary-color)', borderColor: 'var(--primary-color)', color: 'white', padding: '12px 32px' }}>
+                  📄 Download NOC Sheet
+                </button>
+                <button onClick={() => handleDownloadFull()} className="btn btn-lg btn-outline" style={{ padding: '12px 32px' }}>
+                  📥 Download Full Audit
+                </button>
+              </>
+           ) : (
+              <>
+                <div onClickCapture={() => sessionStorage.setItem('pendingPdfDownload', 'noc')}>
+                  <SignInButton mode="modal" forceRedirectUrl={window.location.href}>
+                    <button className="btn btn-lg" style={{ background: 'var(--primary-color)', borderColor: 'var(--primary-color)', color: 'white', padding: '12px 32px' }}>
+                      📄 Sign In & Download NOC Sheet
+                    </button>
+                  </SignInButton>
+                </div>
+                <div onClickCapture={() => sessionStorage.setItem('pendingPdfDownload', 'full')}>
+                  <SignInButton mode="modal" forceRedirectUrl={window.location.href}>
+                    <button className="btn btn-lg btn-outline" style={{ padding: '12px 32px' }}>
+                      📥 Sign In for Full Audit
+                    </button>
+                  </SignInButton>
+                </div>
+              </>
+           )}
+        </div>
+      </div>
+
+      {/* Sticky Toast (Option 1) */}
+      {!isSignedIn && showToast && !toastDismissed && (
+        <div className="sticky-toast" style={{ 
+          position: 'fixed', bottom: '24px', left: '50%', transform: 'translateX(-50%)', 
+          background: 'white', padding: '16px 24px', borderRadius: '12px', 
+          boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.2), 0 10px 10px -5px rgba(0, 0, 0, 0.14)', 
+          border: '1px solid rgba(0,0,0,0.05)', zIndex: 50, display: 'flex', 
+          alignItems: 'center', gap: '20px', maxWidth: '90vw', width: 'max-content', 
+          animation: 'slideUp 0.4s cubic-bezier(0.16, 1, 0.3, 1)' 
+        }}>
+          <div>
+            <div style={{ fontWeight: 600, color: '#1f2937', marginBottom: '4px', fontSize: '1rem' }}>Don't lose this report!</div>
+            <div style={{ fontSize: '0.9rem', color: '#6b7280' }}>Sign in to safely download your PDF.</div>
+          </div>
+          <div onClickCapture={() => sessionStorage.setItem('pendingPdfDownload', 'full')}>
+            <SignInButton mode="modal" forceRedirectUrl={window.location.href}>
+              <button className="btn" style={{ background: '#4285F4', borderColor: '#4285F4', color: 'white', padding: '8px 20px', fontSize: '0.95rem', fontWeight: 500 }}>
+                Sign in
+              </button>
+            </SignInButton>
+          </div>
+          <button onClick={() => setToastDismissed(true)} style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: '#9ca3af', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '4px', marginLeft: '-8px' }} aria-label="Dismiss">
+             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+          </button>
+        </div>
+      )}
+
     </div>
   );
 };

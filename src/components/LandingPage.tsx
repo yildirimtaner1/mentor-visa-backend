@@ -25,12 +25,11 @@ export const LandingPage: FC<LandingPageProps> = ({ onGetStarted }) => {
         <div className="hero-content">
           <div className="hero-badge">🤖 Powered by AI &amp; Official NOC 2021 Database</div>
           <h1 className="hero-title">
-            Get Your Employment Letter<br />
-            <span className="hero-highlight">Audited Before IRCC Does</span>
+            Don't Let a Small Mistake<br />
+            <span className="hero-highlight">Cost You Your PR</span>
           </h1>
           <p className="hero-subtitle">
-            Upload your employment reference letter and get an instant, AI-powered compliance check against 
-            official IRCC requirements and all 516 NOC 2021 codes — before you submit your Express Entry application.
+            Get your Express Entry employment letter instantly audited against official IRCC requirements and all 516 NOC 2021 codes — before the officer reviews it.
           </p>
           <div className="hero-actions" style={{ marginBottom: '24px' }}>
             <button className="btn btn-primary btn-lg" onClick={onGetStarted}>
@@ -172,7 +171,10 @@ export const LandingPage: FC<LandingPageProps> = ({ onGetStarted }) => {
 
       {/* CTA Section */}
       <section className="section cta-section">
-        <h2 className="cta-title">Don't Let a Small Mistake Cost You Your PR</h2>
+        <h2 className="cta-title">
+          Get Your Employment Letter<br />
+          Audited Before IRCC Does
+        </h2>
         <p className="cta-subtitle">
           A missing element or duty mismatch in your employment letter can delay or even derail your Express Entry application. 
           Catch issues before IRCC does.

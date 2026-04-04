@@ -41,6 +41,10 @@ export interface MandatoryRequirements {
 
 export interface AnalysisResponse {
   document_type: string;
+  role_name?: string;
+  company_name?: string;
+  stored_file_id?: string;
+  original_filename?: string;
   compliance_status: ComplianceStatus;
   summary: string;
   strengths: string[];
