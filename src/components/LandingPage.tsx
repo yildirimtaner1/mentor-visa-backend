@@ -1,10 +1,13 @@
 import type { FC } from 'react';
+import { SignInButton, SignUpButton, useAuth, UserButton } from '@clerk/clerk-react';
 
 interface LandingPageProps {
   onGetStarted: () => void;
 }
 
 export const LandingPage: FC<LandingPageProps> = ({ onGetStarted }) => {
+  const { isSignedIn } = useAuth();
+
   return (
     <div className="landing">
       {/* Navigation */}
@@ -14,9 +17,25 @@ export const LandingPage: FC<LandingPageProps> = ({ onGetStarted }) => {
             <span className="landing-logo-icon">🍁</span>
             <span className="landing-logo-text">Mentor Visa</span>
           </div>
-          <button className="btn btn-primary" onClick={onGetStarted}>
-            Audit My Document
-          </button>
+          <div style={{ display: 'flex', gap: '16px', alignItems: 'center' }}>
+            {!isSignedIn ? (
+              <>
+                <SignInButton mode="modal">
+                  <button className="btn btn-ghost" style={{ padding: '8px 16px', fontSize: '0.95rem' }}>Sign In</button>
+                </SignInButton>
+                <SignUpButton mode="modal">
+                  <button className="btn btn-primary" style={{ padding: '8px 16px', fontSize: '0.95rem' }}>Sign Up</button>
+                </SignUpButton>
+              </>
+            ) : (
+              <>
+                <button className="btn btn-primary" onClick={onGetStarted} style={{ padding: '8px 16px', fontSize: '0.95rem' }}>
+                  Audit My Document
+                </button>
+                <UserButton />
+              </>
+            )}
+          </div>
         </div>
       </nav>
 
