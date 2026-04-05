@@ -46,7 +46,7 @@ export const NOCFinderPage: FC<NOCFinderPageProps> = ({ onNavigate }) => {
         <div className="page-hero-content">
           <div className="page-hero-badge">🎯 AI-Powered NOC Detection</div>
           <h1>Find Your<br /><span className="hero-highlight">NOC Code</span></h1>
-          <p>Describe your job and duties — our AI will match you to the best NOC 2021 code from all 516 unit groups in seconds.</p>
+          <p>Copy and paste the exact information from your employment letter. Our AI will analyze your letter's contents to find your precise NOC 2021 code from all 516 unit groups.</p>
         </div>
       </section>
 
@@ -54,7 +54,8 @@ export const NOCFinderPage: FC<NOCFinderPageProps> = ({ onNavigate }) => {
         <section className="page-section">
           <div style={{ maxWidth: '720px', margin: '0 auto' }}>
             <div className="info-card" style={{ padding: '36px 32px' }}>
-              <h2 className="page-section-title" style={{ fontSize: '1.4rem', marginBottom: '24px' }}>Tell us about your job</h2>
+              <h2 className="page-section-title" style={{ fontSize: '1.4rem', marginBottom: '8px' }}>Employment Letter Details</h2>
+              <p style={{ fontSize: '0.95rem', color: '#64748B', marginBottom: '24px' }}>Please provide the information exactly as it appears on your official employment letter.</p>
               
               <div className="form-group">
                 <label className="form-label">Job Title</label>
@@ -70,11 +71,11 @@ export const NOCFinderPage: FC<NOCFinderPageProps> = ({ onNavigate }) => {
               <div className="form-group">
                 <label className="form-label">
                   Main Duties & Responsibilities
-                  <span className="form-label-hint"> — describe what you actually do at work</span>
+                  <span className="form-label-hint"> — paste the exact duties written on your letter</span>
                 </label>
                 <textarea 
                   className="form-textarea"
-                  placeholder={"For example:\n• Design and develop web applications using React and Node.js\n• Write unit tests and perform code reviews\n• Collaborate with product managers to define requirements\n• Deploy applications to cloud infrastructure (AWS)"}
+                  placeholder={"Paste the duties exactly as they appear on your employment letter here..."}
                   value={duties}
                   onChange={e => setDuties(e.target.value)}
                   rows={6}
