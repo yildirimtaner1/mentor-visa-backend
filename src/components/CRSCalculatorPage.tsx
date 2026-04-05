@@ -411,7 +411,7 @@ export const CRSCalculatorPage: FC<CRSCalculatorPageProps> = ({ onNavigate: _onN
             <div className="page-hero-badge">
               <span>📊</span> Accurate Engine
             </div>
-            <h1>Calculate Your <br /><span style={{ color: 'var(--primary-color)' }}>CRS Score</span></h1>
+            <h1>Canadian <br /><span style={{ color: 'var(--primary-color)' }}>CRS Calculator</span></h1>
             <p>Determine your Comprehensive Ranking System score instantly. Our smart wizard evaluates your profile against the latest IRCC criteria.</p>
           </div>
         </div>
