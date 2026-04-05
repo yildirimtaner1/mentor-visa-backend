@@ -18,7 +18,7 @@ export const LandingPage: FC<LandingPageProps> = ({ onGetStarted, onNavigate }) 
       <nav className={`landing-nav ${scrolled ? 'nav-scrolled' : ''} ${hidden ? 'nav-hidden' : ''}`}>
         <div className="landing-nav-inner">
           <div className="landing-logo">
-            <img src="/logo.png" alt="Mentor Visa" className="landing-logo-icon" style={{ height: '84px', width: '84px', objectFit: 'contain' }} />
+            <img src="/logo.png" alt="Mentor Visa" className="landing-logo-icon" style={{ height: '36px', width: '36px', objectFit: 'contain' }} />
             <span className="landing-logo-text">Mentor Visa</span>
           </div>
 
@@ -33,7 +33,7 @@ export const LandingPage: FC<LandingPageProps> = ({ onGetStarted, onNavigate }) 
               {!isSignedIn ? (
                 <>
                   <SignInButton mode="modal">
-                    <button className="btn btn-ghost" style={{ padding: '8px 16px', fontSize: '0.9rem' }}>Sign In</button>
+                    <button className="btn btn-ghost" style={{ padding: '8px 16px', fontSize: '0.9rem' }}>Login</button>
                   </SignInButton>
                   <SignUpButton mode="modal">
                     <button className="btn btn-primary" style={{ padding: '8px 16px', fontSize: '0.9rem' }}>Sign Up</button>
@@ -72,7 +72,7 @@ export const LandingPage: FC<LandingPageProps> = ({ onGetStarted, onNavigate }) 
               {!isSignedIn ? (
                 <>
                   <SignInButton mode="modal">
-                    <button className="btn btn-ghost" style={{ flex: 1, fontSize: '0.9rem' }}>Sign In</button>
+                    <button className="btn btn-ghost" style={{ flex: 1, fontSize: '0.9rem' }}>Login</button>
                   </SignInButton>
                   <SignUpButton mode="modal">
                     <button className="btn btn-primary" style={{ flex: 1, fontSize: '0.9rem' }}>Sign Up</button>

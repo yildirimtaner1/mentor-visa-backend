@@ -86,7 +86,7 @@ function App() {
         <nav className={`landing-nav ${scrolled ? 'nav-scrolled' : ''} ${hidden ? 'nav-hidden' : ''}`}>
           <div className="landing-nav-inner">
             <div className="landing-logo" style={{ cursor: 'pointer' }} onClick={handleBackToHome}>
-              <img src="/logo.png" alt="Mentor Visa" className="landing-logo-icon" style={{ height: '84px', width: '84px', objectFit: 'contain' }} />
+              <img src="/logo.png" alt="Mentor Visa" className="landing-logo-icon" style={{ height: '36px', width: '36px', objectFit: 'contain' }} />
               <span className="landing-logo-text">Mentor Visa</span>
             </div>
             <div className="nav-links-desktop">
