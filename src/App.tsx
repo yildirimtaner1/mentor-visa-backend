@@ -96,7 +96,18 @@ function App() {
               <button className={`nav-link ${page === 'crs-calculator' ? 'active' : ''}`} onClick={() => handleNavigate('crs-calculator')}>CRS Calculator</button>
               <button className={`nav-link ${page === 'checklist' ? 'active' : ''}`} onClick={() => handleNavigate('checklist')}>CEC Application Checklist</button>
               <div className="nav-auth">
-                {isSignedIn ? <UserButton /> : null}
+                {isSignedIn ? (
+                  <>
+                    <button 
+                      className="btn btn-outline" 
+                      onClick={() => handleNavigate('history')} 
+                      style={{ padding: '8px 16px', fontSize: '0.9rem' }}
+                    >
+                      My Evaluations
+                    </button>
+                    <UserButton />
+                  </>
+                ) : null}
               </div>
             </div>
           </div>

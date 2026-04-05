@@ -41,8 +41,12 @@ export const LandingPage: FC<LandingPageProps> = ({ onGetStarted, onNavigate }) 
                 </>
               ) : (
                 <>
-                  <button className="btn btn-primary" onClick={onGetStarted} style={{ padding: '8px 16px', fontSize: '0.9rem' }}>
-                    Audit Employment Letter
+                  <button 
+                    className="btn btn-outline" 
+                    onClick={() => onNavigate('history')} 
+                    style={{ padding: '8px 16px', fontSize: '0.9rem' }}
+                  >
+                    My Evaluations
                   </button>
                   <UserButton />
                 </>
@@ -79,9 +83,18 @@ export const LandingPage: FC<LandingPageProps> = ({ onGetStarted, onNavigate }) 
                   </SignUpButton>
                 </>
               ) : (
-                <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                  <UserButton />
-                  <span style={{ fontSize: '0.9rem', color: 'var(--text-muted)' }}>My Account</span>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', width: '100%' }}>
+                  <button 
+                    className="mobile-menu-link" 
+                    onClick={() => { onNavigate('history'); setMobileMenuOpen(false); }}
+                    style={{ fontWeight: 600 }}
+                  >
+                    📋 My Evaluations
+                  </button>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                    <UserButton />
+                    <span style={{ fontSize: '0.9rem', color: 'var(--text-muted)' }}>My Account</span>
+                  </div>
                 </div>
               )}
             </div>
