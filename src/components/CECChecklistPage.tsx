@@ -42,17 +42,31 @@ const CHECKLIST_DATA: ChecklistCategory[] = [
     ]
   },
   {
+    id: 'education',
+    icon: '🎓',
+    title: 'Education (Crucial for CRS Points)',
+    items: [
+      { id: 'edu-1', text: 'I have my official degree/diploma certificates for all post-secondary education' },
+      { id: 'edu-2', text: 'I have official transcripts for all my post-secondary education' },
+      { id: 'edu-3', text: 'For foreign degrees: I have a valid Educational Credential Assessment (ECA) report', hint: 'E.g., through WES. Must be less than 5 years old.' },
+      { id: 'edu-4', text: 'For Canadian degrees: I have proof of graduation from a Designated Learning Institution (DLI)', optional: true },
+    ]
+  },
+  {
     id: 'documents',
-    icon: '📄',
-    title: 'Employment Letters',
+    icon: '📂',
+    title: 'Employment Documents',
     items: [
       { id: 'doc-1', text: 'I have a reference letter from each employer (covering 1+ year total)' },
-      { id: 'doc-2', text: 'Each letter is on official company letterhead' },
-      { id: 'doc-3', text: 'Each letter includes: my name, job title, dates of employment' },
-      { id: 'doc-4', text: 'Each letter includes: hours per week and salary/compensation' },
-      { id: 'doc-5', text: 'Each letter includes: a detailed list of my main duties' },
-      { id: 'doc-6', text: 'Each letter is signed by my supervisor or an HR officer' },
-      { id: 'doc-7', text: 'I have audited my letter(s) using the Mentor Visa AI Auditor', hint: 'Catches NOC mismatches and missing IRCC requirements', optional: true },
+      { id: 'doc-2', text: 'Reference letter(s) include: my name, job title, and dates of employment' },
+      { id: 'doc-3', text: 'Reference letter(s) include: hours per week, salary, and a detailed list of main duties' },
+      { id: 'doc-4', text: 'I have audited my letter(s) using the Mentor Visa AI Auditor', hint: 'Catches NOC mismatches and missing IRCC requirements', optional: true },
+      { id: 'doc-5', text: 'I have my T4 tax information slips for the period of employment' },
+      { id: 'doc-6', text: 'I have Notices of Assessment (NOA) from the CRA', hint: 'Provides strong proof of Canadian earnings' },
+      { id: 'doc-7', text: 'I have payslips/pay stubs covering the period of my experience' },
+      { id: 'doc-8', text: 'I have bank statements showing payroll deposits', hint: 'Cross-reference with payslips for bulletproof evidence' },
+      { id: 'doc-9', text: 'I have verified my exact 5-digit NOC code matches my documents', hint: 'Crucial: IRCC officers scrutinize NOC code alignment' },
+      { id: 'doc-10', text: 'I have a Copy of my Employment Contract(s)', optional: true },
     ]
   },
   {

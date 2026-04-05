@@ -10,6 +10,7 @@ import { CECChecklistPage } from './components/CECChecklistPage';
 import { CRSCalculatorPage } from './components/CRSCalculatorPage';
 import { useAuth, UserButton } from '@clerk/clerk-react';
 import { saveEvaluation } from './services/api';
+import { useSmartNav } from './hooks/useSmartNav';
 import './components/LandingPage.css';
 import './components/Pages.css';
 import './App.css';
@@ -21,6 +22,8 @@ const FULL_PAGES = new Set<AppPage>(['cec-guide', 'noc-finder', 'checklist', 'cr
 
 function App() {
   const { isSignedIn, getToken } = useAuth();
+  const { scrolled, hidden } = useSmartNav();
+  
   const [page, setPage] = useState<AppPage>(() => {
     if (sessionStorage.getItem('mentorVisaAnalysisResult')) return 'results';
     return 'landing';
@@ -80,7 +83,7 @@ function App() {
     return (
       <div className="landing">
         {/* Shared Nav */}
-        <nav className="landing-nav">
+        <nav className={`landing-nav ${scrolled ? 'nav-scrolled' : ''} ${hidden ? 'nav-hidden' : ''}`}>
           <div className="landing-nav-inner">
             <div className="landing-logo" style={{ cursor: 'pointer' }} onClick={handleBackToHome}>
               <span className="landing-logo-icon">🍁</span>

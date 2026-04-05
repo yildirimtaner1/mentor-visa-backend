@@ -43,6 +43,17 @@ export const Dashboard: FC<DashboardProps> = ({ data, onReset }) => {
   };
 
   const handleDownloadFull = async () => {
+    const originalWidth = fullTargetRef.current?.style.width || '';
+    const originalMaxWidth = fullTargetRef.current?.style.maxWidth || '';
+
+    if (fullTargetRef.current) {
+       fullTargetRef.current.style.width = '1024px';
+       fullTargetRef.current.style.maxWidth = '1024px';
+    }
+
+    // Force layout recalculation before measurement
+    await new Promise(resolve => setTimeout(resolve, 50));
+
     if (fullTargetRef.current && breakSpacerRef.current) {
       const fullBounds = fullTargetRef.current.getBoundingClientRect();
       const spacerBounds = breakSpacerRef.current.getBoundingClientRect();
@@ -66,9 +77,31 @@ export const Dashboard: FC<DashboardProps> = ({ data, onReset }) => {
     // Clean up
     setTimeout(() => {
       if (breakSpacerRef.current) breakSpacerRef.current.style.height = '0px';
+      if (fullTargetRef.current) {
+        fullTargetRef.current.style.width = originalWidth;
+        fullTargetRef.current.style.maxWidth = originalMaxWidth;
+      }
     }, 500);
   };
 
+  const handleDownloadNoc = async () => {
+    if (!nocTargetRef.current) return;
+    const originalWidth = nocTargetRef.current.style.width;
+    const originalMaxWidth = nocTargetRef.current.style.maxWidth;
+    
+    nocTargetRef.current.style.width = '1024px';
+    nocTargetRef.current.style.maxWidth = '1024px';
+    
+    await new Promise(resolve => setTimeout(resolve, 100));
+    toNocPDF();
+    
+    setTimeout(() => {
+      if (nocTargetRef.current) {
+        nocTargetRef.current.style.width = originalWidth;
+        nocTargetRef.current.style.maxWidth = originalMaxWidth;
+      }
+    }, 500);
+  };
 
   useEffect(() => {
     if (isSignedIn) {
@@ -86,7 +119,7 @@ export const Dashboard: FC<DashboardProps> = ({ data, onReset }) => {
         });
 
         if (pending === 'noc') {
-          setTimeout(() => toNocPDF(), 1000);
+          setTimeout(() => handleDownloadNoc(), 1000);
         } else {
           setTimeout(() => handleDownloadFull(), 1000);
         }
@@ -137,7 +170,7 @@ export const Dashboard: FC<DashboardProps> = ({ data, onReset }) => {
         <div style={{ display: 'flex', gap: '10px' }}>
           {isSignedIn ? (
             <>
-              <button onClick={() => toNocPDF()} className="btn" style={{ background: 'var(--primary-color)', borderColor: 'var(--primary-color)', color: 'white' }}>
+              <button onClick={() => handleDownloadNoc()} className="btn" style={{ background: 'var(--primary-color)', borderColor: 'var(--primary-color)', color: 'white' }}>
                 📄 Download NOC Sheet
               </button>
               <button onClick={() => handleDownloadFull()} className="btn btn-outline" style={{ borderColor: 'var(--text-muted)' }}>

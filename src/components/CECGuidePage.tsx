@@ -62,7 +62,7 @@ export const CECGuidePage: FC<CECGuidePageProps> = ({ onNavigate }) => {
             <div className="info-card">
               <div className="info-card-icon">📄</div>
               <h3>Valid Work Authorization</h3>
-              <p>Your Canadian work experience must have been gained while you held valid work authorization (work permit, co-op permit, or as a permanent resident).</p>
+              <p>Your Canadian work experience must have been gained while you held valid temporary resident status with authorization to work (e.g., Post-Graduation Work Permit (PGWP), Employer-specific work permit, or Open Work Permit). <br/><br/><strong>Important:</strong> Work experience gained while you were a full-time student (such as on a co-op work permit) does <strong>not</strong> count towards CEC eligibility.</p>
             </div>
             <div className="info-card">
               <div className="info-card-icon">⚕️</div>

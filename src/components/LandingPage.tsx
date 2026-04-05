@@ -1,5 +1,6 @@
 import { type FC, useState } from 'react';
 import { SignInButton, SignUpButton, useAuth, UserButton } from '@clerk/clerk-react';
+import { useSmartNav } from '../hooks/useSmartNav';
 
 interface LandingPageProps {
   onGetStarted: () => void;
@@ -9,11 +10,12 @@ interface LandingPageProps {
 export const LandingPage: FC<LandingPageProps> = ({ onGetStarted, onNavigate }) => {
   const { isSignedIn } = useAuth();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const { scrolled, hidden } = useSmartNav();
 
   return (
     <div className="landing">
       {/* Navigation */}
-      <nav className="landing-nav">
+      <nav className={`landing-nav ${scrolled ? 'nav-scrolled' : ''} ${hidden ? 'nav-hidden' : ''}`}>
         <div className="landing-nav-inner">
           <div className="landing-logo">
             <span className="landing-logo-icon">🍁</span>
