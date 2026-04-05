@@ -455,10 +455,10 @@ export const CRSCalculatorPage: FC<CRSCalculatorPageProps> = ({ onNavigate: _onN
       )}
 
       <div className="page-container" style={{ paddingTop: '40px' }}>
-        <div style={{ display: 'flex', gap: '32px', alignItems: 'flex-start' }}>
+        <div className="crs-main-layout">
           
           {/* Sidebar */}
-          <div style={{ 
+          <div className="crs-sidebar" style={{ 
             flex: isFinalStep ? '0 0 0px' : '0 0 280px',
             opacity: isFinalStep ? 0 : 1,
             overflow: 'hidden',
@@ -526,14 +526,23 @@ export const CRSCalculatorPage: FC<CRSCalculatorPageProps> = ({ onNavigate: _onN
             <div style={{ 
               padding: '28px 32px', 
               borderBottom: '1px solid var(--border-color, #E2E8F0)', 
-              display: 'flex', 
-              alignItems: 'center', 
-              gap: '14px'
+              display: 'flex',
+              flexDirection: 'column',
+              justifyContent: 'center',
+              alignItems: 'flex-start',
+              gap: '8px'
             }}>
+              {currentStep.id !== 'results' && (
+                <div className="crs-mobile-step">
+                  Step {currentStepIndex + 1} of {steps.length - 1}
+                </div>
+              )}
+              <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
               <span style={{ fontSize: '1.5rem' }}>{currentStep.icon}</span>
               <h2 style={{ fontSize: '1.4rem', fontWeight: 700, color: '#0F172A', margin: 0 }}>
                 {currentStep.title}
               </h2>
+              </div>
             </div>
 
             <div style={{ padding: '32px' }}>
@@ -1215,9 +1224,34 @@ export const CRSCalculatorPage: FC<CRSCalculatorPageProps> = ({ onNavigate: _onN
           grid-template-columns: 1fr 1fr;
           gap: 16px;
         }
+        .crs-main-layout {
+          display: flex;
+          gap: 32px;
+          align-items: flex-start;
+        }
+        .crs-mobile-step {
+          display: none;
+          font-size: 0.85rem;
+          text-transform: uppercase;
+          letter-spacing: 0.5px;
+          color: var(--primary-color);
+          font-weight: 700;
+        }
         @media (max-width: 640px) {
           .crs-grid {
             grid-template-columns: 1fr;
+          }
+          .crs-main-layout {
+            flex-direction: column;
+          }
+          .crs-sidebar {
+            display: none !important;
+          }
+          .crs-mobile-step {
+            display: block;
+          }
+          .info-card {
+            padding: 16px !important;
           }
         }
       `}</style>
