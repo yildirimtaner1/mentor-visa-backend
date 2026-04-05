@@ -24,7 +24,6 @@ interface NOCFinderPageProps {
 }
 
 export const NOCFinderPage: FC<NOCFinderPageProps> = ({ onNavigate }) => {
-  const [activeTab, setActiveTab] = useState<'upload' | 'manual'>('upload');
   const [jobTitle, setJobTitle] = useState('');
   const [duties, setDuties] = useState('');
   const [file, setFile] = useState<File | null>(null);
@@ -32,23 +31,46 @@ export const NOCFinderPage: FC<NOCFinderPageProps> = ({ onNavigate }) => {
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<NOCResult | null>(null);
   const [error, setError] = useState('');
+  const [isDragActive, setIsDragActive] = useState(false);
   
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
       setFile(e.target.files[0]);
+      setJobTitle('');
+      setDuties('');
+      setError('');
+    }
+  };
+
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragActive(true);
+  };
+
+  const handleDragLeave = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragActive(false);
+  };
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragActive(false);
+    if (e.dataTransfer.files && e.dataTransfer.files[0]) {
+      setFile(e.dataTransfer.files[0]);
+      setJobTitle('');
+      setDuties('');
       setError('');
     }
   };
 
   const handleSubmit = async () => {
-    if (activeTab === 'manual' && (!jobTitle.trim() || !duties.trim())) {
-      setError('Please fill in both your job title and duties.');
-      return;
-    }
-    if (activeTab === 'upload' && !file) {
-      setError('Please upload your employment letter document.');
+    if (!file && (!jobTitle.trim() || !duties.trim())) {
+      setError('Please either upload a document OR fill in your job title and duties.');
       return;
     }
     
@@ -57,8 +79,8 @@ export const NOCFinderPage: FC<NOCFinderPageProps> = ({ onNavigate }) => {
     setResult(null);
     try {
       let data;
-      if (activeTab === 'upload') {
-        data = await findNOCCode(undefined, undefined, file!);
+      if (file) {
+        data = await findNOCCode(undefined, undefined, file);
       } else {
         data = await findNOCCode(jobTitle.trim(), duties.trim());
       }
@@ -91,91 +113,81 @@ export const NOCFinderPage: FC<NOCFinderPageProps> = ({ onNavigate }) => {
           <div style={{ maxWidth: '720px', margin: '0 auto' }}>
             <div className="info-card" style={{ padding: '36px 32px' }}>
               
-              <div style={{ display: 'flex', gap: '16px', marginBottom: '24px', borderBottom: '1px solid var(--border-color)', paddingBottom: '16px' }}>
-                <button 
-                  onClick={() => { setActiveTab('upload'); setError(''); setResult(null); }}
+              <div style={{ marginBottom: '32px' }}>
+                <h3 style={{ fontSize: '1.2rem', fontWeight: 700, marginBottom: '8px' }}>Option 1: Upload Document</h3>
+                <p style={{ fontSize: '0.95rem', color: '#64748B', marginBottom: '16px' }}>
+                  Upload your official employment letter (PDF, Word, or Image). We'll extract the duties automatically.
+                </p>
+                <div 
+                  onClick={() => fileInputRef.current?.click()}
+                  onDragOver={handleDragOver}
+                  onDragLeave={handleDragLeave}
+                  onDrop={handleDrop}
                   style={{
-                    background: activeTab === 'upload' ? 'var(--primary-color)' : 'transparent',
-                    color: activeTab === 'upload' ? 'white' : 'var(--text-color)',
-                    border: 'none', padding: '10px 20px', borderRadius: '8px', cursor: 'pointer', fontWeight: 600
+                    border: isDragActive ? '2px dashed var(--primary-color)' : '2px dashed var(--border-color)',
+                    borderRadius: '12px',
+                    padding: '40px 20px',
+                    textAlign: 'center',
+                    cursor: 'pointer',
+                    background: isDragActive ? 'var(--primary-light)' : (file ? '#F8FAFC' : 'white'),
+                    transition: 'all 0.2s ease',
+                    boxShadow: isDragActive ? '0 0 10px rgba(0,0,0,0.05) inset' : 'none'
                   }}
                 >
-                  Upload Document
-                </button>
-                <button 
-                  onClick={() => { setActiveTab('manual'); setError(''); setResult(null); }}
-                  style={{
-                    background: activeTab === 'manual' ? 'var(--primary-color)' : 'transparent',
-                    color: activeTab === 'manual' ? 'white' : 'var(--text-color)',
-                    border: 'none', padding: '10px 20px', borderRadius: '8px', cursor: 'pointer', fontWeight: 600
-                  }}
-                >
-                  Type Manually
-                </button>
+                  <input type="file" ref={fileInputRef} onChange={handleFileChange} style={{ display: 'none' }} accept=".pdf,.doc,.docx,.png,.jpg,.jpeg" />
+                  <div style={{ fontSize: '2rem', marginBottom: '12px' }}>📄</div>
+                  {file ? (
+                    <div>
+                      <div style={{ fontWeight: 600, color: 'var(--text-color)' }}>{file.name}</div>
+                      <div style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>{(file.size / 1024 / 1024).toFixed(2)} MB</div>
+                      <button style={{ marginTop: '12px', fontSize: '0.9rem', color: 'var(--primary-color)', background: 'none', border: 'none', cursor: 'pointer', textDecoration: 'underline' }}>Change File</button>
+                    </div>
+                  ) : (
+                    <>
+                      <div style={{ fontWeight: 600, color: 'var(--text-color)', marginBottom: '8px' }}>Click to browse or drag and drop</div>
+                      <div style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>PDF, Word, JPG, PNG</div>
+                    </>
+                  )}
+                </div>
               </div>
 
-              {activeTab === 'upload' ? (
-                <div style={{ marginBottom: '24px' }}>
-                  <p style={{ fontSize: '0.95rem', color: '#64748B', marginBottom: '16px' }}>
-                    Upload your official employment letter (PDF, Word, or Image). We'll extract the duties automatically.
-                  </p>
-                  <div 
-                    onClick={() => fileInputRef.current?.click()}
-                    style={{
-                      border: '2px dashed var(--border-color)',
-                      borderRadius: '12px',
-                      padding: '40px 20px',
-                      textAlign: 'center',
-                      cursor: 'pointer',
-                      background: file ? '#F8FAFC' : 'white',
-                      transition: 'all 0.2s ease'
-                    }}
-                  >
-                    <input type="file" ref={fileInputRef} onChange={handleFileChange} style={{ display: 'none' }} accept=".pdf,.doc,.docx,.png,.jpg,.jpeg" />
-                    <div style={{ fontSize: '2rem', marginBottom: '12px' }}>📄</div>
-                    {file ? (
-                      <div>
-                        <div style={{ fontWeight: 600, color: 'var(--text-color)' }}>{file.name}</div>
-                        <div style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>{(file.size / 1024 / 1024).toFixed(2)} MB</div>
-                        <button style={{ marginTop: '12px', fontSize: '0.9rem', color: 'var(--primary-color)', background: 'none', border: 'none', cursor: 'pointer', textDecoration: 'underline' }}>Change File</button>
-                      </div>
-                    ) : (
-                      <>
-                        <div style={{ fontWeight: 600, color: 'var(--text-color)', marginBottom: '8px' }}>Click to browse or drag and drop</div>
-                        <div style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>PDF, Word, JPG, PNG</div>
-                      </>
-                    )}
-                  </div>
-                </div>
-              ) : (
-                <>
-                  <p style={{ fontSize: '0.95rem', color: '#64748B', marginBottom: '24px' }}>Please provide the information exactly as it appears on your official employment letter.</p>
-                  <div className="form-group">
-                    <label className="form-label">Job Title</label>
-                    <input 
-                      type="text"
-                      className="form-input"
-                      placeholder="e.g., Software Developer, Marketing Manager, Electrician"
-                      value={jobTitle}
-                      onChange={e => setJobTitle(e.target.value)}
-                    />
-                  </div>
+              <div style={{ display: 'flex', alignItems: 'center', margin: '32px 0' }}>
+                <div style={{ flex: 1, backgroundColor: 'var(--border-color)', height: '1px' }}></div>
+                <div style={{ padding: '0 16px', color: 'var(--text-muted)', fontWeight: 600, fontSize: '0.9rem', letterSpacing: '1px' }}>OR</div>
+                <div style={{ flex: 1, backgroundColor: 'var(--border-color)', height: '1px' }}></div>
+              </div>
 
-                  <div className="form-group">
-                    <label className="form-label">
-                      Main Duties & Responsibilities
-                      <span className="form-label-hint"> — paste the exact duties written on your letter</span>
-                    </label>
-                    <textarea 
-                      className="form-textarea"
-                      placeholder="Paste the duties exactly as they appear on your employment letter here..."
-                      value={duties}
-                      onChange={e => setDuties(e.target.value)}
-                      rows={6}
-                    />
-                  </div>
-                </>
-              )}
+              <div style={{ marginBottom: '24px' }}>
+                <h3 style={{ fontSize: '1.2rem', fontWeight: 700, marginBottom: '8px' }}>Option 2: Type Manually</h3>
+                <p style={{ fontSize: '0.95rem', color: '#64748B', marginBottom: '20px' }}>
+                  If you don't have a document handy, you can paste the information manually. 
+                  {file && <span style={{ color: 'var(--primary-color)', fontWeight: 600 }}> (Uploading a file will override manual entry)</span>}
+                </p>
+                <div className="form-group">
+                  <label className="form-label">Job Title</label>
+                  <input 
+                    type="text"
+                    className="form-input"
+                    placeholder="e.g., Software Developer, Marketing Manager, Electrician"
+                    value={jobTitle}
+                    onChange={e => { setJobTitle(e.target.value); setFile(null); }}
+                  />
+                </div>
+
+                <div className="form-group">
+                  <label className="form-label">
+                    Main Duties & Responsibilities
+                    <span className="form-label-hint"> — paste the exact duties written on your letter</span>
+                  </label>
+                  <textarea 
+                    className="form-textarea"
+                    placeholder="Paste the duties exactly as they appear on your employment letter here..."
+                    value={duties}
+                    onChange={e => { setDuties(e.target.value); setFile(null); }}
+                    rows={6}
+                  />
+                </div>
+              </div>
 
               {error && (
                 <div style={{ color: '#DC2626', fontSize: '0.9rem', marginBottom: '16px', padding: '10px 16px', background: '#FEF2F2', borderRadius: '8px' }}>

@@ -733,7 +733,7 @@ export const CRSCalculatorPage: FC<CRSCalculatorPageProps> = ({ onNavigate: _onN
                     {lang1Test && (
                       <div style={{ animation: 'fadeInUp 0.3s ease-out' }}>
                         <h5 style={{ fontSize: '0.95rem', color: '#1E3A8A', fontWeight: 700, marginBottom: '12px' }}>Language Scores</h5>
-                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+                        <div className="crs-grid">
                           <div className="form-group" style={{ marginBottom: 0 }}>
                             <label className="form-label" style={{fontSize: '0.85rem'}}>Listening *</label>
                             <select className="form-select" value={lang1L} onChange={e => setLang1L(e.target.value)} style={{padding: '10px'}}>
@@ -804,7 +804,7 @@ export const CRSCalculatorPage: FC<CRSCalculatorPageProps> = ({ onNavigate: _onN
                     {lang2Test !== 'None / Not Applicable' && (
                       <div style={{ marginTop: '24px', animation: 'fadeInUp 0.3s ease-out' }}>
                         <h5 style={{ fontSize: '0.95rem', color: '#065F46', fontWeight: 700, marginBottom: '12px' }}>Language Scores</h5>
-                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+                        <div className="crs-grid">
                           <div className="form-group" style={{ marginBottom: 0 }}>
                             <label className="form-label" style={{fontSize: '0.85rem', color: '#064E3B'}}>Listening *</label>
                             <select className="form-select" value={lang2L} onChange={e => setLang2L(e.target.value)} style={{padding: '10px'}}>
@@ -1032,7 +1032,7 @@ export const CRSCalculatorPage: FC<CRSCalculatorPageProps> = ({ onNavigate: _onN
                   {spLangTest !== 'None / Not Applicable' && (
                     <div style={{ animation: 'fadeInUp 0.3s ease-out' }}>
                       <h5 style={{ fontSize: '0.95rem', color: '#166534', fontWeight: 700, marginBottom: '12px' }}>Language Scores</h5>
-                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+                      <div className="crs-grid">
                         <div className="form-group" style={{ marginBottom: 0 }}><label className="form-label" style={{fontSize: '0.85rem', color: '#14532D'}}>Listening *</label><select className="form-select" value={spL} onChange={e => setSpL(e.target.value)} style={{padding: '10px', borderColor: '#86EFAC'}}>{['10-12','9','8','7','6','5','4','< 4'].map(n => <option key={n} value={n}>{n}</option>)}</select></div>
                         <div className="form-group" style={{ marginBottom: 0 }}><label className="form-label" style={{fontSize: '0.85rem', color: '#14532D'}}>Speaking *</label><select className="form-select" value={spS} onChange={e => setSpS(e.target.value)} style={{padding: '10px', borderColor: '#86EFAC'}}>{['10-12','9','8','7','6','5','4','< 4'].map(n => <option key={n} value={n}>{n}</option>)}</select></div>
                         <div className="form-group" style={{ marginBottom: 0 }}><label className="form-label" style={{fontSize: '0.85rem', color: '#14532D'}}>Reading *</label><select className="form-select" value={spR} onChange={e => setSpR(e.target.value)} style={{padding: '10px', borderColor: '#86EFAC'}}>{['10-12','9','8','7','6','5','4','< 4'].map(n => <option key={n} value={n}>{n}</option>)}</select></div>
@@ -1078,7 +1078,7 @@ export const CRSCalculatorPage: FC<CRSCalculatorPageProps> = ({ onNavigate: _onN
                   <div style={{ padding: '40px 32px' }}>
                     <h3 style={{ fontSize: '1.3rem', fontWeight: 700, color: '#0F172A', marginBottom: '20px' }}>Score Breakdown</h3>
                     
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+                    <div className="crs-grid">
                       
                       {/* Core */}
                       <div className="info-card" style={{ padding: '20px' }}>
@@ -1209,6 +1209,18 @@ export const CRSCalculatorPage: FC<CRSCalculatorPageProps> = ({ onNavigate: _onN
         </div>
 
       </div>
+      <style>{`
+        .crs-grid {
+          display: grid;
+          grid-template-columns: 1fr 1fr;
+          gap: 16px;
+        }
+        @media (max-width: 640px) {
+          .crs-grid {
+            grid-template-columns: 1fr;
+          }
+        }
+      `}</style>
     </div>
   );
 };
