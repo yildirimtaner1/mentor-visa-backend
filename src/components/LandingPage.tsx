@@ -1,12 +1,14 @@
-import type { FC } from 'react';
+import { type FC, useState } from 'react';
 import { SignInButton, SignUpButton, useAuth, UserButton } from '@clerk/clerk-react';
 
 interface LandingPageProps {
   onGetStarted: () => void;
+  onNavigate: (page: string) => void;
 }
 
-export const LandingPage: FC<LandingPageProps> = ({ onGetStarted }) => {
+export const LandingPage: FC<LandingPageProps> = ({ onGetStarted, onNavigate }) => {
   const { isSignedIn } = useAuth();
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   return (
     <div className="landing">
@@ -17,26 +19,72 @@ export const LandingPage: FC<LandingPageProps> = ({ onGetStarted }) => {
             <span className="landing-logo-icon">🍁</span>
             <span className="landing-logo-text">Mentor Visa</span>
           </div>
-          <div style={{ display: 'flex', gap: '16px', alignItems: 'center' }}>
-            {!isSignedIn ? (
-              <>
-                <SignInButton mode="modal">
-                  <button className="btn btn-ghost" style={{ padding: '8px 16px', fontSize: '0.95rem' }}>Sign In</button>
-                </SignInButton>
-                <SignUpButton mode="modal">
-                  <button className="btn btn-primary" style={{ padding: '8px 16px', fontSize: '0.95rem' }}>Sign Up</button>
-                </SignUpButton>
-              </>
-            ) : (
-              <>
-                <button className="btn btn-primary" onClick={onGetStarted} style={{ padding: '8px 16px', fontSize: '0.95rem' }}>
-                  Audit My Document
-                </button>
-                <UserButton />
-              </>
-            )}
+
+          {/* Desktop Nav Links */}
+          <div className="nav-links-desktop">
+            <button className="nav-link" onClick={onGetStarted}>Audit Employment Letter</button>
+            <button className="nav-link" onClick={() => onNavigate('noc-finder')}>Find My NOC</button>
+            <button className="nav-link" onClick={() => onNavigate('cec-guide')}>Express Entry CEC Guide</button>
+            <button className="nav-link" onClick={() => onNavigate('crs-calculator')}>CRS Calculator</button>
+            <button className="nav-link" onClick={() => onNavigate('checklist')}>CEC Application Checklist</button>
+            <div className="nav-auth">
+              {!isSignedIn ? (
+                <>
+                  <SignInButton mode="modal">
+                    <button className="btn btn-ghost" style={{ padding: '8px 16px', fontSize: '0.9rem' }}>Sign In</button>
+                  </SignInButton>
+                  <SignUpButton mode="modal">
+                    <button className="btn btn-primary" style={{ padding: '8px 16px', fontSize: '0.9rem' }}>Sign Up</button>
+                  </SignUpButton>
+                </>
+              ) : (
+                <>
+                  <button className="btn btn-primary" onClick={onGetStarted} style={{ padding: '8px 16px', fontSize: '0.9rem' }}>
+                    Audit Employment Letter
+                  </button>
+                  <UserButton />
+                </>
+              )}
+            </div>
           </div>
+
+          {/* Mobile Hamburger */}
+          <button
+            className={`hamburger ${mobileMenuOpen ? 'open' : ''}`}
+            onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+            aria-label="Toggle menu"
+          >
+            <span /><span /><span />
+          </button>
         </div>
+
+        {/* Mobile Menu */}
+        {mobileMenuOpen && (
+          <div className="mobile-menu">
+            <button className="mobile-menu-link" onClick={() => { onGetStarted(); setMobileMenuOpen(false); }}>📄 Audit Employment Letter</button>
+            <button className="mobile-menu-link" onClick={() => { onNavigate('noc-finder'); setMobileMenuOpen(false); }}>🎯 Find My NOC</button>
+            <button className="mobile-menu-link" onClick={() => { onNavigate('cec-guide'); setMobileMenuOpen(false); }}>📘 Express Entry CEC Guide</button>
+            <button className="mobile-menu-link" onClick={() => { onNavigate('crs-calculator'); setMobileMenuOpen(false); }}>📊 CRS Calculator</button>
+            <button className="mobile-menu-link" onClick={() => { onNavigate('checklist'); setMobileMenuOpen(false); }}>✅ CEC Application Checklist</button>
+            <div style={{ borderTop: '1px solid var(--border-color)', paddingTop: '12px', marginTop: '4px', display: 'flex', gap: '12px' }}>
+              {!isSignedIn ? (
+                <>
+                  <SignInButton mode="modal">
+                    <button className="btn btn-ghost" style={{ flex: 1, fontSize: '0.9rem' }}>Sign In</button>
+                  </SignInButton>
+                  <SignUpButton mode="modal">
+                    <button className="btn btn-primary" style={{ flex: 1, fontSize: '0.9rem' }}>Sign Up</button>
+                  </SignUpButton>
+                </>
+              ) : (
+                <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                  <UserButton />
+                  <span style={{ fontSize: '0.9rem', color: 'var(--text-muted)' }}>My Account</span>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
       </nav>
 
       {/* Hero Section */}
@@ -52,10 +100,10 @@ export const LandingPage: FC<LandingPageProps> = ({ onGetStarted }) => {
           </p>
           <div className="hero-actions" style={{ marginBottom: '24px' }}>
             <button className="btn btn-primary btn-lg" onClick={onGetStarted}>
-              Audit My Document — Free
+              Audit Employment Letter — Free
             </button>
-            <a href="#how-it-works" className="btn btn-ghost btn-lg">
-              See How It Works ↓
+            <a href="#tools" className="btn btn-ghost btn-lg">
+              Explore Our Tools ↓
             </a>
           </div>
 
@@ -97,9 +145,41 @@ export const LandingPage: FC<LandingPageProps> = ({ onGetStarted }) => {
         </div>
       </section>
 
+      {/* Tools Section */}
+      <section id="tools" className="section">
+        <h2 className="section-title">Your AI-Powered CEC Toolkit</h2>
+        <p className="section-subtitle">Everything you need to build a bulletproof Canadian Experience Class application — completely free.</p>
+        <div className="tools-grid">
+          <div className="tool-card" onClick={onGetStarted}>
+            <div className="tool-card-icon">📄</div>
+            <h3>AI Employment Letter Auditor</h3>
+            <p>Upload your employment letter and get an instant AI audit against all 9 IRCC requirements and 516 NOC codes.</p>
+            <span className="tool-card-tag">Most Popular</span>
+          </div>
+          <div className="tool-card" onClick={() => onNavigate('noc-finder')}>
+            <div className="tool-card-icon">🎯</div>
+            <h3>AI NOC Code Matcher</h3>
+            <p>Describe your job duties and our AI will match you to the best NOC 2021 code from all 516 unit groups.</p>
+            <span className="tool-card-tag">AI-Powered</span>
+          </div>
+          <div className="tool-card" onClick={() => onNavigate('crs-calculator')}>
+            <div className="tool-card-icon">📊</div>
+            <h3>CRS Score Estimator</h3>
+            <p>Calculate your Comprehensive Ranking System score and compare it against recent Express Entry draw cutoffs.</p>
+            <span className="tool-card-tag">Real-Time</span>
+          </div>
+          <div className="tool-card" onClick={() => onNavigate('checklist')}>
+            <div className="tool-card-icon">✅</div>
+            <h3>Interactive CEC Checklist</h3>
+            <p>Track every document and requirement for your application with our interactive, auto-saving checklist.</p>
+            <span className="tool-card-tag">Interactive</span>
+          </div>
+        </div>
+      </section>
+
       {/* How It Works */}
-      <section id="how-it-works" className="section">
-        <h2 className="section-title">How It Works</h2>
+      <section id="how-it-works" className="section section-dark">
+        <h2 className="section-title">How the Letter Auditor Works</h2>
         <p className="section-subtitle">Three simple steps to a bulletproof employment letter</p>
         <div className="steps-grid">
           <div className="step-card">
@@ -124,7 +204,7 @@ export const LandingPage: FC<LandingPageProps> = ({ onGetStarted }) => {
       </section>
 
       {/* Features */}
-      <section className="section section-dark">
+      <section className="section">
         <h2 className="section-title">What Makes Us Different</h2>
         <p className="section-subtitle">Built specifically for Canadian Experience Class applicants</p>
         <div className="features-grid">
@@ -156,13 +236,13 @@ export const LandingPage: FC<LandingPageProps> = ({ onGetStarted }) => {
           <div className="feature-card">
             <div className="feature-icon">🔒</div>
             <h3>Private & Secure</h3>
-            <p>Your documents are processed in real-time and never stored on our servers. Your personal information stays private.</p>
+            <p>Your documents are processed securely and protected with enterprise-grade encryption. Your personal information stays private.</p>
           </div>
         </div>
       </section>
 
       {/* FAQ */}
-      <section className="section">
+      <section className="section section-dark">
         <h2 className="section-title">Frequently Asked Questions</h2>
         <div className="faq-list">
           <details className="faq-item">
@@ -171,7 +251,7 @@ export const LandingPage: FC<LandingPageProps> = ({ onGetStarted }) => {
           </details>
           <details className="faq-item">
             <summary>Do I need to know my NOC code before using this tool?</summary>
-            <p>No! Our AI automatically reads the duties in your employment letter and identifies the best-matching NOC 2021 code from all 516 unit groups. You don't need to look anything up.</p>
+            <p>No! Our AI automatically reads the duties in your employment letter and identifies the best-matching NOC 2021 code from all 516 unit groups. You can also use our dedicated "Find My NOC" tool to look up your code before auditing your letter.</p>
           </details>
           <details className="faq-item">
             <summary>What elements does IRCC require in an employment letter?</summary>
@@ -179,7 +259,7 @@ export const LandingPage: FC<LandingPageProps> = ({ onGetStarted }) => {
           </details>
           <details className="faq-item">
             <summary>Is my document stored on your servers?</summary>
-            <p>No. Your document is processed in real-time by our AI and is never saved or stored. Once you close the page, the data is gone.</p>
+            <p>Your document is securely processed by our AI. If you create an account, you can optionally save your evaluations for future reference. All data is encrypted and protected.</p>
           </details>
           <details className="faq-item">
             <summary>Does this replace an immigration consultant?</summary>
@@ -199,7 +279,7 @@ export const LandingPage: FC<LandingPageProps> = ({ onGetStarted }) => {
           Catch issues before IRCC does.
         </p>
         <button className="btn btn-primary btn-lg" onClick={onGetStarted}>
-          Audit My Document Now — Free
+          Audit Employment Letter Now — Free
         </button>
       </section>
 
@@ -209,6 +289,12 @@ export const LandingPage: FC<LandingPageProps> = ({ onGetStarted }) => {
           <div className="landing-footer-brand">
             <span className="landing-logo-icon">🍁</span>
             <span>Mentor Visa</span>
+          </div>
+          <div className="landing-footer-links">
+            <button onClick={() => onNavigate('cec-guide')}>Express Entry CEC Guide</button>
+            <button onClick={() => onNavigate('noc-finder')}>Find My NOC</button>
+            <button onClick={() => onNavigate('crs-calculator')}>CRS Calculator</button>
+            <button onClick={() => onNavigate('checklist')}>CEC Application Checklist</button>
           </div>
           <p className="landing-footer-disclaimer">
             © 2026 Mentor Visa Services. All rights reserved.<br />

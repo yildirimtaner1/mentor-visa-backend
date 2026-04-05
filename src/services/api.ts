@@ -50,3 +50,16 @@ export async function getEvaluations(token: string) {
   }
   return response.json();
 }
+
+export async function findNOCCode(jobTitle: string, dutiesDescription: string) {
+  const response = await fetch(`${API_BASE_URL}/api/v1/noc-finder`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ job_title: jobTitle, duties_description: dutiesDescription }),
+  });
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({}));
+    throw new Error(errorData.detail || 'Failed to find NOC code.');
+  }
+  return response.json();
+}

@@ -77,56 +77,72 @@ export const Uploader: FC<UploaderProps> = ({ onAnalysisResult }) => {
   };
 
   return (
-    <div className="uploader-card">
-      <div 
-        className={`drop-zone ${isDragging ? 'active' : ''}`}
-        onDragOver={handleDragOver}
-        onDragLeave={handleDragLeave}
-        onDrop={handleDrop}
-        onClick={() => !loading && fileInputRef.current?.click()}
-      >
-        <div className="drop-zone-icon">📄</div>
-        {loading ? (
-          <div>
-            <div className="loading-spinner"></div>
-            <p style={{ fontWeight: 500 }}>Detecting NOC code & auditing against IRCC standards...</p>
-            <p style={{ fontSize: '13px', color: 'var(--text-muted)' }}>The AI is reading your document and the NOC 2021 guide. This may take ~15 seconds.</p>
-          </div>
-        ) : (
-          <div>
-            <p style={{ fontWeight: 600, fontSize: '18px', color: 'var(--text-main)', marginBottom: '8px' }}>Drag & Drop Your Document</p>
-            <p style={{ color: 'var(--text-muted)' }}>or click to browse</p>
-            <p style={{ color: 'var(--text-muted)', fontSize: '13px', marginTop: '8px' }}>
-              Accepted formats: PDF, Word (.docx), and Images (JPG, PNG)
-            </p>
-            <p style={{ color: 'var(--primary-light)', fontSize: '13px', marginTop: '12px', fontWeight: 500 }}>
-              🤖 NOC code will be detected automatically
-            </p>
-          </div>
-        )}
-        <input 
-          type="file" 
-          accept={ACCEPTED_EXTENSIONS}
-          ref={fileInputRef} 
-          style={{ display: 'none' }} 
-          onChange={handleFileChange}
-          disabled={loading}
-        />
-      </div>
-      {error && (
-        <div style={{ 
-          marginTop: '16px', 
-          padding: '12px 16px', 
-          background: '#fef2f2', 
-          border: '1px solid #fecaca', 
-          borderRadius: '8px', 
-          color: '#991b1b', 
-          fontSize: '14px',
-          textAlign: 'left' 
-        }}>
-          ⚠️ {error}
+    <div>
+      <section className="page-hero">
+        <div className="page-hero-content">
+          <div className="page-hero-badge">📄 AI-Powered Auditor</div>
+          <h1>Audit Your<br /><span className="hero-highlight">Employment Letter</span></h1>
+          <p>Drop your document below. Our AI will instantly audit it against all 9 mandatory IRCC requirements and 516 NOC codes.</p>
         </div>
-      )}
+      </section>
+
+      <div className="page-container">
+        <section className="page-section">
+          <div style={{ maxWidth: '720px', margin: '0 auto' }}>
+            <div className="uploader-card" style={{ marginBottom: 0 }}>
+              <div 
+                className={`drop-zone ${isDragging ? 'active' : ''}`}
+                onDragOver={handleDragOver}
+                onDragLeave={handleDragLeave}
+                onDrop={handleDrop}
+                onClick={() => !loading && fileInputRef.current?.click()}
+              >
+                <div className="drop-zone-icon">📄</div>
+                {loading ? (
+                  <div>
+                    <div className="loading-spinner"></div>
+                    <p style={{ fontWeight: 500 }}>Detecting NOC code & auditing against IRCC standards...</p>
+                    <p style={{ fontSize: '13px', color: 'var(--text-muted)' }}>The AI is reading your document and the NOC 2021 guide. This may take ~15 seconds.</p>
+                  </div>
+                ) : (
+                  <div>
+                    <p style={{ fontWeight: 600, fontSize: '18px', color: 'var(--text-main)', marginBottom: '8px' }}>Drag & Drop Your Document</p>
+                    <p style={{ color: 'var(--text-muted)' }}>or click to browse</p>
+                    <p style={{ color: 'var(--text-muted)', fontSize: '13px', marginTop: '8px' }}>
+                      Accepted formats: PDF, Word (.docx), and Images (JPG, PNG)
+                    </p>
+                    <p style={{ color: 'var(--primary-light)', fontSize: '13px', marginTop: '12px', fontWeight: 500 }}>
+                      🤖 NOC code will be detected automatically
+                    </p>
+                  </div>
+                )}
+                <input 
+                  type="file" 
+                  accept={ACCEPTED_EXTENSIONS}
+                  ref={fileInputRef} 
+                  style={{ display: 'none' }} 
+                  onChange={handleFileChange}
+                  disabled={loading}
+                />
+              </div>
+              {error && (
+                <div style={{ 
+                  marginTop: '16px', 
+                  padding: '12px 16px', 
+                  background: '#fef2f2', 
+                  border: '1px solid #fecaca', 
+                  borderRadius: '8px', 
+                  color: '#991b1b', 
+                  fontSize: '14px',
+                  textAlign: 'left' 
+                }}>
+                  ⚠️ {error}
+                </div>
+              )}
+            </div>
+          </div>
+        </section>
+      </div>
     </div>
   );
 };
