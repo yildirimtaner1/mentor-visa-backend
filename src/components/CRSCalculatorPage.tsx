@@ -113,6 +113,35 @@ function extractCLB(rawStr: string): number {
   return 0;
 }
 
+const getLangOptions = (testName: string, skill: 'Listening' | 'Reading' | 'Writing' | 'Speaking') => {
+  if (testName.includes('IELTS')) {
+    if (skill === 'Listening') return [ {v: '10-12', l: '8.5-9.0'}, {v: '9', l: '8.0'}, {v: '8', l: '7.5'}, {v: '7', l: '6.0-7.0'}, {v: '6', l: '5.5'}, {v: '5', l: '5.0'}, {v: '4', l: '4.5'}, {v: '< 4', l: '0-4.0'} ];
+    if (skill === 'Reading') return [ {v: '10-12', l: '8.0-9.0'}, {v: '9', l: '7.0-7.5'}, {v: '8', l: '6.5'}, {v: '7', l: '6.0'}, {v: '6', l: '5.0-5.5'}, {v: '5', l: '4.0-4.5'}, {v: '4', l: '3.5'}, {v: '< 4', l: '0-3.0'} ];
+    if (skill === 'Writing' || skill === 'Speaking') return [ {v: '10-12', l: '7.5-9.0'}, {v: '9', l: '7.0'}, {v: '8', l: '6.5'}, {v: '7', l: '6.0'}, {v: '6', l: '5.5'}, {v: '5', l: '5.0'}, {v: '4', l: '4.0-4.5'}, {v: '< 4', l: '0-3.5'} ];
+  }
+  if (testName.includes('CELPIP')) {
+    return [ {v: '10-12', l: '10-12'}, {v: '9', l: '9'}, {v: '8', l: '8'}, {v: '7', l: '7'}, {v: '6', l: '6'}, {v: '5', l: '5'}, {v: '4', l: '4'}, {v: '< 4', l: 'M, 0-3'} ];
+  }
+  if (testName.includes('PTE')) {
+    if (skill === 'Listening') return [ {v: '10-12', l: '89-90'}, {v: '9', l: '82-88'}, {v: '8', l: '71-81'}, {v: '7', l: '60-70'}, {v: '6', l: '50-59'}, {v: '5', l: '39-49'}, {v: '4', l: '28-38'}, {v: '< 4', l: '0-27'} ];
+    if (skill === 'Reading') return [ {v: '10-12', l: '88-90'}, {v: '9', l: '78-87'}, {v: '8', l: '68-77'}, {v: '7', l: '60-67'}, {v: '6', l: '51-59'}, {v: '5', l: '42-50'}, {v: '4', l: '33-41'}, {v: '< 4', l: '0-32'} ];
+    if (skill === 'Writing') return [ {v: '10-12', l: '90'}, {v: '9', l: '88-89'}, {v: '8', l: '79-87'}, {v: '7', l: '69-78'}, {v: '6', l: '60-68'}, {v: '5', l: '51-59'}, {v: '4', l: '41-50'}, {v: '< 4', l: '0-40'} ];
+    if (skill === 'Speaking') return [ {v: '10-12', l: '89-90'}, {v: '9', l: '84-88'}, {v: '8', l: '76-83'}, {v: '7', l: '68-75'}, {v: '6', l: '59-67'}, {v: '5', l: '51-58'}, {v: '4', l: '42-50'}, {v: '< 4', l: '0-41'} ];
+  }
+  if (testName.includes('TEF')) {
+    if (skill === 'Listening') return [ {v: '10-12', l: '316-360'}, {v: '9', l: '298-315'}, {v: '8', l: '280-297'}, {v: '7', l: '249-279'}, {v: '6', l: '217-248'}, {v: '5', l: '181-216'}, {v: '4', l: '145-180'}, {v: '< 4', l: '0-144'} ];
+    if (skill === 'Reading') return [ {v: '10-12', l: '263-300'}, {v: '9', l: '248-262'}, {v: '8', l: '233-247'}, {v: '7', l: '207-232'}, {v: '6', l: '181-206'}, {v: '5', l: '151-180'}, {v: '4', l: '121-150'}, {v: '< 4', l: '0-120'} ];
+    if (skill === 'Writing' || skill === 'Speaking') return [ {v: '10-12', l: '393-450'}, {v: '9', l: '371-392'}, {v: '8', l: '349-370'}, {v: '7', l: '310-348'}, {v: '6', l: '271-309'}, {v: '5', l: '226-270'}, {v: '4', l: '181-225'}, {v: '< 4', l: '0-180'} ];
+  }
+  if (testName.includes('TCF')) {
+    if (skill === 'Listening') return [ {v: '10-12', l: '549-699'}, {v: '9', l: '523-548'}, {v: '8', l: '503-522'}, {v: '7', l: '458-502'}, {v: '6', l: '398-457'}, {v: '5', l: '369-397'}, {v: '4', l: '331-368'}, {v: '< 4', l: '0-330'} ];
+    if (skill === 'Reading') return [ {v: '10-12', l: '549-699'}, {v: '9', l: '524-548'}, {v: '8', l: '499-523'}, {v: '7', l: '453-498'}, {v: '6', l: '406-452'}, {v: '5', l: '375-405'}, {v: '4', l: '342-374'}, {v: '< 4', l: '0-341'} ];
+    if (skill === 'Writing' || skill === 'Speaking') return [ {v: '10-12', l: '16-20'}, {v: '9', l: '14-15'}, {v: '8', l: '12-13'}, {v: '7', l: '10-11'}, {v: '6', l: '7-9'}, {v: '5', l: '6'}, {v: '4', l: '4-5'}, {v: '< 4', l: '0-3'} ];
+  }
+  // Default to CLB level
+  return [ {v: '10-12', l: 'CLB 10-12'}, {v: '9', l: 'CLB 9'}, {v: '8', l: 'CLB 8'}, {v: '7', l: 'CLB 7'}, {v: '6', l: 'CLB 6'}, {v: '5', l: 'CLB 5'}, {v: '4', l: 'CLB 4'}, {v: '< 4', l: 'CLB < 4'} ];
+};
+
 
 export const CRSCalculatorPage: FC<CRSCalculatorPageProps> = ({ onNavigate: _onNavigate }) => {
   // Step 1: Age
@@ -135,17 +164,19 @@ export const CRSCalculatorPage: FC<CRSCalculatorPageProps> = ({ onNavigate: _onN
   const [canadianEducation, setCanadianEducation] = useState('');
 
   // Step 5: Language Tests
-  const [lang1Test, setLang1Test] = useState('CELPIP-General (English)');
-  const [lang1R, setLang1R] = useState('10-12');
-  const [lang1W, setLang1W] = useState('10-12');
-  const [lang1L, setLang1L] = useState('10-12');
-  const [lang1S, setLang1S] = useState('9');
+  const [lang1Test, setLang1Test] = useState('');
+  const [lang1R, setLang1R] = useState('');
+  const [lang1W, setLang1W] = useState('');
+  const [lang1L, setLang1L] = useState('');
+  const [lang1S, setLang1S] = useState('');
 
   const [lang2Test, setLang2Test] = useState('None / Not Applicable');
   const [lang2R, setLang2R] = useState('');
   const [lang2W, setLang2W] = useState('');
   const [lang2L, setLang2L] = useState('');
   const [lang2S, setLang2S] = useState('');
+
+
 
   const clbReading = extractCLB(lang1R);
   const clbWriting = extractCLB(lang1W);
@@ -383,6 +414,12 @@ export const CRSCalculatorPage: FC<CRSCalculatorPageProps> = ({ onNavigate: _onN
     if (currentStep.id === 'education') {
       if (education === '') return false;
       if (hasCanadianEducation === 'Yes' && canadianEducation === '') return false;
+      return true;
+    }
+    if (currentStep.id === 'language') {
+      if (lang1Test === '') return false;
+      if (lang1Test !== '' && (lang1R === '' || lang1W === '' || lang1L === '' || lang1S === '')) return false;
+      if (lang2Test !== 'None / Not Applicable' && (lang2R === '' || lang2W === '' || lang2L === '' || lang2S === '')) return false;
       return true;
     }
     if (currentStep.id === 'work') {
@@ -673,7 +710,14 @@ export const CRSCalculatorPage: FC<CRSCalculatorPageProps> = ({ onNavigate: _onN
 
                     <div className="form-group">
                       <label className="form-label" style={{ fontSize: '0.9rem', color: '#1E3A8A', fontWeight: 500 }}>Which language test have you taken, or do you plan to take? <span style={{color: '#DC2626'}}>*</span></label>
-                      <select className="form-select" value={lang1Test} onChange={e => setLang1Test(e.target.value)} style={{ padding: '12px', fontSize: '0.9rem', borderColor: '#93C5FD' }}>
+                      <select className="form-select" value={lang1Test} onChange={e => {
+                        setLang1Test(e.target.value);
+                        setLang1L(''); setLang1S(''); setLang1R(''); setLang1W('');
+                        // If they select English for lang1, change lang2 defaults to not include same
+                        if (e.target.value.includes('English') && lang2Test.includes('English')) setLang2Test('None / Not Applicable');
+                        if (e.target.value.includes('French') && lang2Test.includes('French')) setLang2Test('None / Not Applicable');
+                      }} style={{ padding: '12px', fontSize: '0.9rem', borderColor: '#93C5FD' }}>
+                        <option value="">Select test</option>
                         <option value="CELPIP-General (English)">CELPIP-General (English)</option>
                         <option value="IELTS General Training (English)">IELTS General Training (English)</option>
                         <option value="PTE Core (English)">PTE Core (English)</option>
@@ -686,13 +730,41 @@ export const CRSCalculatorPage: FC<CRSCalculatorPageProps> = ({ onNavigate: _onN
                       <strong>Test Selection:</strong> Choose the approved language test you have taken or plan to take, and enter your scores. Language Test - 1 should be the test where you expect to receive the higher scores.
                     </p>
 
-                    <h5 style={{ fontSize: '0.95rem', color: '#1E3A8A', fontWeight: 700, marginBottom: '12px' }}>Language Scores</h5>
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
-                      <div className="form-group" style={{ marginBottom: 0 }}><label className="form-label" style={{fontSize: '0.85rem'}}>Listening *</label><select className="form-select" value={lang1L} onChange={e => setLang1L(e.target.value)} style={{padding: '10px'}}>{['10-12','9','8','7','6','5','4','< 4'].map(n => <option key={n} value={n}>{n}</option>)}</select></div>
-                      <div className="form-group" style={{ marginBottom: 0 }}><label className="form-label" style={{fontSize: '0.85rem'}}>Speaking *</label><select className="form-select" value={lang1S} onChange={e => setLang1S(e.target.value)} style={{padding: '10px'}}>{['10-12','9','8','7','6','5','4','< 4'].map(n => <option key={n} value={n}>{n}</option>)}</select></div>
-                      <div className="form-group" style={{ marginBottom: 0 }}><label className="form-label" style={{fontSize: '0.85rem'}}>Reading *</label><select className="form-select" value={lang1R} onChange={e => setLang1R(e.target.value)} style={{padding: '10px'}}>{['10-12','9','8','7','6','5','4','< 4'].map(n => <option key={n} value={n}>{n}</option>)}</select></div>
-                      <div className="form-group" style={{ marginBottom: 0 }}><label className="form-label" style={{fontSize: '0.85rem'}}>Writing *</label><select className="form-select" value={lang1W} onChange={e => setLang1W(e.target.value)} style={{padding: '10px'}}>{['10-12','9','8','7','6','5','4','< 4'].map(n => <option key={n} value={n}>{n}</option>)}</select></div>
-                    </div>
+                    {lang1Test && (
+                      <div style={{ animation: 'fadeInUp 0.3s ease-out' }}>
+                        <h5 style={{ fontSize: '0.95rem', color: '#1E3A8A', fontWeight: 700, marginBottom: '12px' }}>Language Scores</h5>
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+                          <div className="form-group" style={{ marginBottom: 0 }}>
+                            <label className="form-label" style={{fontSize: '0.85rem'}}>Listening *</label>
+                            <select className="form-select" value={lang1L} onChange={e => setLang1L(e.target.value)} style={{padding: '10px'}}>
+                              <option value="">Select points</option>
+                              {getLangOptions(lang1Test, 'Listening').map(o => <option key={o.v} value={o.v}>{o.l}</option>)}
+                            </select>
+                          </div>
+                          <div className="form-group" style={{ marginBottom: 0 }}>
+                            <label className="form-label" style={{fontSize: '0.85rem'}}>Speaking *</label>
+                            <select className="form-select" value={lang1S} onChange={e => setLang1S(e.target.value)} style={{padding: '10px'}}>
+                              <option value="">Select points</option>
+                              {getLangOptions(lang1Test, 'Speaking').map(o => <option key={o.v} value={o.v}>{o.l}</option>)}
+                            </select>
+                          </div>
+                          <div className="form-group" style={{ marginBottom: 0 }}>
+                            <label className="form-label" style={{fontSize: '0.85rem'}}>Reading *</label>
+                            <select className="form-select" value={lang1R} onChange={e => setLang1R(e.target.value)} style={{padding: '10px'}}>
+                              <option value="">Select points</option>
+                              {getLangOptions(lang1Test, 'Reading').map(o => <option key={o.v} value={o.v}>{o.l}</option>)}
+                            </select>
+                          </div>
+                          <div className="form-group" style={{ marginBottom: 0 }}>
+                            <label className="form-label" style={{fontSize: '0.85rem'}}>Writing *</label>
+                            <select className="form-select" value={lang1W} onChange={e => setLang1W(e.target.value)} style={{padding: '10px'}}>
+                              <option value="">Select points</option>
+                              {getLangOptions(lang1Test, 'Writing').map(o => <option key={o.v} value={o.v}>{o.l}</option>)}
+                            </select>
+                          </div>
+                        </div>
+                      </div>
+                    )}
                   </div>
 
                   {/* Language Test 2 Box (Optional) */}
@@ -733,10 +805,34 @@ export const CRSCalculatorPage: FC<CRSCalculatorPageProps> = ({ onNavigate: _onN
                       <div style={{ marginTop: '24px', animation: 'fadeInUp 0.3s ease-out' }}>
                         <h5 style={{ fontSize: '0.95rem', color: '#065F46', fontWeight: 700, marginBottom: '12px' }}>Language Scores</h5>
                         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
-                          <div className="form-group" style={{ marginBottom: 0 }}><label className="form-label" style={{fontSize: '0.85rem', color: '#064E3B'}}>Listening *</label><select className="form-select" value={lang2L} onChange={e => setLang2L(e.target.value)} style={{padding: '10px'}}>{['10-12','9','8','7','6','5','4','< 4'].map(n => <option key={n} value={n}>{n}</option>)}</select></div>
-                          <div className="form-group" style={{ marginBottom: 0 }}><label className="form-label" style={{fontSize: '0.85rem', color: '#064E3B'}}>Speaking *</label><select className="form-select" value={lang2S} onChange={e => setLang2S(e.target.value)} style={{padding: '10px'}}>{['10-12','9','8','7','6','5','4','< 4'].map(n => <option key={n} value={n}>{n}</option>)}</select></div>
-                          <div className="form-group" style={{ marginBottom: 0 }}><label className="form-label" style={{fontSize: '0.85rem', color: '#064E3B'}}>Reading *</label><select className="form-select" value={lang2R} onChange={e => setLang2R(e.target.value)} style={{padding: '10px'}}>{['10-12','9','8','7','6','5','4','< 4'].map(n => <option key={n} value={n}>{n}</option>)}</select></div>
-                          <div className="form-group" style={{ marginBottom: 0 }}><label className="form-label" style={{fontSize: '0.85rem', color: '#064E3B'}}>Writing *</label><select className="form-select" value={lang2W} onChange={e => setLang2W(e.target.value)} style={{padding: '10px'}}>{['10-12','9','8','7','6','5','4','< 4'].map(n => <option key={n} value={n}>{n}</option>)}</select></div>
+                          <div className="form-group" style={{ marginBottom: 0 }}>
+                            <label className="form-label" style={{fontSize: '0.85rem', color: '#064E3B'}}>Listening *</label>
+                            <select className="form-select" value={lang2L} onChange={e => setLang2L(e.target.value)} style={{padding: '10px'}}>
+                              <option value="">Select points</option>
+                              {getLangOptions(lang2Test, 'Listening').map(o => <option key={o.v} value={o.v}>{o.l}</option>)}
+                            </select>
+                          </div>
+                          <div className="form-group" style={{ marginBottom: 0 }}>
+                            <label className="form-label" style={{fontSize: '0.85rem', color: '#064E3B'}}>Speaking *</label>
+                            <select className="form-select" value={lang2S} onChange={e => setLang2S(e.target.value)} style={{padding: '10px'}}>
+                              <option value="">Select points</option>
+                              {getLangOptions(lang2Test, 'Speaking').map(o => <option key={o.v} value={o.v}>{o.l}</option>)}
+                            </select>
+                          </div>
+                          <div className="form-group" style={{ marginBottom: 0 }}>
+                            <label className="form-label" style={{fontSize: '0.85rem', color: '#064E3B'}}>Reading *</label>
+                            <select className="form-select" value={lang2R} onChange={e => setLang2R(e.target.value)} style={{padding: '10px'}}>
+                              <option value="">Select points</option>
+                              {getLangOptions(lang2Test, 'Reading').map(o => <option key={o.v} value={o.v}>{o.l}</option>)}
+                            </select>
+                          </div>
+                          <div className="form-group" style={{ marginBottom: 0 }}>
+                            <label className="form-label" style={{fontSize: '0.85rem', color: '#064E3B'}}>Writing *</label>
+                            <select className="form-select" value={lang2W} onChange={e => setLang2W(e.target.value)} style={{padding: '10px'}}>
+                              <option value="">Select points</option>
+                              {getLangOptions(lang2Test, 'Writing').map(o => <option key={o.v} value={o.v}>{o.l}</option>)}
+                            </select>
+                          </div>
                         </div>
                       </div>
                     )}
