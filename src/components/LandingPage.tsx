@@ -18,7 +18,7 @@ export const LandingPage: FC<LandingPageProps> = ({ onGetStarted, onNavigate }) 
       <nav className={`landing-nav ${scrolled ? 'nav-scrolled' : ''} ${hidden ? 'nav-hidden' : ''}`}>
         <div className="landing-nav-inner">
           <div className="landing-logo">
-            <span className="landing-logo-icon">🍁</span>
+            <img src="/logo.png" alt="Mentor Visa" className="landing-logo-icon" style={{ height: '84px', width: '84px', objectFit: 'contain' }} />
             <span className="landing-logo-text">Mentor Visa</span>
           </div>
 

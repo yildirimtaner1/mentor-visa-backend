@@ -216,7 +216,11 @@
   justify-content: center;
   text-align: center;
   padding: 120px 24px 80px;
-  background: linear-gradient(180deg, #F8FAFC 0%, #EFF6FF 50%, #DBEAFE 100%);
+  background: 
+    linear-gradient(180deg, rgba(248,250,252,0.85) 0%, rgba(239,246,255,0.85) 50%, rgba(219,234,254,0.85) 100%),
+    linear-gradient(rgba(15,23,42,0.07) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(15,23,42,0.07) 1px, transparent 1px);
+  background-size: 100% 100%, 30px 30px, 30px 30px;
   position: relative;
   overflow: hidden;
 }
@@ -256,6 +260,43 @@
   color: var(--primary-color);
   margin-bottom: 28px;
   animation: fadeInUp 0.6s ease-out;
+}
+
+.trust-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 12px;
+  padding: 6px 16px 6px 6px;
+  background: white;
+  border: 1px solid var(--border-color);
+  box-shadow: 0 4px 12px rgba(0,0,0,0.04);
+  border-radius: 100px;
+  margin-bottom: 24px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--text-main);
+  animation: fadeInUp 0.5s ease-out;
+}
+
+.trust-pill-avatars {
+  display: flex;
+}
+
+.trust-pill-avatars img {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  border: 2px solid white;
+  margin-left: -8px;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+.trust-pill-avatars img:first-child {
+  margin-left: 0;
+}
+
+.trust-pill-stars {
+  color: #F59E0B;
+  letter-spacing: 1px;
 }
 
 .hero-title {
