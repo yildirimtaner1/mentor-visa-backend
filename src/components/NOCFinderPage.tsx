@@ -1,37 +1,67 @@
-import { type FC, useState } from 'react';
+import { type FC, useState, useRef } from 'react';
 import { findNOCCode } from '../services/api';
 
-interface NOCFinderPageProps {
-  onNavigate: (page: string) => void;
+interface AlternativeNOC {
+  noc_code: string;
+  noc_title: string;
+  match_score: number;
+  explanation: string;
 }
 
 interface NOCResult {
   noc_code: string;
   noc_title: string;
   teer_category: string;
-  match_confidence: string;
+  match_score: number;
+  alternative_nocs: AlternativeNOC[];
   explanation: string;
   matched_duties: string[];
   cec_eligible: boolean;
 }
 
+interface NOCFinderPageProps {
+  onNavigate: (page: string) => void;
+}
+
 export const NOCFinderPage: FC<NOCFinderPageProps> = ({ onNavigate }) => {
+  const [activeTab, setActiveTab] = useState<'upload' | 'manual'>('upload');
   const [jobTitle, setJobTitle] = useState('');
   const [duties, setDuties] = useState('');
+  const [file, setFile] = useState<File | null>(null);
+  
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<NOCResult | null>(null);
   const [error, setError] = useState('');
+  
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files[0]) {
+      setFile(e.target.files[0]);
+      setError('');
+    }
+  };
 
   const handleSubmit = async () => {
-    if (!jobTitle.trim() || !duties.trim()) {
+    if (activeTab === 'manual' && (!jobTitle.trim() || !duties.trim())) {
       setError('Please fill in both your job title and duties.');
       return;
     }
+    if (activeTab === 'upload' && !file) {
+      setError('Please upload your employment letter document.');
+      return;
+    }
+    
     setError('');
     setLoading(true);
     setResult(null);
     try {
-      const data = await findNOCCode(jobTitle.trim(), duties.trim());
+      let data;
+      if (activeTab === 'upload') {
+        data = await findNOCCode(undefined, undefined, file!);
+      } else {
+        data = await findNOCCode(jobTitle.trim(), duties.trim());
+      }
       setResult(data);
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Something went wrong. Please try again.');
@@ -40,13 +70,19 @@ export const NOCFinderPage: FC<NOCFinderPageProps> = ({ onNavigate }) => {
     }
   };
 
+  const getScoreColor = (score: number) => {
+    if (score >= 80) return '#059669'; // Green
+    if (score >= 65) return '#D97706'; // Orange
+    return '#DC2626'; // Red
+  };
+
   return (
     <div>
       <section className="page-hero">
         <div className="page-hero-content">
           <div className="page-hero-badge">🎯 AI-Powered NOC Detection</div>
           <h1>Find Your<br /><span className="hero-highlight">NOC Code</span></h1>
-          <p>Copy and paste the exact information from your employment letter. Our AI will analyze your letter's contents to find your precise NOC 2021 code from all 516 unit groups.</p>
+          <p>Upload your employment letter or paste your duties. Our AI will analyze the contents to find your precise NOC 2021 code from all 516 unit groups.</p>
         </div>
       </section>
 
@@ -54,33 +90,92 @@ export const NOCFinderPage: FC<NOCFinderPageProps> = ({ onNavigate }) => {
         <section className="page-section">
           <div style={{ maxWidth: '720px', margin: '0 auto' }}>
             <div className="info-card" style={{ padding: '36px 32px' }}>
-              <h2 className="page-section-title" style={{ fontSize: '1.4rem', marginBottom: '8px' }}>Employment Letter Details</h2>
-              <p style={{ fontSize: '0.95rem', color: '#64748B', marginBottom: '24px' }}>Please provide the information exactly as it appears on your official employment letter.</p>
               
-              <div className="form-group">
-                <label className="form-label">Job Title</label>
-                <input 
-                  type="text"
-                  className="form-input"
-                  placeholder="e.g., Software Developer, Marketing Manager, Electrician"
-                  value={jobTitle}
-                  onChange={e => setJobTitle(e.target.value)}
-                />
+              <div style={{ display: 'flex', gap: '16px', marginBottom: '24px', borderBottom: '1px solid var(--border-color)', paddingBottom: '16px' }}>
+                <button 
+                  onClick={() => { setActiveTab('upload'); setError(''); setResult(null); }}
+                  style={{
+                    background: activeTab === 'upload' ? 'var(--primary-color)' : 'transparent',
+                    color: activeTab === 'upload' ? 'white' : 'var(--text-color)',
+                    border: 'none', padding: '10px 20px', borderRadius: '8px', cursor: 'pointer', fontWeight: 600
+                  }}
+                >
+                  Upload Document
+                </button>
+                <button 
+                  onClick={() => { setActiveTab('manual'); setError(''); setResult(null); }}
+                  style={{
+                    background: activeTab === 'manual' ? 'var(--primary-color)' : 'transparent',
+                    color: activeTab === 'manual' ? 'white' : 'var(--text-color)',
+                    border: 'none', padding: '10px 20px', borderRadius: '8px', cursor: 'pointer', fontWeight: 600
+                  }}
+                >
+                  Type Manually
+                </button>
               </div>
 
-              <div className="form-group">
-                <label className="form-label">
-                  Main Duties & Responsibilities
-                  <span className="form-label-hint"> — paste the exact duties written on your letter</span>
-                </label>
-                <textarea 
-                  className="form-textarea"
-                  placeholder={"Paste the duties exactly as they appear on your employment letter here..."}
-                  value={duties}
-                  onChange={e => setDuties(e.target.value)}
-                  rows={6}
-                />
-              </div>
+              {activeTab === 'upload' ? (
+                <div style={{ marginBottom: '24px' }}>
+                  <p style={{ fontSize: '0.95rem', color: '#64748B', marginBottom: '16px' }}>
+                    Upload your official employment letter (PDF, Word, or Image). We'll extract the duties automatically.
+                  </p>
+                  <div 
+                    onClick={() => fileInputRef.current?.click()}
+                    style={{
+                      border: '2px dashed var(--border-color)',
+                      borderRadius: '12px',
+                      padding: '40px 20px',
+                      textAlign: 'center',
+                      cursor: 'pointer',
+                      background: file ? '#F8FAFC' : 'white',
+                      transition: 'all 0.2s ease'
+                    }}
+                  >
+                    <input type="file" ref={fileInputRef} onChange={handleFileChange} style={{ display: 'none' }} accept=".pdf,.doc,.docx,.png,.jpg,.jpeg" />
+                    <div style={{ fontSize: '2rem', marginBottom: '12px' }}>📄</div>
+                    {file ? (
+                      <div>
+                        <div style={{ fontWeight: 600, color: 'var(--text-color)' }}>{file.name}</div>
+                        <div style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>{(file.size / 1024 / 1024).toFixed(2)} MB</div>
+                        <button style={{ marginTop: '12px', fontSize: '0.9rem', color: 'var(--primary-color)', background: 'none', border: 'none', cursor: 'pointer', textDecoration: 'underline' }}>Change File</button>
+                      </div>
+                    ) : (
+                      <>
+                        <div style={{ fontWeight: 600, color: 'var(--text-color)', marginBottom: '8px' }}>Click to browse or drag and drop</div>
+                        <div style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>PDF, Word, JPG, PNG</div>
+                      </>
+                    )}
+                  </div>
+                </div>
+              ) : (
+                <>
+                  <p style={{ fontSize: '0.95rem', color: '#64748B', marginBottom: '24px' }}>Please provide the information exactly as it appears on your official employment letter.</p>
+                  <div className="form-group">
+                    <label className="form-label">Job Title</label>
+                    <input 
+                      type="text"
+                      className="form-input"
+                      placeholder="e.g., Software Developer, Marketing Manager, Electrician"
+                      value={jobTitle}
+                      onChange={e => setJobTitle(e.target.value)}
+                    />
+                  </div>
+
+                  <div className="form-group">
+                    <label className="form-label">
+                      Main Duties & Responsibilities
+                      <span className="form-label-hint"> — paste the exact duties written on your letter</span>
+                    </label>
+                    <textarea 
+                      className="form-textarea"
+                      placeholder="Paste the duties exactly as they appear on your employment letter here..."
+                      value={duties}
+                      onChange={e => setDuties(e.target.value)}
+                      rows={6}
+                    />
+                  </div>
+                </>
+              )}
 
               {error && (
                 <div style={{ color: '#DC2626', fontSize: '0.9rem', marginBottom: '16px', padding: '10px 16px', background: '#FEF2F2', borderRadius: '8px' }}>
@@ -107,8 +202,12 @@ export const NOCFinderPage: FC<NOCFinderPageProps> = ({ onNavigate }) => {
 
             {/* Result */}
             {result && (
-              <div className="result-card">
-                <div className="result-card-header">
+              <div className="result-card" style={{ marginTop: '32px' }}>
+                <h3 style={{ fontSize: '1.2rem', fontWeight: 700, marginBottom: '20px', color: 'var(--text-color)', borderBottom: '1px solid var(--border-color)', paddingBottom: '12px' }}>
+                  Primary match
+                </h3>
+                  
+                <div className="result-card-header" style={{ marginBottom: '20px' }}>
                   <div className="result-card-icon">🎯</div>
                   <div>
                     <div className="result-card-title">NOC {result.noc_code}</div>
@@ -122,9 +221,9 @@ export const NOCFinderPage: FC<NOCFinderPageProps> = ({ onNavigate }) => {
                     <div style={{ fontSize: '1.1rem', fontWeight: 700 }}>{result.teer_category}</div>
                   </div>
                   <div style={{ padding: '14px', background: 'white', borderRadius: '10px', border: '1px solid var(--border-color)' }}>
-                    <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '4px' }}>Match Confidence</div>
-                    <div style={{ fontSize: '1.1rem', fontWeight: 700, color: result.match_confidence === 'High' ? '#059669' : result.match_confidence === 'Medium' ? '#D97706' : '#DC2626' }}>
-                      {result.match_confidence}
+                    <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '4px' }}>Match Score</div>
+                    <div style={{ fontSize: '1.1rem', fontWeight: 700, color: getScoreColor(result.match_score) }}>
+                      {result.match_score}%
                     </div>
                   </div>
                 </div>
@@ -134,30 +233,47 @@ export const NOCFinderPage: FC<NOCFinderPageProps> = ({ onNavigate }) => {
                   <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem', lineHeight: 1.6 }}>{result.explanation}</p>
                 </div>
 
-                {result.matched_duties.length > 0 && (
-                  <div style={{ marginBottom: '20px' }}>
+                {result.matched_duties && result.matched_duties.length > 0 && (
+                  <div style={{ marginBottom: '24px' }}>
                     <h4 style={{ fontSize: '0.95rem', fontWeight: 700, marginBottom: '8px' }}>Matched Official Duties:</h4>
                     <ul style={{ paddingLeft: '20px', color: 'var(--text-muted)', fontSize: '0.9rem', lineHeight: 1.7 }}>
                       {result.matched_duties.map((duty, i) => <li key={i}>{duty}</li>)}
                     </ul>
                   </div>
                 )}
+                
+                {result.alternative_nocs && result.alternative_nocs.length > 0 && (
+                  <div style={{ marginBottom: '24px', borderTop: '1px solid var(--border-color)', paddingTop: '20px' }}>
+                    <h4 style={{ fontSize: '0.95rem', fontWeight: 700, marginBottom: '12px' }}>Other Potential Matches:</h4>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                      {result.alternative_nocs.map((alt, i) => (
+                        <div key={i} style={{ background: '#F8FAFC', padding: '16px', borderRadius: '8px', border: '1px solid var(--border-color)' }}>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                            <div style={{ fontWeight: 600, fontSize: '0.95rem' }}>NOC {alt.noc_code} — {alt.noc_title}</div>
+                            <div style={{ fontWeight: 700, color: getScoreColor(alt.match_score), fontSize: '0.9rem' }}>{alt.match_score}% Match</div>
+                          </div>
+                          <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', lineHeight: 1.5, margin: 0 }}>{alt.explanation}</p>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
 
                 <div className={`highlight-box ${result.cec_eligible ? 'highlight-box-blue' : ''}`}>
-                  <p>
+                  <p style={{ margin: 0, fontSize: '0.9rem', lineHeight: 1.5 }}>
                     {result.cec_eligible 
-                      ? `✅ Great news! NOC ${result.noc_code} (${result.teer_category}) is eligible for the Canadian Experience Class. You can use this code for your Express Entry application.`
-                      : `⚠️ NOC ${result.noc_code} (${result.teer_category}) may not be eligible for CEC. CEC requires TEER 0, 1, 2, or 3 occupations. Consider consulting an immigration professional.`
+                      ? `✅ NOC ${result.noc_code} falls under TEER ${result.teer_category}. Eligible for CEC (Provided you have legally accumulated at least 1,560 hours of total qualifying Canadian experience in TEER 0, 1, 2, or 3 occupations).`
+                      : `⚠️ NOC ${result.noc_code} falls under TEER ${result.teer_category}. This is generally NOT eligible for CEC unless specific exceptions apply. CEC requires TEER 0, 1, 2, or 3.`
                     }
                   </p>
                 </div>
 
                 <div style={{ marginTop: '24px', textAlign: 'center' }}>
                   <p style={{ fontSize: '0.95rem', color: 'var(--text-muted)', marginBottom: '16px' }}>
-                    Now that you know your NOC code, make sure your employment letter properly aligns with it:
+                    Now that you have your NOC code possibilities, make sure your letter complies with all IRCC formatting requirements:
                   </p>
                   <button className="btn btn-primary btn-lg" onClick={() => onNavigate('audit')}>
-                    📄 Audit My Employment Letter
+                    📄 Audit Employment Letter
                   </button>
                 </div>
               </div>

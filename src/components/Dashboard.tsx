@@ -265,12 +265,24 @@ export const Dashboard: FC<DashboardProps> = ({ data, onReset }) => {
               </div>
             </div>
             <div style={{ marginBottom: '12px' }}>
-              <strong>Match Level: </strong> 
-              {data.noc_analysis.match_level === 'high' ? <span className="badge badge-success">High</span> : 
-               data.noc_analysis.match_level === 'medium' ? <span className="badge badge-warning">Medium</span> : 
-               <span className="badge badge-danger">Low</span>}
+              <strong>Match Score: </strong> 
+              <span className={`badge ${data.noc_analysis.match_score >= 80 ? 'badge-success' : data.noc_analysis.match_score >= 65 ? 'badge-warning' : 'badge-danger'}`}>
+                {data.noc_analysis.match_score}% Match
+              </span>
             </div>
-            <p style={{ fontSize: '0.9rem', color: 'var(--text-muted)' }}>{data.noc_analysis.notes}</p>
+            {data.noc_analysis.alternative_nocs && data.noc_analysis.alternative_nocs.length > 0 && (
+              <div style={{ marginTop: '12px', padding: '12px', background: 'white', borderRadius: '6px', border: '1px dashed var(--border-color)' }}>
+                <h4 style={{ fontSize: '0.85rem', fontWeight: 'bold', marginBottom: '8px', color: 'var(--text-muted)' }}>ALTERNATIVE NOC CODES:</h4>
+                <ul style={{ listStyle: 'none', padding: 0, margin: 0, fontSize: '0.9rem' }}>
+                  {data.noc_analysis.alternative_nocs.map((alt, i) => (
+                    <li key={i} style={{ marginBottom: '6px', borderBottom: i !== data.noc_analysis.alternative_nocs.length - 1 ? '1px solid var(--border-color)' : 'none', paddingBottom: i !== data.noc_analysis.alternative_nocs.length - 1 ? '6px' : '0' }}>
+                      <strong>{alt.noc_code}</strong> - {alt.noc_title} <span style={{ color: alt.match_score >= 80 ? '#059669' : '#D97706', fontWeight: 'bold', fontSize: '0.8rem', marginLeft: '6px' }}>({alt.match_score}%)</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+            <p style={{ fontSize: '0.9rem', color: 'var(--text-muted)', marginTop: '12px' }}>{data.noc_analysis.notes}</p>
           </div>
 
           <div className="card">

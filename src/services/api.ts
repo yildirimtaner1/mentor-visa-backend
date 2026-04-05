@@ -51,11 +51,20 @@ export async function getEvaluations(token: string) {
   return response.json();
 }
 
-export async function findNOCCode(jobTitle: string, dutiesDescription: string) {
+export async function findNOCCode(jobTitle?: string, dutiesDescription?: string, document?: File) {
+  const formData = new FormData();
+  if (document) {
+    formData.append('document', document);
+  } else if (jobTitle && dutiesDescription) {
+    formData.append('job_title', jobTitle);
+    formData.append('duties_description', dutiesDescription);
+  } else {
+    throw new Error('Must provide either a document or job title + duties.');
+  }
+
   const response = await fetch(`${API_BASE_URL}/api/v1/noc-finder`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ job_title: jobTitle, duties_description: dutiesDescription }),
+    body: formData,
   });
   if (!response.ok) {
     const errorData = await response.json().catch(() => ({}));

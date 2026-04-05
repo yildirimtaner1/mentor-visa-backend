@@ -16,11 +16,19 @@ export interface NocDutyMatch {
   overlap_description: string;
 }
 
+export interface AlternativeNOC {
+  noc_code: string;
+  noc_title: string;
+  match_score: number;
+  explanation: string;
+}
+
 export interface NOCAnalysis {
   applicable: boolean;
   detected_code: string;
   detected_title: string;
-  match_level: MatchLevel;
+  match_score: number;
+  alternative_nocs: AlternativeNOC[];
   notes: string;
   lead_statement_official: string;
   lead_statement_applicant: string;
