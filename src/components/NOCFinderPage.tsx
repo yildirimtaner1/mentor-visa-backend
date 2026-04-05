@@ -9,6 +9,8 @@ interface AlternativeNOC {
 }
 
 interface NOCResult {
+  document_valid: boolean;
+  rejection_reason: string;
   noc_code: string;
   noc_title: string;
   teer_category: string;
@@ -212,8 +214,30 @@ export const NOCFinderPage: FC<NOCFinderPageProps> = ({ onNavigate }) => {
               </button>
             </div>
 
+            {/* Rejection Warning */}
+            {result && !result.document_valid && (
+              <div style={{ 
+                marginTop: '32px', 
+                padding: '28px', 
+                background: 'linear-gradient(135deg, #FEF3C7, #FDE68A)', 
+                borderRadius: '14px', 
+                border: '1px solid #F59E0B',
+                boxShadow: '0 4px 16px rgba(245, 158, 11, 0.15)'
+              }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '12px' }}>
+                  <span style={{ fontSize: '1.5rem' }}>⚠️</span>
+                  <h3 style={{ fontSize: '1.15rem', fontWeight: 700, color: '#92400E', margin: 0 }}>
+                    Document Could Not Be Processed
+                  </h3>
+                </div>
+                <p style={{ fontSize: '0.95rem', color: '#78350F', lineHeight: 1.7, margin: 0 }}>
+                  {result.rejection_reason}
+                </p>
+              </div>
+            )}
+
             {/* Result */}
-            {result && (
+            {result && result.document_valid && (
               <div className="result-card" style={{ marginTop: '32px' }}>
                 <h3 style={{ fontSize: '1.2rem', fontWeight: 700, marginBottom: '20px', color: 'var(--text-color)', borderBottom: '1px solid var(--border-color)', paddingBottom: '12px' }}>
                   Primary match
