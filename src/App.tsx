@@ -112,7 +112,7 @@ function App() {
         <footer className="landing-footer">
           <div className="landing-footer-inner">
             <div className="landing-footer-brand">
-              <span className="landing-logo-icon">🍁</span>
+              <img src="/logo.png" alt="Mentor Visa" style={{ height: '28px', width: '28px', objectFit: 'contain', background: 'white', borderRadius: '6px', padding: '3px' }} />
               <span>Mentor Visa</span>
             </div>
             <p className="landing-footer-disclaimer">
@@ -137,7 +137,7 @@ function App() {
               style={{ cursor: 'pointer', fontSize: '1.6rem', color: 'var(--primary-dark)' }} 
               onClick={handleBackToHome}
             >
-              <span className="landing-logo-icon">🍁</span>
+              <img src="/logo.png" alt="Mentor Visa" className="landing-logo-icon" style={{ height: '32px', width: '32px', objectFit: 'contain' }} />
               <span className="landing-logo-text">Mentor Visa</span>
             </span>
           </div>

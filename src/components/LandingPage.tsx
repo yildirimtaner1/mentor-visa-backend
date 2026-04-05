@@ -289,7 +289,7 @@ export const LandingPage: FC<LandingPageProps> = ({ onGetStarted, onNavigate }) 
       <footer className="landing-footer">
         <div className="landing-footer-inner">
           <div className="landing-footer-brand">
-            <span className="landing-logo-icon">🍁</span>
+            <img src="/logo.png" alt="Mentor Visa" style={{ height: '28px', width: '28px', objectFit: 'contain', background: 'white', borderRadius: '6px', padding: '3px' }} />
             <span>Mentor Visa</span>
           </div>
           <div className="landing-footer-links">
