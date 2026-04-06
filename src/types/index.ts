@@ -34,6 +34,7 @@ export interface NOCAnalysis {
   lead_statement_applicant: string;
   lead_statement_overlap: string;
   duties_match: NocDutyMatch[];
+  location_of_experience: 'canada' | 'outside_canada' | 'unknown';
 }
 
 export interface MandatoryRequirements {

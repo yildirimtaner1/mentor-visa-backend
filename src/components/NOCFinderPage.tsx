@@ -21,6 +21,7 @@ interface NOCResult {
   explanation: string;
   matched_duties: string[];
   cec_eligible: boolean;
+  location_of_experience?: 'canada' | 'outside_canada' | 'unknown';
 }
 
 interface NOCFinderPageProps {
@@ -328,12 +329,37 @@ export const NOCFinderPage: FC<NOCFinderPageProps> = ({ onNavigate }) => {
                 )}
 
                 <div className={`highlight-box ${result.cec_eligible ? 'highlight-box-blue' : ''}`}>
-                  <p style={{ margin: 0, fontSize: '0.9rem', lineHeight: 1.5 }}>
-                    {result.cec_eligible 
-                      ? `✅ NOC ${result.noc_code} falls under TEER ${result.teer_category}. Eligible for CEC (Provided you have legally accumulated at least 1,560 hours of total qualifying Canadian experience in TEER 0, 1, 2, or 3 occupations).`
-                      : `⚠️ NOC ${result.noc_code} falls under TEER ${result.teer_category}. This is generally NOT eligible for CEC unless specific exceptions apply. CEC requires TEER 0, 1, 2, or 3.`
-                    }
-                  </p>
+                  {!result.cec_eligible ? (
+                    /* TEER 4 or 5 — not eligible regardless of location */
+                    <p style={{ margin: 0, fontSize: '0.9rem', lineHeight: 1.7 }}>
+                      ⚠️ <strong>NOC {result.noc_code} falls under TEER {result.teer_category}.</strong><br />
+                      Occupations in TEER 4 or 5 are generally <strong>NOT</strong> eligible for core Express Entry CRS points or the Canadian Experience Class. You may need to look into targeted Provincial Nominee Programs (PNPs) or specific industry pilots.
+                    </p>
+                  ) : file && result.location_of_experience === 'canada' ? (
+                    /* File uploaded + Canadian experience detected */
+                    <p style={{ margin: 0, fontSize: '0.9rem', lineHeight: 1.7 }}>
+                      ✅ <strong>NOC {result.noc_code} falls under TEER {result.teer_category}.</strong><br />
+                      This occupation is eligible for the <strong>Canadian Experience Class (CEC)</strong> (Provided you have legally accumulated at least 1,560 hours of total qualifying Canadian experience in TEER 0, 1, 2, or 3 occupations).
+                    </p>
+                  ) : file && result.location_of_experience === 'outside_canada' ? (
+                    /* File uploaded + Foreign experience detected */
+                    <p style={{ margin: 0, fontSize: '0.9rem', lineHeight: 1.7 }}>
+                      ✅ <strong>NOC {result.noc_code} falls under TEER {result.teer_category}.</strong><br />
+                      This foreign experience is highly valuable! While it does not count towards the Canadian Experience Class (CEC), having 1 to 3+ years of verifiable foreign work experience in TEER 0, 1, 2, or 3 can <strong>significantly increase your baseline Comprehensive Ranking System (CRS) score.</strong>
+                    </p>
+                  ) : (
+                    /* Manual entry OR location unknown — show both possibilities */
+                    <div style={{ margin: 0, fontSize: '0.9rem', lineHeight: 1.7 }}>
+                      <p style={{ margin: '0 0 8px 0' }}>
+                        ✅ <strong>NOC {result.noc_code} falls under TEER {result.teer_category}.</strong><br />
+                        This skilled occupation is highly valuable for Express Entry.
+                      </p>
+                      <ul style={{ margin: 0, paddingLeft: '20px' }}>
+                        <li><strong>If this was inside Canada:</strong> It counts toward your Canadian Experience Class (CEC) eligibility.</li>
+                        <li><strong>If this was outside Canada:</strong> It can significantly increase your baseline Comprehensive Ranking System (CRS) score.</li>
+                      </ul>
+                    </div>
+                  )}
                 </div>
 
                 <div style={{ marginTop: '24px', textAlign: 'center' }}>
