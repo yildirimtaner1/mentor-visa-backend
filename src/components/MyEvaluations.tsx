@@ -66,9 +66,15 @@ export const MyEvaluations: FC<MyEvaluationsProps> = ({ onSelectEvaluation }) =>
                 </div>
               </div>
               <div>
-                {ev.compliance_status === 'compliant' && <span className="badge badge-success">Compliant</span>}
-                {ev.compliance_status === 'risk' && <span className="badge badge-warning">Risk</span>}
-                {ev.compliance_status === 'non_compliant' && <span className="badge badge-danger">Non-Compliant</span>}
+                {ev.payload?.noc_analysis?.applicable === false ? (
+                  <span className="badge" style={{ background: '#FEF3C7', color: '#92400E', border: '1px solid #F59E0B' }}>Rejected</span>
+                ) : (
+                  <>
+                    {ev.compliance_status === 'compliant' && <span className="badge badge-success">Compliant</span>}
+                    {ev.compliance_status === 'risk' && <span className="badge badge-warning">Risk Match</span>}
+                    {ev.compliance_status === 'non_compliant' && <span className="badge badge-danger">Non-Compliant</span>}
+                  </>
+                )}
               </div>
             </div>
           ))}

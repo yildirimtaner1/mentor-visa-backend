@@ -1,5 +1,6 @@
 import { type FC, useState, useRef } from 'react';
 import { findNOCCode } from '../services/api';
+import { SEO } from './common/SEO';
 
 interface AlternativeNOC {
   noc_code: string;
@@ -24,6 +25,20 @@ interface NOCResult {
 interface NOCFinderPageProps {
   onNavigate: (page: string) => void;
 }
+
+const nocSchema = JSON.stringify({
+  "@context": "https://schema.org",
+  "@type": "SoftwareApplication",
+  "name": "Mentor Visa NOC Matcher AI",
+  "operatingSystem": "Web",
+  "applicationCategory": "WebApplication",
+  "offers": {
+    "@type": "Offer",
+    "price": "0",
+    "priceCurrency": "CAD"
+  },
+  "description": "An AI-powered tool to automatically find and match your job duties to official Canadian NOC 2021 codes for Express Entry."
+});
 
 export const NOCFinderPage: FC<NOCFinderPageProps> = ({ onNavigate }) => {
   const [jobTitle, setJobTitle] = useState('');
@@ -102,6 +117,12 @@ export const NOCFinderPage: FC<NOCFinderPageProps> = ({ onNavigate }) => {
 
   return (
     <div>
+      <SEO 
+        title="Find My NOC Code 2021 | Free AI Matching Tool for Canada PR" 
+        description="Not sure what your Express Entry NOC code is? Paste your job duties and our AI will automatically match them to the correct NOC 2021 TEER category instantly."
+        canonical="/find-my-noc"
+        schema={nocSchema}
+      />
       <section className="page-hero">
         <div className="page-hero-content">
           <div className="page-hero-badge">🎯 AI-Powered NOC Detection</div>

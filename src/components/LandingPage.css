@@ -182,15 +182,14 @@
   background: none;
   border: none;
   font-family: inherit;
-  font-size: 0.85rem;
-  color: rgba(255, 255, 255, 0.6);
+  color: var(--text-muted);
   cursor: pointer;
   transition: color 0.2s;
   padding: 0;
 }
 
 .landing-footer-links button:hover {
-  color: white;
+  color: var(--primary-color);
 }
 
 @media (max-width: 900px) {
@@ -683,9 +682,10 @@
 
 /* Footer */
 .landing-footer {
-  background: var(--gradient-start);
+  background: var(--surface-color, #F8FAFC);
+  border-top: 1px solid var(--border-color);
   padding: 40px 24px;
-  color: rgba(255, 255, 255, 0.6);
+  color: var(--text-muted);
 }
 
 .landing-footer-inner {
@@ -704,7 +704,7 @@
   gap: 8px;
   font-weight: 600;
   font-size: 1.1rem;
-  color: white;
+  color: var(--gradient-start);
 }
 
 .landing-footer-disclaimer {

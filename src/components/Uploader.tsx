@@ -2,6 +2,7 @@ import { useState, useRef } from 'react';
 import type { DragEvent, ChangeEvent, FC } from 'react';
 import type { AnalysisResponse } from '../types';
 import { uploadDocument } from '../services/api';
+import { SEO } from './common/SEO';
 
 const ACCEPTED_TYPES = [
   'application/pdf',
@@ -19,6 +20,20 @@ const ACCEPTED_EXTENSIONS = '.pdf,.docx,.doc,.jpg,.jpeg,.png,.bmp,.tiff,.tif,.we
 interface UploaderProps {
   onAnalysisResult: (result: AnalysisResponse) => void;
 }
+
+const uploaderSchema = JSON.stringify({
+  "@context": "https://schema.org",
+  "@type": "SoftwareApplication",
+  "name": "Mentor Visa Employment Letter Auditor",
+  "operatingSystem": "Web",
+  "applicationCategory": "WebApplication",
+  "offers": {
+    "@type": "Offer",
+    "price": "0",
+    "priceCurrency": "CAD"
+  },
+  "description": "Upload your Express Entry employment letter and check for missing IRCC requirements and NOC code alignment mistakes instantly."
+});
 
 export const Uploader: FC<UploaderProps> = ({ onAnalysisResult }) => {
   const [isDragging, setIsDragging] = useState(false);
@@ -78,6 +93,12 @@ export const Uploader: FC<UploaderProps> = ({ onAnalysisResult }) => {
 
   return (
     <div>
+      <SEO 
+        title="Audit Express Entry Employment Letter | IRCC Checklist Checker" 
+        description="Upload your employment reference letter to check for missing IRCC requirements. Identify missing job duties, incorrect formatting, and NOC mismatch risks instantly."
+        canonical="/audit-employment-letter"
+        schema={uploaderSchema}
+      />
       <section className="page-hero">
         <div className="page-hero-content">
           <div className="page-hero-badge">📄 AI-Powered Auditor</div>

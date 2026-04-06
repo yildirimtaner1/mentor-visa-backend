@@ -1,8 +1,23 @@
 import { type FC, useState, useMemo } from 'react';
+import { SEO } from './common/SEO';
 
 interface CRSCalculatorPageProps {
   onNavigate: (page: string) => void;
 }
+
+const crsSchema = JSON.stringify({
+  "@context": "https://schema.org",
+  "@type": "SoftwareApplication",
+  "name": "Mentor Visa CRS Calculator",
+  "operatingSystem": "Web",
+  "applicationCategory": "WebApplication",
+  "offers": {
+    "@type": "Offer",
+    "price": "0",
+    "priceCurrency": "CAD"
+  },
+  "description": "Calculate your Comprehensive Ranking System (CRS) score for Canadian Express Entry accurately."
+});
 
 // ======================================
 // 1. Math Logistics
@@ -440,7 +455,13 @@ export const CRSCalculatorPage: FC<CRSCalculatorPageProps> = ({ onNavigate: _onN
 
   return (
     <div style={{ backgroundColor: '#F8FAFC', minHeight: '100vh', fontFamily: '"Inter", sans-serif' }}>
-      
+      <SEO 
+        title="Canada CRS Calculator 2026 | Express Entry Points Estimator" 
+        description="Calculate your Comprehensive Ranking System (CRS) score for Canadian Express Entry. Get an accurate points estimate for the Canadian Experience Class."
+        keywords="CRS calculator, Express Entry points, Canada PR score, CEC eligibility"
+        canonical="/crs-calculator"
+        schema={crsSchema}
+      />
       {/* Standardized Platform Hero Header */}
       {!isFinalStep && (
         <div className="page-hero">

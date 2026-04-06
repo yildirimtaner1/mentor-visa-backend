@@ -1,4 +1,5 @@
 import { type FC, useState, useEffect } from 'react';
+import { SEO } from './common/SEO';
 
 interface CECChecklistPageProps {
   onNavigate: (page: string) => void;
@@ -140,6 +141,12 @@ export const CECChecklistPage: FC<CECChecklistPageProps> = ({ onNavigate }) => {
 
   return (
     <div>
+      <SEO 
+        title="Express Entry CEC Document Checklist 2026 | Application Tracker" 
+        description="Track all required documents for your Canadian Experience Class (CEC) immigration application. An interactive checklist for employment letters, language tests, and more."
+        keywords="CEC document checklist, Express Entry required documents, Canada PR tracker"
+        canonical="/cec-checklist"
+      />
       <section className="page-hero">
         <div className="page-hero-content">
           <div className="page-hero-badge">✅ Interactive Tracker</div>

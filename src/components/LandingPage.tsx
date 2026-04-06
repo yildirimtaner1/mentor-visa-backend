@@ -1,106 +1,72 @@
 import { type FC, useState } from 'react';
-import { SignInButton, SignUpButton, useAuth, UserButton } from '@clerk/clerk-react';
-import { useSmartNav } from '../hooks/useSmartNav';
+import { Navbar } from './common/Navbar';
+import { SEO } from './common/SEO';
 
 interface LandingPageProps {
   onGetStarted: () => void;
   onNavigate: (page: string) => void;
 }
 
-export const LandingPage: FC<LandingPageProps> = ({ onGetStarted, onNavigate }) => {
-  const { isSignedIn } = useAuth();
-  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-  const { scrolled, hidden } = useSmartNav();
+const faqSchema = JSON.stringify({
+  "@context": "https://schema.org",
+  "@type": "FAQPage",
+  "mainEntity": [
+    {
+      "@type": "Question",
+      "name": "What is a NOC code and why does it matter?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "The National Occupational Classification (NOC) is Canada's system for classifying jobs. For Express Entry (CEC), your employment letter must demonstrate duties that align with your claimed NOC code. A mismatch can lead to application refusal."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "Do I need to know my NOC code before using this tool?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "No! Our AI automatically reads the duties in your employment letter and identifies the best-matching NOC 2021 code from all 516 unit groups. You can also use our dedicated 'Find My NOC' tool to look up your code before auditing your letter."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "What elements does IRCC require in an employment letter?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "IRCC requires: company letterhead, your full name, company contact information, job title, employment dates, hours per week, salary/compensation, detailed duties, and a signatory (supervisor or HR officer)."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "Is my document stored on your servers?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "Your document is securely processed by our AI. If you create an account, you can optionally save your evaluations for future reference. All data is encrypted and protected."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "Does this replace an immigration consultant?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "No. This tool is designed to help you catch common issues before you submit your application. It is not legal advice. We recommend consulting a licensed RCIC or immigration lawyer for complex cases."
+      }
+    }
+  ]
+});
 
+export const LandingPage: FC<LandingPageProps> = ({ onGetStarted, onNavigate }) => {
   return (
     <div className="landing">
+      <SEO 
+        title="Mentor Visa — Free AI Document Auditor for Canadian Express Entry" 
+        description="Get your employment reference letter checked against official IRCC requirements and 516 NOC 2021 codes. Spot rejection risks instantly before applying for permanent residency."
+        keywords="Canadian Experience Class, CEC document checklist, Express Entry employment letter format, NOC code finder"
+        canonical="/"
+        schema={faqSchema}
+      />
       {/* Navigation */}
-      <nav className={`landing-nav ${scrolled ? 'nav-scrolled' : ''} ${hidden ? 'nav-hidden' : ''}`}>
-        <div className="landing-nav-inner">
-          <div className="landing-logo">
-            <img src="/logo.png" alt="Mentor Visa" className="landing-logo-icon" style={{ height: '36px', width: '36px', objectFit: 'contain' }} />
-            <span className="landing-logo-text">Mentor Visa</span>
-          </div>
+      <Navbar />
 
-          {/* Desktop Nav Links */}
-          <div className="nav-links-desktop">
-            <button className="nav-link" onClick={onGetStarted}>Audit Employment Letter</button>
-            <button className="nav-link" onClick={() => onNavigate('noc-finder')}>Find My NOC</button>
-            <button className="nav-link" onClick={() => onNavigate('cec-guide')}>Express Entry CEC Guide</button>
-            <button className="nav-link" onClick={() => onNavigate('crs-calculator')}>CRS Calculator</button>
-            <button className="nav-link" onClick={() => onNavigate('checklist')}>CEC Application Checklist</button>
-            <div className="nav-auth">
-              {!isSignedIn ? (
-                <>
-                  <SignInButton mode="modal">
-                    <button className="btn btn-ghost" style={{ padding: '8px 16px', fontSize: '0.9rem' }}>Login</button>
-                  </SignInButton>
-                  <SignUpButton mode="modal">
-                    <button className="btn btn-primary" style={{ padding: '8px 16px', fontSize: '0.9rem' }}>Sign Up</button>
-                  </SignUpButton>
-                </>
-              ) : (
-                <>
-                  <button 
-                    className="btn btn-outline" 
-                    onClick={() => onNavigate('history')} 
-                    style={{ padding: '8px 16px', fontSize: '0.9rem' }}
-                  >
-                    My Evaluations
-                  </button>
-                  <UserButton />
-                </>
-              )}
-            </div>
-          </div>
-
-          {/* Mobile Hamburger */}
-          <button
-            className={`hamburger ${mobileMenuOpen ? 'open' : ''}`}
-            onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-            aria-label="Toggle menu"
-          >
-            <span /><span /><span />
-          </button>
-        </div>
-
-        {/* Mobile Menu */}
-        {mobileMenuOpen && (
-          <div className="mobile-menu">
-            <button className="mobile-menu-link" onClick={() => { onGetStarted(); setMobileMenuOpen(false); }}>📄 Audit Employment Letter</button>
-            <button className="mobile-menu-link" onClick={() => { onNavigate('noc-finder'); setMobileMenuOpen(false); }}>🎯 Find My NOC</button>
-            <button className="mobile-menu-link" onClick={() => { onNavigate('cec-guide'); setMobileMenuOpen(false); }}>📘 Express Entry CEC Guide</button>
-            <button className="mobile-menu-link" onClick={() => { onNavigate('crs-calculator'); setMobileMenuOpen(false); }}>📊 CRS Calculator</button>
-            <button className="mobile-menu-link" onClick={() => { onNavigate('checklist'); setMobileMenuOpen(false); }}>✅ CEC Application Checklist</button>
-            <div style={{ borderTop: '1px solid var(--border-color)', paddingTop: '12px', marginTop: '4px', display: 'flex', gap: '12px' }}>
-              {!isSignedIn ? (
-                <>
-                  <SignInButton mode="modal">
-                    <button className="btn btn-ghost" style={{ flex: 1, fontSize: '0.9rem' }}>Login</button>
-                  </SignInButton>
-                  <SignUpButton mode="modal">
-                    <button className="btn btn-primary" style={{ flex: 1, fontSize: '0.9rem' }}>Sign Up</button>
-                  </SignUpButton>
-                </>
-              ) : (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', width: '100%' }}>
-                  <button 
-                    className="mobile-menu-link" 
-                    onClick={() => { onNavigate('history'); setMobileMenuOpen(false); }}
-                    style={{ fontWeight: 600 }}
-                  >
-                    📋 My Evaluations
-                  </button>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                    <UserButton />
-                    <span style={{ fontSize: '0.9rem', color: 'var(--text-muted)' }}>My Account</span>
-                  </div>
-                </div>
-              )}
-            </div>
-          </div>
-        )}
-      </nav>
 
       {/* Hero Section */}
       <section className="hero">
@@ -302,7 +268,7 @@ export const LandingPage: FC<LandingPageProps> = ({ onGetStarted, onNavigate }) 
       <footer className="landing-footer">
         <div className="landing-footer-inner">
           <div className="landing-footer-brand">
-            <img src="/logo.png" alt="Mentor Visa" style={{ height: '28px', width: '28px', objectFit: 'contain', background: 'white', borderRadius: '6px', padding: '3px' }} />
+            <img src="/logo.png" alt="Mentor Visa" style={{ height: '28px', width: '28px', objectFit: 'contain' }} />
             <span>Mentor Visa</span>
           </div>
           <div className="landing-footer-links">

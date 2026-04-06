@@ -168,306 +168,349 @@ export const Dashboard: FC<DashboardProps> = ({ data, onReset }) => {
           </span>
         </h2>
         <div style={{ display: 'flex', gap: '10px' }}>
-          {isSignedIn ? (
-            <>
-              <button onClick={() => handleDownloadNoc()} className="btn" style={{ background: 'var(--primary-color)', borderColor: 'var(--primary-color)', color: 'white' }}>
-                📄 Download NOC Sheet
-              </button>
-              <button onClick={() => handleDownloadFull()} className="btn btn-outline" style={{ borderColor: 'var(--text-muted)' }}>
-                📥 Download Full Audit
-              </button>
-              {data.stored_file_id && (
-                <button onClick={handleDownloadOriginal} className="btn btn-outline" style={{ borderColor: '#10b981', color: '#10b981' }}>
-                  📎 Original Letter
+          {data.noc_analysis?.applicable && (
+            isSignedIn ? (
+              <>
+                <button onClick={() => handleDownloadNoc()} className="btn" style={{ background: 'var(--primary-color)', borderColor: 'var(--primary-color)', color: 'white' }}>
+                  📄 Download NOC Sheet
                 </button>
-              )}
-            </>
-          ) : (
-            <div onClickCapture={() => sessionStorage.setItem('pendingPdfDownload', 'full')}>
-              <SignInButton mode="modal" forceRedirectUrl={window.location.href}>
-                <button className="btn" style={{ background: '#4285F4', borderColor: '#4285F4', color: 'white' }}>
-                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" style={{ marginRight: '8px', verticalAlign: 'middle', display: 'inline' }}>
-                     <path fill="white" fillRule="evenodd" clipRule="evenodd" d="M23.04 12.2614C23.04 11.4459 22.9668 10.662 22.8339 9.91016H12V14.3575H18.1891C17.9224 15.7949 17.1114 17.006 15.8943 17.8202V20.7135H19.6105C21.7855 18.7118 23.04 15.7618 23.04 12.2614Z" />
-                     <path fill="white" fillRule="evenodd" clipRule="evenodd" d="M12 24C15.105 24 17.7082 22.9705 19.6105 20.7135L15.8943 17.8202C14.8643 18.5109 13.5457 18.9255 12 18.9255C9.00477 18.9255 6.46955 16.9016 5.56432 14.185H1.7225V17.1636C3.615 20.9232 7.50455 24 12 24Z" />
-                     <path fill="white" fillRule="evenodd" clipRule="evenodd" d="M5.56432 14.1851C5.33318 13.4944 5.20364 12.7584 5.20364 12.0001C5.20364 11.2418 5.33318 10.5058 5.56432 9.81514V6.83655H1.7225C0.942727 8.38973 0.5 10.1424 0.5 12.0001C0.5 13.8578 0.942727 15.6106 1.7225 17.1638L5.56432 14.1851Z" />
-                     <path fill="white" fillRule="evenodd" clipRule="evenodd" d="M12 5.07455C13.6909 5.07455 15.2082 5.65727 16.4027 6.79364L20.0168 3.17955C17.7082 1.02955 15.105 0 12 0C7.50455 0 3.615 3.07682 1.7225 6.83636L5.56432 9.81495C6.46955 7.09841 9.00477 5.07455 12 5.07455Z" />
-                  </svg>
-                  Sign in to Download Info
+                <button onClick={() => handleDownloadFull()} className="btn btn-outline" style={{ borderColor: 'var(--text-muted)' }}>
+                  📥 Download Full Audit
                 </button>
-              </SignInButton>
-            </div>
+                {data.stored_file_id && (
+                  <button onClick={handleDownloadOriginal} className="btn btn-outline" style={{ borderColor: '#10b981', color: '#10b981' }}>
+                    📎 Original Letter
+                  </button>
+                )}
+              </>
+            ) : (
+              <div onClickCapture={() => sessionStorage.setItem('pendingPdfDownload', 'full')}>
+                <SignInButton mode="modal" forceRedirectUrl={window.location.href}>
+                  <button className="btn" style={{ background: '#4285F4', borderColor: '#4285F4', color: 'white' }}>
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" style={{ marginRight: '8px', verticalAlign: 'middle', display: 'inline' }}>
+                       <path fill="white" fillRule="evenodd" clipRule="evenodd" d="M23.04 12.2614C23.04 11.4459 22.9668 10.662 22.8339 9.91016H12V14.3575H18.1891C17.9224 15.7949 17.1114 17.006 15.8943 17.8202V20.7135H19.6105C21.7855 18.7118 23.04 15.7618 23.04 12.2614Z" />
+                       <path fill="white" fillRule="evenodd" clipRule="evenodd" d="M12 24C15.105 24 17.7082 22.9705 19.6105 20.7135L15.8943 17.8202C14.8643 18.5109 13.5457 18.9255 12 18.9255C9.00477 18.9255 6.46955 16.9016 5.56432 14.185H1.7225V17.1636C3.615 20.9232 7.50455 24 12 24Z" />
+                       <path fill="white" fillRule="evenodd" clipRule="evenodd" d="M5.56432 14.1851C5.33318 13.4944 5.20364 12.7584 5.20364 12.0001C5.20364 11.2418 5.33318 10.5058 5.56432 9.81514V6.83655H1.7225C0.942727 8.38973 0.5 10.1424 0.5 12.0001C0.5 13.8578 0.942727 15.6106 1.7225 17.1638L5.56432 14.1851Z" />
+                       <path fill="white" fillRule="evenodd" clipRule="evenodd" d="M12 5.07455C13.6909 5.07455 15.2082 5.65727 16.4027 6.79364L20.0168 3.17955C17.7082 1.02955 15.105 0 12 0C7.50455 0 3.615 3.07682 1.7225 6.83636L5.56432 9.81495C6.46955 7.09841 9.00477 5.07455 12 5.07455Z" />
+                    </svg>
+                    Sign in to Download Info
+                  </button>
+                </SignInButton>
+              </div>
+            )
           )}
           <button className="btn btn-outline" onClick={onReset}>Upload New</button>
         </div>
       </div>
       
-      <div ref={fullTargetRef} style={{ background: 'var(--bg-color)', padding: '20px', borderRadius: '8px' }}>
-        <div className="dashboard">
-          {/* Left Column */}
-          <div>
-            <div className="card">
-            <h3 className="card-title">Overall Assessment {renderBadge(data.compliance_status)}</h3>
+      {!data.noc_analysis?.applicable ? (
+        <div className="card" style={{ 
+          marginTop: '20px', 
+          padding: '40px', 
+          textAlign: 'center', 
+          background: 'linear-gradient(135deg, #FEF3C7, #FDE68A)', 
+          border: '1px solid #F59E0B',
+          boxShadow: '0 10px 25px -5px rgba(245, 158, 11, 0.2)'
+        }}>
+          <div style={{ fontSize: '3rem', marginBottom: '20px' }}>⚠️</div>
+          <h2 style={{ fontSize: '1.75rem', fontWeight: 800, color: '#92400E', marginBottom: '16px' }}>
+            Document Rejected: {data.document_type}
+          </h2>
+          <div style={{ 
+            maxWidth: '650px', 
+            margin: '0 auto', 
+            fontSize: '1.1rem', 
+            color: '#78350F', 
+            lineHeight: 1.6, 
+            textAlign: 'left',
+            background: 'rgba(255, 255, 255, 0.5)',
+            padding: '24px',
+            borderRadius: '12px'
+          }}>
+            <p style={{ marginTop: 0 }}><strong>Why this happened:</strong></p>
             <p>{data.summary}</p>
-            {data.strengths.length > 0 && (
-               <div style={{ marginTop: '16px' }}>
-                 <strong style={{ color: 'var(--success-color)' }}>✅ Strengths:</strong>
-                 <ul style={{ paddingLeft: '20px', marginTop: '8px', fontSize: '14px' }}>
-                   {data.strengths.map((s, idx) => <li key={idx}>{s}</li>)}
-                 </ul>
-               </div>
-            )}
-          </div>
-
-          <div className="card">
-            <h3 className="card-title">⚠️ Identified Risks ({data.risks.length})</h3>
-            {data.risks.length === 0 ? <p>No significant risks found in the document.</p> : null}
-            {data.risks.map((risk: Risk, idx: number) => (
-              <div key={idx} className={`risk-item ${risk.severity === 'high' ? 'high' : ''}`}>
-                <div className="risk-title">{risk.issue}</div>
-                <div className="risk-impact">Impact: {risk.impact}</div>
-                <strong>Recommendation:</strong> {risk.recommendation}
+            
+            {data.risks.length > 0 && (
+              <div style={{ marginTop: '20px' }}>
+                <p style={{ fontWeight: 'bold', marginBottom: '8px' }}>Action Required:</p>
+                <div className="risk-item high" style={{ background: 'white', border: '1px solid #ef4444' }}>
+                  <div className="risk-title">{data.risks[0].issue}</div>
+                  <div className="risk-impact">{data.risks[0].recommendation}</div>
+                </div>
               </div>
-            ))}
-          </div>
-
-          <div className="card">
-            <h3 className="card-title">❌ Missing Elements</h3>
-            {data.missing_elements.length > 0 ? (
-              <ul className="missing-elements">
-                {data.missing_elements.map((item, idx) => (
-                  <li key={idx}>{item}</li>
-                ))}
-              </ul>
-            ) : <p>All essential elements are present in the document.</p>}
+            )}
           </div>
           
-          <div className="card">
-            <h3 className="card-title">🔧 Recommended Fixes</h3>
-             <ul style={{ paddingLeft: '20px' }}>
-                {data.recommended_fixes.map((fix, idx) => (
-                  <li key={idx} style={{ marginBottom: '8px' }}>{fix}</li>
-                ))}
-              </ul>
+          <div style={{ marginTop: '32px' }}>
+            <button className="btn btn-primary btn-lg" onClick={onReset} style={{ padding: '12px 32px' }}>
+              Upload Correct Document
+            </button>
+            <p style={{ fontSize: '0.85rem', color: '#92400E', marginTop: '16px' }}>
+              Only official employment/reference letters with job duties can be audited.
+            </p>
           </div>
         </div>
+      ) : (
+        <>
+          <div ref={fullTargetRef} style={{ background: 'var(--bg-color)', padding: '20px', borderRadius: '8px' }}>
+            <div className="dashboard">
+              <div>
+                <div className="card">
+                  <h3 className="card-title">Overall Assessment {renderBadge(data.compliance_status)}</h3>
+                  <p>{data.summary}</p>
+                  {data.strengths.length > 0 && (
+                     <div style={{ marginTop: '16px' }}>
+                       <strong style={{ color: 'var(--success-color)' }}>✅ Strengths:</strong>
+                       <ul style={{ paddingLeft: '20px', marginTop: '8px', fontSize: '14px' }}>
+                         {data.strengths.map((s, idx) => <li key={idx}>{s}</li>)}
+                       </ul>
+                     </div>
+                  )}
+                </div>
 
-        {/* Right Column */}
-        <div>
-          <div className="card">
-            <h3 className="card-title">NOC Compliance Analysis</h3>
-            <div style={{ background: 'var(--bg-color)', borderRadius: '8px', padding: '16px', marginBottom: '16px', border: '1px solid var(--border-color)' }}>
-              <div style={{ fontSize: '13px', color: 'var(--text-muted)', marginBottom: '4px' }}>Detected NOC Code</div>
-              <div style={{ fontSize: '1.4rem', fontWeight: 'bold', color: 'var(--primary-color)' }}>
-                {data.noc_analysis.detected_code}
-              </div>
-              <div style={{ fontSize: '0.95rem', color: 'var(--text-main)', marginTop: '4px' }}>
-                {data.noc_analysis.detected_title}
-              </div>
-            </div>
-            <div style={{ marginBottom: '12px' }}>
-              <strong>Match Score: </strong> 
-              <span className={`badge ${data.noc_analysis.match_score >= 80 ? 'badge-success' : data.noc_analysis.match_score >= 65 ? 'badge-warning' : 'badge-danger'}`}>
-                {data.noc_analysis.match_score}% Match
-              </span>
-            </div>
-            {data.noc_analysis.alternative_nocs && data.noc_analysis.alternative_nocs.length > 0 && (
-              <div style={{ marginTop: '12px', padding: '12px', background: 'white', borderRadius: '6px', border: '1px dashed var(--border-color)' }}>
-                <h4 style={{ fontSize: '0.85rem', fontWeight: 'bold', marginBottom: '8px', color: 'var(--text-muted)' }}>ALTERNATIVE NOC CODES:</h4>
-                <ul style={{ listStyle: 'none', padding: 0, margin: 0, fontSize: '0.9rem' }}>
-                  {data.noc_analysis.alternative_nocs.map((alt, i) => (
-                    <li key={i} style={{ marginBottom: '6px', borderBottom: i !== data.noc_analysis.alternative_nocs.length - 1 ? '1px solid var(--border-color)' : 'none', paddingBottom: i !== data.noc_analysis.alternative_nocs.length - 1 ? '6px' : '0' }}>
-                      <strong>{alt.noc_code}</strong> - {alt.noc_title} <span style={{ color: alt.match_score >= 80 ? '#059669' : '#D97706', fontWeight: 'bold', fontSize: '0.8rem', marginLeft: '6px' }}>({alt.match_score}%)</span>
-                    </li>
+                <div className="card">
+                  <h3 className="card-title">⚠️ Identified Risks ({data.risks.length})</h3>
+                  {data.risks.length === 0 ? <p>No significant risks found in the document.</p> : null}
+                  {data.risks.map((risk: Risk, idx: number) => (
+                    <div key={idx} className={`risk-item ${risk.severity === 'high' ? 'high' : ''}`}>
+                      <div className="risk-title">{risk.issue}</div>
+                      <div className="risk-impact">Impact: {risk.impact}</div>
+                      <strong>Recommendation:</strong> {risk.recommendation}
+                    </div>
                   ))}
-                </ul>
+                </div>
+
+                <div className="card">
+                  <h3 className="card-title">❌ Missing Elements</h3>
+                  {data.missing_elements.length > 0 ? (
+                    <ul className="missing-elements">
+                      {data.missing_elements.map((item, idx) => (
+                        <li key={idx}>{item}</li>
+                      ))}
+                    </ul>
+                  ) : <p>All essential elements are present in the document.</p>}
+                </div>
+                
+                <div className="card">
+                  <h3 className="card-title">🔧 Recommended Fixes</h3>
+                  <ul style={{ paddingLeft: '20px' }}>
+                    {data.recommended_fixes.map((fix, idx) => (
+                      <li key={idx} style={{ marginBottom: '8px' }}>{fix}</li>
+                    ))}
+                  </ul>
+                </div>
               </div>
+
+              <div>
+                <div className="card">
+                  <h3 className="card-title">NOC Compliance Analysis</h3>
+                  <div style={{ background: 'var(--bg-color)', borderRadius: '8px', padding: '16px', marginBottom: '16px', border: '1px solid var(--border-color)' }}>
+                    <div style={{ fontSize: '13px', color: 'var(--text-muted)', marginBottom: '4px' }}>Detected NOC Code</div>
+                    <div style={{ fontSize: '1.4rem', fontWeight: 'bold', color: 'var(--primary-color)' }}>
+                      {data.noc_analysis.detected_code}
+                    </div>
+                    <div style={{ fontSize: '0.95rem', color: 'var(--text-main)', marginTop: '4px' }}>
+                      {data.noc_analysis.detected_title}
+                    </div>
+                  </div>
+                  <div style={{ marginBottom: '12px' }}>
+                    <strong>Match Score: </strong> 
+                    <span className={`badge ${data.noc_analysis.match_score >= 80 ? 'badge-success' : data.noc_analysis.match_score >= 65 ? 'badge-warning' : 'badge-danger'}`}>
+                      {data.noc_analysis.match_score}% Match
+                    </span>
+                  </div>
+                  {data.noc_analysis.alternative_nocs && data.noc_analysis.alternative_nocs.length > 0 && (
+                    <div style={{ marginTop: '12px', padding: '12px', background: 'white', borderRadius: '6px', border: '1px dashed var(--border-color)' }}>
+                      <h4 style={{ fontSize: '0.85rem', fontWeight: 'bold', marginBottom: '8px', color: 'var(--text-muted)' }}>ALTERNATIVE NOC CODES:</h4>
+                      <ul style={{ listStyle: 'none', padding: 0, margin: 0, fontSize: '0.9rem' }}>
+                        {data.noc_analysis.alternative_nocs.map((alt, i) => (
+                          <li key={i} style={{ marginBottom: '6px', borderBottom: i !== data.noc_analysis.alternative_nocs.length - 1 ? '1px solid var(--border-color)' : 'none', paddingBottom: i !== data.noc_analysis.alternative_nocs.length - 1 ? '6px' : '0' }}>
+                            <strong>{alt.noc_code}</strong> - {alt.noc_title} <span style={{ color: alt.match_score >= 80 ? '#059669' : '#D97706', fontWeight: 'bold', fontSize: '0.8rem', marginLeft: '6px' }}>({alt.match_score}%)</span>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+                  <p style={{ fontSize: '0.9rem', color: 'var(--text-muted)', marginTop: '12px' }}>{data.noc_analysis.notes}</p>
+                </div>
+
+                <div className="card">
+                  <h3 className="card-title">✍️ Suggested Wording</h3>
+                  {data.suggested_wording.map((text, idx) => (
+                    <div key={idx} className="recommendation-box" style={{ fontStyle: 'italic', color: 'var(--primary-dark)' }}>
+                      "{text}"
+                    </div>
+                  ))}
+                </div>
+
+                <div className="card" style={{ background: 'var(--bg-color)', border: '2px solid var(--primary-color)' }}>
+                  <h3 className="card-title">🟢 Final Verdict</h3>
+                  <p style={{ fontSize: '1.1rem', fontWeight: 600, marginBottom: '10px' }}>
+                    {data.final_verdict === 'ready' ? 'Ready to Submit' : 
+                     data.final_verdict === 'revise_minor' ? 'Minor Revisions Recommended' : 
+                     'Major Issues Must Be Resolved Before Submission'}
+                  </p>
+                  {renderBadge(data.final_verdict)}
+                  <p style={{ marginTop: '20px', fontSize: '11px', color: 'var(--text-muted)', textAlign: 'center' }}>
+                    * This review is for informational purposes only and does not constitute legal advice.
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            {data.noc_analysis?.duties_match && data.noc_analysis.duties_match.length > 0 && (
+               <>
+                 <div ref={breakSpacerRef} style={{ transition: 'height 0.1s ease-in-out' }}></div>
+                 <div style={{ pageBreakBefore: 'always', margin: '40px 0 0 0' }} className="html2pdf__page-break"></div>
+                 <div ref={nocTargetRef} className="card" style={{ marginTop: '0' }}>
+                    <h2 style={{ fontSize: '1.5rem', fontWeight: 'bold', marginBottom: '16px', borderBottom: '2px solid var(--primary-light)', paddingBottom: '8px' }}>
+                      NOC Alignment Sheet (For IRCC Officer)
+                    </h2>
+                    
+                    <h3 style={{ fontSize: '1.2rem', marginTop: '20px', marginBottom: '12px', color: 'var(--primary-dark)' }}>1. Lead Statement Alignment</h3>
+                    <div style={{ overflowX: 'auto' }}>
+                      <table style={{ width: '100%', borderCollapse: 'collapse', border: '1px solid var(--border-color)', marginBottom: '30px' }}>
+                        <thead>
+                          <tr style={{ backgroundColor: 'var(--bg-color)' }}>
+                            <th style={{ padding: '12px', border: '1px solid var(--border-color)', textAlign: 'left', width: '33%' }}>Official NOC Description</th>
+                            <th style={{ padding: '12px', border: '1px solid var(--border-color)', textAlign: 'left', width: '33%' }}>Evidence in Employment Letter</th>
+                            <th style={{ padding: '12px', border: '1px solid var(--border-color)', textAlign: 'left', width: '33%' }}>Overlap Description</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          <tr>
+                            <td style={{ padding: '12px', border: '1px solid var(--border-color)', verticalAlign: 'top', fontStyle: 'italic', color: 'var(--text-muted)', fontSize: '0.95rem' }}>"{data.noc_analysis.lead_statement_official}"</td>
+                            <td style={{ padding: '12px', border: '1px solid var(--border-color)', verticalAlign: 'top', fontWeight: 500, fontSize: '0.95rem' }}>"{data.noc_analysis.lead_statement_applicant}"</td>
+                            <td style={{ padding: '12px', border: '1px solid var(--border-color)', verticalAlign: 'top', color: 'var(--primary-dark)', fontSize: '0.95rem' }}>{data.noc_analysis.lead_statement_overlap}</td>
+                          </tr>
+                        </tbody>
+                      </table>
+                    </div>
+
+                    <h3 style={{ fontSize: '1.2rem', marginTop: '10px', marginBottom: '12px', color: 'var(--primary-dark)' }}>2. Main Duties Comparison</h3>
+                    <div style={{ overflowX: 'auto' }}>
+                      <table style={{ width: '100%', borderCollapse: 'collapse', border: '1px solid var(--border-color)' }}>
+                        <thead>
+                          <tr style={{ backgroundColor: 'var(--bg-color)' }}>
+                            <th style={{ padding: '12px', border: '1px solid var(--border-color)', textAlign: 'left', width: '33%' }}>Official NOC Documented Duty</th>
+                            <th style={{ padding: '12px', border: '1px solid var(--border-color)', textAlign: 'left', width: '33%' }}>Applicant's Duty (from letter)</th>
+                            <th style={{ padding: '12px', border: '1px solid var(--border-color)', textAlign: 'left', width: '33%' }}>Overlap Description</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {data.noc_analysis.duties_match.map((duty, idx) => (
+                            <tr key={idx}>
+                              <td style={{ padding: '12px', border: '1px solid var(--border-color)', verticalAlign: 'top', color: 'var(--text-muted)', fontSize: '0.95rem' }}>{duty.official_noc_duty}</td>
+                              <td style={{ padding: '12px', border: '1px solid var(--border-color)', verticalAlign: 'top', fontWeight: 500, fontSize: '0.95rem' }}>"{duty.applicant_duty}"</td>
+                              <td style={{ padding: '12px', border: '1px solid var(--border-color)', verticalAlign: 'top', color: 'var(--primary-dark)', fontSize: '0.95rem' }}>{duty.overlap_description}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+
+                    <h3 style={{ fontSize: '1.2rem', marginTop: '20px', marginBottom: '12px', color: 'var(--primary-dark)' }}>3. Mandatory Document Checklist (Verified)</h3>
+                    <p style={{ fontSize: '0.95rem', color: 'var(--text-muted)', fontStyle: 'italic', marginBottom: '12px' }}>
+                      The attached employment letter has been evaluated for the following mandatory elements required by IRCC:
+                    </p>
+                    <div style={{ background: 'var(--bg-color)', padding: '16px', borderRadius: '8px', border: '1px solid var(--border-color)' }}>
+                      <ul style={{ listStyleType: 'none', padding: 0, margin: 0, display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '12px' }}>
+                        <li style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                          {data.mandatory_requirements?.company_letterhead ? '✅' : '❌'} <span>Printed on official company letterhead</span>
+                        </li>
+                        <li style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                          {data.mandatory_requirements?.applicant_name ? '✅' : '❌'} <span>Applicant's full name is clearly stated</span>
+                        </li>
+                        <li style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                          {data.mandatory_requirements?.contact_information ? '✅' : '❌'} <span>Includes company contact information</span>
+                        </li>
+                        <li style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                          {data.mandatory_requirements?.job_title ? '✅' : '❌'} <span>Job title(s) are explicitly stated</span>
+                        </li>
+                        <li style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                          {data.mandatory_requirements?.dates_of_employment ? '✅' : '❌'} <span>States the exact dates of employment</span>
+                        </li>
+                        <li style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                          {data.mandatory_requirements?.hours_worked ? '✅' : '❌'} <span>States the number of hours worked per week</span>
+                        </li>
+                        <li style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                          {data.mandatory_requirements?.salary_compensation ? '✅' : '❌'} <span>States the applicant's compensation / salary</span>
+                        </li>
+                        <li style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                          {data.mandatory_requirements?.signatory ? '✅' : '❌'} <span>Signed by the immediate supervisor or HR officer</span>
+                        </li>
+                      </ul>
+                    </div>
+                 </div>
+               </>
             )}
-            <p style={{ fontSize: '0.9rem', color: 'var(--text-muted)', marginTop: '12px' }}>{data.noc_analysis.notes}</p>
           </div>
 
-          <div className="card">
-            <h3 className="card-title">✍️ Suggested Wording</h3>
-             {data.suggested_wording.map((text, idx) => (
-                <div key={idx} className="recommendation-box" style={{ fontStyle: 'italic', color: 'var(--primary-dark)' }}>
-                  "{text}"
-                </div>
-              ))}
-          </div>
-
-          <div className="card" style={{ background: 'var(--bg-color)', border: '2px solid var(--primary-color)' }}>
-            <h3 className="card-title">🟢 Final Verdict</h3>
-            <p style={{ fontSize: '1.1rem', fontWeight: 600, marginBottom: '10px' }}>
-              {data.final_verdict === 'ready' ? 'Ready to Submit' : 
-               data.final_verdict === 'revise_minor' ? 'Minor Revisions Recommended' : 
-               'Major Issues Must Be Resolved Before Submission'}
-            </p>
-            {renderBadge(data.final_verdict)}
-            <p style={{ marginTop: '20px', fontSize: '11px', color: 'var(--text-muted)', textAlign: 'center' }}>
-              * This review is for informational purposes only and does not constitute legal advice.
-            </p>
-          </div>
-        </div>
-      </div>
-
-      {/* New Section: NOC Alignment Sheet */}
-      {data.noc_analysis?.duties_match && data.noc_analysis.duties_match.length > 0 && (
-         <>
-         <div ref={breakSpacerRef} style={{ transition: 'height 0.1s ease-in-out' }}></div>
-         <div style={{ pageBreakBefore: 'always', margin: '40px 0 0 0' }} className="html2pdf__page-break"></div>
-         <div ref={nocTargetRef} className="card" style={{ marginTop: '0' }}>
-            <h2 style={{ fontSize: '1.5rem', fontWeight: 'bold', marginBottom: '16px', borderBottom: '2px solid var(--primary-light)', paddingBottom: '8px' }}>
-              NOC Alignment Sheet (For IRCC Officer)
-            </h2>
-            
-            {/* Lead Statement Table */}
-            <h3 style={{ fontSize: '1.2rem', marginTop: '20px', marginBottom: '12px', color: 'var(--primary-dark)' }}>1. Lead Statement Alignment</h3>
-            <div style={{ overflowX: 'auto' }}>
-              <table style={{ width: '100%', borderCollapse: 'collapse', border: '1px solid var(--border-color)', marginBottom: '30px' }}>
-                <thead>
-                  <tr style={{ backgroundColor: 'var(--bg-color)' }}>
-                    <th style={{ padding: '12px', border: '1px solid var(--border-color)', textAlign: 'left', width: '33%' }}>Official NOC Description</th>
-                    <th style={{ padding: '12px', border: '1px solid var(--border-color)', textAlign: 'left', width: '33%' }}>Evidence in Employment Letter</th>
-                    <th style={{ padding: '12px', border: '1px solid var(--border-color)', textAlign: 'left', width: '33%' }}>Overlap Description</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  <tr>
-                    <td style={{ padding: '12px', border: '1px solid var(--border-color)', verticalAlign: 'top', fontStyle: 'italic', color: 'var(--text-muted)', fontSize: '0.95rem' }}>"{data.noc_analysis.lead_statement_official}"</td>
-                    <td style={{ padding: '12px', border: '1px solid var(--border-color)', verticalAlign: 'top', fontWeight: 500, fontSize: '0.95rem' }}>"{data.noc_analysis.lead_statement_applicant}"</td>
-                    <td style={{ padding: '12px', border: '1px solid var(--border-color)', verticalAlign: 'top', color: 'var(--primary-dark)', fontSize: '0.95rem' }}>{data.noc_analysis.lead_statement_overlap}</td>
-                  </tr>
-                </tbody>
-              </table>
+          <div data-html2canvas-ignore="true" style={{ marginTop: '40px', background: 'var(--surface-color)', padding: '40px 30px', borderRadius: '12px', border: '1px solid var(--border-color)', textAlign: 'center', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.1)' }}>
+            <h3 style={{ fontSize: '1.75rem', marginBottom: '12px', color: 'var(--primary-dark)', fontWeight: 'bold' }}>Ready to submit?</h3>
+            <div style={{ background: '#EFF6FF', border: '1px solid #BFDBFE', padding: '16px', borderRadius: '8px', maxWidth: '700px', margin: '0 auto 24px auto', textAlign: 'left' }}>
+              <p style={{ color: '#1E3A8A', margin: 0, fontSize: '0.95rem', lineHeight: '1.5' }}>
+                💡 <strong>Pro Tip for Application:</strong> We strongly recommend submitting the <strong>"NOC Sheet Only"</strong> completely separately as the very first page of your employment records. IRCC officers process hundreds of records a week and they absolutely love seeing clear, structured alignment sheets. It drastically reduces processing time and ambiguity!
+              </p>
             </div>
-
-            {/* Main Duties Table */}
-            <h3 style={{ fontSize: '1.2rem', marginTop: '10px', marginBottom: '12px', color: 'var(--primary-dark)' }}>2. Main Duties Comparison</h3>
-            <div style={{ overflowX: 'auto' }}>
-              <table style={{ width: '100%', borderCollapse: 'collapse', border: '1px solid var(--border-color)' }}>
-                <thead>
-                  <tr style={{ backgroundColor: 'var(--bg-color)' }}>
-                    <th style={{ padding: '12px', border: '1px solid var(--border-color)', textAlign: 'left', width: '33%' }}>Official NOC Documented Duty</th>
-                    <th style={{ padding: '12px', border: '1px solid var(--border-color)', textAlign: 'left', width: '33%' }}>Applicant's Duty (from letter)</th>
-                    <th style={{ padding: '12px', border: '1px solid var(--border-color)', textAlign: 'left', width: '33%' }}>Overlap Description</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {data.noc_analysis.duties_match.map((duty, idx) => (
-                    <tr key={idx}>
-                      <td style={{ padding: '12px', border: '1px solid var(--border-color)', verticalAlign: 'top', color: 'var(--text-muted)', fontSize: '0.95rem' }}>{duty.official_noc_duty}</td>
-                      <td style={{ padding: '12px', border: '1px solid var(--border-color)', verticalAlign: 'top', fontWeight: 500, fontSize: '0.95rem' }}>"{duty.applicant_duty}"</td>
-                      <td style={{ padding: '12px', border: '1px solid var(--border-color)', verticalAlign: 'top', color: 'var(--primary-dark)', fontSize: '0.95rem' }}>{duty.overlap_description}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-
-            {/* Mandatory Document Checklist */}
-            <h3 style={{ fontSize: '1.2rem', marginTop: '20px', marginBottom: '12px', color: 'var(--primary-dark)' }}>3. Mandatory Document Checklist (Verified)</h3>
-            <p style={{ fontSize: '0.95rem', color: 'var(--text-muted)', fontStyle: 'italic', marginBottom: '12px' }}>
-              The attached employment letter has been evaluated for the following mandatory elements required by IRCC:
-            </p>
-            <div style={{ background: 'var(--bg-color)', padding: '16px', borderRadius: '8px', border: '1px solid var(--border-color)' }}>
-              <ul style={{ listStyleType: 'none', padding: 0, margin: 0, display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '12px' }}>
-                <li style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  {data.mandatory_requirements?.company_letterhead ? '✅' : '❌'} <span>Printed on official company letterhead</span>
-                </li>
-                <li style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  {data.mandatory_requirements?.applicant_name ? '✅' : '❌'} <span>Applicant's full name is clearly stated</span>
-                </li>
-                <li style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  {data.mandatory_requirements?.contact_information ? '✅' : '❌'} <span>Includes company contact information</span>
-                </li>
-                <li style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  {data.mandatory_requirements?.job_title ? '✅' : '❌'} <span>Job title(s) are explicitly stated</span>
-                </li>
-                <li style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  {data.mandatory_requirements?.dates_of_employment ? '✅' : '❌'} <span>States the exact dates of employment</span>
-                </li>
-                <li style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  {data.mandatory_requirements?.hours_worked ? '✅' : '❌'} <span>States the number of hours worked per week</span>
-                </li>
-                <li style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  {data.mandatory_requirements?.salary_compensation ? '✅' : '❌'} <span>States the applicant's compensation / salary</span>
-                </li>
-                <li style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  {data.mandatory_requirements?.signatory ? '✅' : '❌'} <span>Signed by the immediate supervisor or HR officer</span>
-                </li>
-              </ul>
-            </div>
-         </div>
-         </>
-      )}
-      </div>
-
-      {/* Contextual CTA (Option 2) */}
-      <div data-html2canvas-ignore="true" style={{ marginTop: '40px', background: 'var(--surface-color)', padding: '40px 30px', borderRadius: '12px', border: '1px solid var(--border-color)', textAlign: 'center', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.1)' }}>
-        <h3 style={{ fontSize: '1.75rem', marginBottom: '12px', color: 'var(--primary-dark)', fontWeight: 'bold' }}>Ready to submit?</h3>
-        
-        <div style={{ background: '#EFF6FF', border: '1px solid #BFDBFE', padding: '16px', borderRadius: '8px', maxWidth: '700px', margin: '0 auto 24px auto', textAlign: 'left' }}>
-          <p style={{ color: '#1E3A8A', margin: 0, fontSize: '0.95rem', lineHeight: '1.5' }}>
-            💡 <strong>Pro Tip for Application:</strong> We strongly recommend submitting the <strong>"NOC Sheet Only"</strong> completely separately as the very first page of your employment records. IRCC officers process hundreds of records a week and they absolutely love seeing clear, structured alignment sheets. It drastically reduces processing time and ambiguity!
-          </p>
-        </div>
-        <div style={{ display: 'flex', gap: '16px', justifyContent: 'center', flexWrap: 'wrap' }}>
-           {isSignedIn ? (
-              <>
-                <button onClick={() => toNocPDF()} className="btn btn-lg" style={{ background: 'var(--primary-color)', borderColor: 'var(--primary-color)', color: 'white', padding: '12px 32px' }}>
-                  📄 Download NOC Sheet
-                </button>
-                <button onClick={() => handleDownloadFull()} className="btn btn-lg btn-outline" style={{ padding: '12px 32px' }}>
-                  📥 Download Full Audit
-                </button>
-              </>
-           ) : (
-              <>
-                <div onClickCapture={() => sessionStorage.setItem('pendingPdfDownload', 'noc')}>
-                  <SignInButton mode="modal" forceRedirectUrl={window.location.href}>
-                    <button className="btn btn-lg" style={{ background: 'var(--primary-color)', borderColor: 'var(--primary-color)', color: 'white', padding: '12px 32px' }}>
-                      📄 Sign In & Download NOC Sheet
+            <div style={{ display: 'flex', gap: '16px', justifyContent: 'center', flexWrap: 'wrap' }}>
+               {isSignedIn ? (
+                  <>
+                    <button onClick={() => handleDownloadNoc()} className="btn btn-lg" style={{ background: 'var(--primary-color)', borderColor: 'var(--primary-color)', color: 'white', padding: '12px 32px' }}>
+                      📄 Download NOC Sheet
                     </button>
-                  </SignInButton>
-                </div>
-                <div onClickCapture={() => sessionStorage.setItem('pendingPdfDownload', 'full')}>
-                  <SignInButton mode="modal" forceRedirectUrl={window.location.href}>
-                    <button className="btn btn-lg btn-outline" style={{ padding: '12px 32px' }}>
-                      📥 Sign In for Full Audit
+                    <button onClick={() => handleDownloadFull()} className="btn btn-lg btn-outline" style={{ padding: '12px 32px' }}>
+                      📥 Download Full Audit
                     </button>
-                  </SignInButton>
-                </div>
-              </>
-           )}
-        </div>
-      </div>
-
-      {/* Sticky Toast (Option 1) */}
-      {!isSignedIn && showToast && !toastDismissed && (
-        <div className="sticky-toast" style={{ 
-          position: 'fixed', bottom: '24px', left: '50%', transform: 'translateX(-50%)', 
-          background: 'white', padding: '16px 24px', borderRadius: '12px', 
-          boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.2), 0 10px 10px -5px rgba(0, 0, 0, 0.14)', 
-          border: '1px solid rgba(0,0,0,0.05)', zIndex: 50, display: 'flex', 
-          alignItems: 'center', gap: '20px', maxWidth: '90vw', width: 'max-content', 
-          animation: 'slideUp 0.4s cubic-bezier(0.16, 1, 0.3, 1)' 
-        }}>
-          <div>
-            <div style={{ fontWeight: 600, color: '#1f2937', marginBottom: '4px', fontSize: '1rem' }}>Don't lose this report!</div>
-            <div style={{ fontSize: '0.9rem', color: '#6b7280' }}>Sign in to safely download your PDF.</div>
+                  </>
+               ) : (
+                  <>
+                    <div onClickCapture={() => sessionStorage.setItem('pendingPdfDownload', 'noc')}>
+                      <SignInButton mode="modal" forceRedirectUrl={window.location.href}>
+                        <button className="btn btn-lg" style={{ background: 'var(--primary-color)', borderColor: 'var(--primary-color)', color: 'white', padding: '12px 32px' }}>
+                          📄 Sign In & Download NOC Sheet
+                        </button>
+                      </SignInButton>
+                    </div>
+                    <div onClickCapture={() => sessionStorage.setItem('pendingPdfDownload', 'full')}>
+                      <SignInButton mode="modal" forceRedirectUrl={window.location.href}>
+                        <button className="btn btn-lg btn-outline" style={{ padding: '12px 32px' }}>
+                          📥 Sign In for Full Audit
+                        </button>
+                      </SignInButton>
+                    </div>
+                  </>
+               )}
+            </div>
           </div>
-          <div onClickCapture={() => sessionStorage.setItem('pendingPdfDownload', 'full')}>
-            <SignInButton mode="modal" forceRedirectUrl={window.location.href}>
-              <button className="btn" style={{ background: '#4285F4', borderColor: '#4285F4', color: 'white', padding: '8px 20px', fontSize: '0.95rem', fontWeight: 500 }}>
-                Sign in
+
+          {!isSignedIn && showToast && !toastDismissed && (
+            <div className="sticky-toast" style={{ 
+              position: 'fixed', bottom: '24px', left: '50%', transform: 'translateX(-50%)', 
+              background: 'white', padding: '16px 24px', borderRadius: '12px', 
+              boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.2), 0 10px 10px -5px rgba(0, 0, 0, 0.14)', 
+              border: '1px solid rgba(0,0,0,0.05)', zIndex: 50, display: 'flex', 
+              alignItems: 'center', gap: '20px', maxWidth: '90vw', width: 'max-content', 
+              animation: 'slideUp 0.4s cubic-bezier(0.16, 1, 0.3, 1)' 
+            }}>
+              <div>
+                <div style={{ fontWeight: 600, color: '#1f2937', marginBottom: '4px', fontSize: '1rem' }}>Don't lose this report!</div>
+                <div style={{ fontSize: '0.9rem', color: '#6b7280' }}>Sign in to safely download your PDF.</div>
+              </div>
+              <div onClickCapture={() => sessionStorage.setItem('pendingPdfDownload', 'full')}>
+                <SignInButton mode="modal" forceRedirectUrl={window.location.href}>
+                  <button className="btn" style={{ background: '#4285F4', borderColor: '#4285F4', color: 'white', padding: '8px 20px', fontSize: '0.95rem', fontWeight: 500 }}>
+                    Sign in
+                  </button>
+                </SignInButton>
+              </div>
+              <button onClick={() => setToastDismissed(true)} style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: '#9ca3af', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '4px', marginLeft: '-8px' }} aria-label="Dismiss">
+                 <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
               </button>
-            </SignInButton>
-          </div>
-          <button onClick={() => setToastDismissed(true)} style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: '#9ca3af', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '4px', marginLeft: '-8px' }} aria-label="Dismiss">
-             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
-          </button>
-        </div>
+            </div>
+          )}
+        </>
       )}
-
     </div>
   );
 };
