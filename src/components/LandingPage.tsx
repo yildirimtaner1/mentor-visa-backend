@@ -137,7 +137,7 @@ export const LandingPage: FC<LandingPageProps> = ({ onGetStarted, onNavigate }) 
             <p>Upload your employment letter and get an instant AI audit against all 9 IRCC requirements and 516 NOC codes.</p>
             <span className="tool-card-tag">Most Popular</span>
           </div>
-          <div className="tool-card" onClick={() => onNavigate('noc-finder')}>
+          <div className="tool-card" onClick={() => onNavigate('find-my-noc')}>
             <div className="tool-card-icon">🎯</div>
             <h3>AI NOC Code Matcher</h3>
             <p>Describe your job duties and our AI will match you to the best NOC 2021 code from all 516 unit groups.</p>
@@ -149,7 +149,7 @@ export const LandingPage: FC<LandingPageProps> = ({ onGetStarted, onNavigate }) 
             <p>Calculate your Comprehensive Ranking System score and compare it against recent Express Entry draw cutoffs.</p>
             <span className="tool-card-tag">Real-Time</span>
           </div>
-          <div className="tool-card" onClick={() => onNavigate('checklist')}>
+          <div className="tool-card" onClick={() => onNavigate('cec-checklist')}>
             <div className="tool-card-icon">✅</div>
             <h3>Interactive CEC Checklist</h3>
             <p>Track every document and requirement for your application with our interactive, auto-saving checklist.</p>
@@ -272,10 +272,10 @@ export const LandingPage: FC<LandingPageProps> = ({ onGetStarted, onNavigate }) 
             <span>Mentor Visa</span>
           </div>
           <div className="landing-footer-links">
-            <button onClick={() => onNavigate('cec-guide')}>Express Entry CEC Guide</button>
-            <button onClick={() => onNavigate('noc-finder')}>Find My NOC</button>
+            <button onClick={() => onNavigate('express-entry-cec-guide')}>Express Entry CEC Guide</button>
+            <button onClick={() => onNavigate('find-my-noc')}>Find My NOC</button>
             <button onClick={() => onNavigate('crs-calculator')}>CRS Calculator</button>
-            <button onClick={() => onNavigate('checklist')}>CEC Application Checklist</button>
+            <button onClick={() => onNavigate('cec-checklist')}>CEC Application Checklist</button>
           </div>
           <p className="landing-footer-disclaimer">
             © 2026 Mentor Visa Services. All rights reserved.<br />

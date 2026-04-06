@@ -232,10 +232,10 @@ export const CECChecklistPage: FC<CECChecklistPageProps> = ({ onNavigate }) => {
                 Our AI auditor checks your letter against all 9 IRCC requirements and 516 NOC codes.
               </p>
               <div style={{ display: 'flex', gap: '12px', justifyContent: 'center', flexWrap: 'wrap' }}>
-                <button className="btn btn-primary" onClick={() => onNavigate('audit')}>
+                <button className="btn btn-primary" onClick={() => onNavigate('audit-employment-letter')}>
                   📄 Audit Employment Letter
                 </button>
-                <button className="btn btn-outline" onClick={() => onNavigate('noc-finder')}>
+                <button className="btn btn-outline" onClick={() => onNavigate('find-my-noc')}>
                   🎯 Find My NOC Code
                 </button>
               </div>

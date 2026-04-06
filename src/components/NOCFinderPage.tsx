@@ -366,7 +366,7 @@ export const NOCFinderPage: FC<NOCFinderPageProps> = ({ onNavigate }) => {
                   <p style={{ fontSize: '0.95rem', color: 'var(--text-muted)', marginBottom: '16px' }}>
                     Now that you have your NOC code possibilities, make sure your letter complies with all IRCC formatting requirements:
                   </p>
-                  <button className="btn btn-primary btn-lg" onClick={() => onNavigate('audit')}>
+                  <button className="btn btn-primary btn-lg" onClick={() => onNavigate('audit-employment-letter')}>
                     📄 Audit Employment Letter
                   </button>
                 </div>
