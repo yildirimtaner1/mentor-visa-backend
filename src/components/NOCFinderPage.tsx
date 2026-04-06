@@ -1,6 +1,7 @@
 import { type FC, useState, useRef } from 'react';
 import { findNOCCode } from '../services/api';
 import { SEO } from './common/SEO';
+import { DynamicLoader } from './common/DynamicLoader';
 
 interface AlternativeNOC {
   noc_code: string;
@@ -218,21 +219,20 @@ export const NOCFinderPage: FC<NOCFinderPageProps> = ({ onNavigate }) => {
                 </div>
               )}
 
-              <button 
-                className="btn btn-primary btn-lg" 
-                onClick={handleSubmit}
-                disabled={loading}
-                style={{ width: '100%', marginTop: '8px' }}
-              >
-                {loading ? (
-                  <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '10px' }}>
-                    <span className="spinner" style={{ width: '18px', height: '18px', border: '3px solid rgba(255,255,255,0.3)', borderTopColor: 'white', borderRadius: '50%', animation: 'spin 0.8s linear infinite', display: 'inline-block' }} />
-                    Analyzing against 516 NOC codes...
-                  </span>
-                ) : (
-                  '🔍 Find My NOC Code'
-                )}
-              </button>
+              {loading ? (
+                <div style={{ marginTop: '32px' }}>
+                  <DynamicLoader tool="noc" />
+                </div>
+              ) : (
+                <button 
+                  className="btn btn-primary btn-lg" 
+                  onClick={handleSubmit}
+                  disabled={loading}
+                  style={{ width: '100%', marginTop: '8px' }}
+                >
+                  🔍 Find My NOC Code
+                </button>
+              )}
             </div>
 
             {/* Rejection Warning */}

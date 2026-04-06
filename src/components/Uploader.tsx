@@ -3,6 +3,7 @@ import type { DragEvent, ChangeEvent, FC } from 'react';
 import type { AnalysisResponse } from '../types';
 import { uploadDocument } from '../services/api';
 import { SEO } from './common/SEO';
+import { DynamicLoader } from './common/DynamicLoader';
 
 const ACCEPTED_TYPES = [
   'application/pdf',
@@ -120,11 +121,7 @@ export const Uploader: FC<UploaderProps> = ({ onAnalysisResult }) => {
               >
                 <div className="drop-zone-icon">📄</div>
                 {loading ? (
-                  <div>
-                    <div className="loading-spinner"></div>
-                    <p style={{ fontWeight: 500 }}>Detecting NOC code & auditing against IRCC standards...</p>
-                    <p style={{ fontSize: '13px', color: 'var(--text-muted)' }}>The AI is reading your document and the NOC 2021 guide. This may take ~15 seconds.</p>
-                  </div>
+                  <DynamicLoader tool="audit" />
                 ) : (
                   <div>
                     <p style={{ fontWeight: 600, fontSize: '18px', color: 'var(--text-main)', marginBottom: '8px' }}>Drag & Drop Your Document</p>
