@@ -53,12 +53,38 @@ export const NOCFinderPage: FC<NOCFinderPageProps> = ({ onNavigate }) => {
   
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  const processInput = async (inputFile: File | null, inputTitle: string = '', inputDuties: string = '') => {
+    if (!inputFile && (!inputTitle.trim() || !inputDuties.trim())) {
+      setError('Please either upload a document OR fill in your job title and duties.');
+      return;
+    }
+    
+    setError('');
+    setLoading(true);
+    setResult(null);
+    try {
+      let data;
+      if (inputFile) {
+        data = await findNOCCode(undefined, undefined, inputFile);
+      } else {
+        data = await findNOCCode(inputTitle.trim(), inputDuties.trim());
+      }
+      setResult(data);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Something went wrong. Please try again.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
-      setFile(e.target.files[0]);
+      const selectedFile = e.target.files[0];
+      setFile(selectedFile);
       setJobTitle('');
       setDuties('');
       setError('');
+      processInput(selectedFile);
     }
   };
 
@@ -79,35 +105,17 @@ export const NOCFinderPage: FC<NOCFinderPageProps> = ({ onNavigate }) => {
     e.stopPropagation();
     setIsDragActive(false);
     if (e.dataTransfer.files && e.dataTransfer.files[0]) {
-      setFile(e.dataTransfer.files[0]);
+      const droppedFile = e.dataTransfer.files[0];
+      setFile(droppedFile);
       setJobTitle('');
       setDuties('');
       setError('');
+      processInput(droppedFile);
     }
   };
 
-  const handleSubmit = async () => {
-    if (!file && (!jobTitle.trim() || !duties.trim())) {
-      setError('Please either upload a document OR fill in your job title and duties.');
-      return;
-    }
-    
-    setError('');
-    setLoading(true);
-    setResult(null);
-    try {
-      let data;
-      if (file) {
-        data = await findNOCCode(undefined, undefined, file);
-      } else {
-        data = await findNOCCode(jobTitle.trim(), duties.trim());
-      }
-      setResult(data);
-    } catch (e) {
-      setError(e instanceof Error ? e.message : 'Something went wrong. Please try again.');
-    } finally {
-      setLoading(false);
-    }
+  const handleSubmit = () => {
+    processInput(file, jobTitle, duties);
   };
 
   const getScoreColor = (score: number) => {
@@ -175,43 +183,46 @@ export const NOCFinderPage: FC<NOCFinderPageProps> = ({ onNavigate }) => {
                 </div>
               </div>
 
-              <div style={{ display: 'flex', alignItems: 'center', margin: '32px 0' }}>
-                <div style={{ flex: 1, backgroundColor: 'var(--border-color)', height: '1px' }}></div>
-                <div style={{ padding: '0 16px', color: 'var(--text-muted)', fontWeight: 600, fontSize: '0.9rem', letterSpacing: '1px' }}>OR</div>
-                <div style={{ flex: 1, backgroundColor: 'var(--border-color)', height: '1px' }}></div>
-              </div>
+              {!file && (
+                <>
+                  <div style={{ display: 'flex', alignItems: 'center', margin: '32px 0' }}>
+                    <div style={{ flex: 1, backgroundColor: 'var(--border-color)', height: '1px' }}></div>
+                    <div style={{ padding: '0 16px', color: 'var(--text-muted)', fontWeight: 600, fontSize: '0.9rem', letterSpacing: '1px' }}>OR</div>
+                    <div style={{ flex: 1, backgroundColor: 'var(--border-color)', height: '1px' }}></div>
+                  </div>
 
-              <div style={{ marginBottom: '24px' }}>
-                <h3 style={{ fontSize: '1.2rem', fontWeight: 700, marginBottom: '8px' }}>Option 2: Type Manually</h3>
-                <p style={{ fontSize: '0.95rem', color: '#64748B', marginBottom: '20px' }}>
-                  If you don't have a document handy, you can paste the information manually. 
-                  {file && <span style={{ color: 'var(--primary-color)', fontWeight: 600 }}> (Uploading a file will override manual entry)</span>}
-                </p>
-                <div className="form-group">
-                  <label className="form-label">Job Title</label>
-                  <input 
-                    type="text"
-                    className="form-input"
-                    placeholder="e.g., Software Developer, Marketing Manager, Electrician"
-                    value={jobTitle}
-                    onChange={e => { setJobTitle(e.target.value); setFile(null); }}
-                  />
-                </div>
+                  <div style={{ marginBottom: '24px' }}>
+                    <h3 style={{ fontSize: '1.2rem', fontWeight: 700, marginBottom: '8px' }}>Option 2: Type Manually</h3>
+                    <p style={{ fontSize: '0.95rem', color: '#64748B', marginBottom: '20px' }}>
+                      If you don't have a document handy, you can paste the information manually. 
+                    </p>
+                    <div className="form-group">
+                      <label className="form-label">Job Title</label>
+                      <input 
+                        type="text"
+                        className="form-input"
+                        placeholder="e.g., Software Developer, Marketing Manager, Electrician"
+                        value={jobTitle}
+                        onChange={e => { setJobTitle(e.target.value); setFile(null); }}
+                      />
+                    </div>
 
-                <div className="form-group">
-                  <label className="form-label">
-                    Main Duties & Responsibilities
-                    <span className="form-label-hint"> — paste the exact duties written on your letter</span>
-                  </label>
-                  <textarea 
-                    className="form-textarea"
-                    placeholder="Paste the duties exactly as they appear on your employment letter here..."
-                    value={duties}
-                    onChange={e => { setDuties(e.target.value); setFile(null); }}
-                    rows={6}
-                  />
-                </div>
-              </div>
+                    <div className="form-group">
+                      <label className="form-label">
+                        Main Duties & Responsibilities
+                        <span className="form-label-hint"> — paste the exact duties written on your letter</span>
+                      </label>
+                      <textarea 
+                        className="form-textarea"
+                        placeholder="Paste the duties exactly as they appear on your employment letter here..."
+                        value={duties}
+                        onChange={e => { setDuties(e.target.value); setFile(null); }}
+                        rows={6}
+                      />
+                    </div>
+                  </div>
+                </>
+              )}
 
               {error && (
                 <div style={{ color: '#DC2626', fontSize: '0.9rem', marginBottom: '16px', padding: '10px 16px', background: '#FEF2F2', borderRadius: '8px' }}>
@@ -223,7 +234,7 @@ export const NOCFinderPage: FC<NOCFinderPageProps> = ({ onNavigate }) => {
                 <div style={{ marginTop: '32px' }}>
                   <DynamicLoader tool="noc" />
                 </div>
-              ) : (
+              ) : !file && (
                 <button 
                   className="btn btn-primary btn-lg" 
                   onClick={handleSubmit}
