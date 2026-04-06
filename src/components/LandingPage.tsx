@@ -1,4 +1,4 @@
-import { type FC, useState } from 'react';
+import type { FC } from 'react';
 import { Navbar } from './common/Navbar';
 import { SEO } from './common/SEO';
 
