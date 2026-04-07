@@ -3,7 +3,7 @@ import { useUser, SignInButton, useAuth } from '@clerk/clerk-react';
 import { usePDF } from 'react-to-pdf';
 import type { AnalysisResponse, Risk } from '../types';
 import { reevaluateDocument } from '../services/api';
-import { DynamicLoader } from './common/DynamicLoader';
+
 
 interface DashboardProps {
   data: AnalysisResponse;
@@ -11,7 +11,7 @@ interface DashboardProps {
   onUpdate?: (newResult: AnalysisResponse) => void;
 }
 
-export const Dashboard: FC<DashboardProps> = ({ data, onReset }) => {
+export const Dashboard: FC<DashboardProps> = ({ data, onReset, onUpdate }) => {
   const { isSignedIn } = useUser();
   const { getToken } = useAuth();
   const { toPDF: toFullPDF, targetRef: fullTargetRef } = usePDF({filename: 'MentorVisa-AuditReport.pdf', page: { margin: 15 }});
@@ -191,7 +191,7 @@ export const Dashboard: FC<DashboardProps> = ({ data, onReset }) => {
     );
   }
 
-  if (!data || !data.applicable) {
+  if (!data || !data.noc_analysis?.applicable) {
     return (
       <div style={{ maxWidth: '600px', margin: '40px auto', padding: '40px', background: '#FEF2F2', borderRadius: '12px', textAlign: 'center', border: '1px solid #FCA5A5' }}>
         <h2 style={{ fontSize: '1.5rem', fontWeight: 700, color: '#991b1b', marginBottom: '12px' }}>Document Validation Failed</h2>
