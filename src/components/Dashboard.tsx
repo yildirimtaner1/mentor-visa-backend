@@ -367,35 +367,29 @@ export const Dashboard: FC<DashboardProps> = ({ data, onReset, onUpdate }) => {
                     <div style={{ marginTop: '12px', padding: '12px', background: 'white', borderRadius: '6px', border: '1px dashed var(--border-color)' }}>
                       <h4 style={{ fontSize: '0.85rem', fontWeight: 'bold', marginBottom: '8px', color: 'var(--text-muted)' }}>ALTERNATIVE NOC CODES:</h4>
                       <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginBottom: '12px' }}>Want to apply under one of these instead? Click a NOC below to run the audit against it.</p>
-                      <ul style={{ listStyle: 'none', padding: 0, margin: 0, fontSize: '0.9rem' }}>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
                         {data.noc_analysis.alternative_nocs.map((alt, i) => (
-                          <li 
+                          <div 
                             key={i} 
                             onClick={() => handleReevaluate(alt.noc_code)}
-                            style={{ 
-                              marginBottom: '6px', 
-                              borderBottom: i !== data.noc_analysis.alternative_nocs.length - 1 ? '1px solid var(--border-color)' : 'none', 
-                              paddingBottom: i !== data.noc_analysis.alternative_nocs.length - 1 ? '10px' : '0',
-                              paddingTop: '6px',
-                              cursor: 'pointer',
-                              display: 'flex',
-                              justifyContent: 'space-between',
-                              alignItems: 'center'
-                            }}
                             className="alternative-noc-card"
+                            style={{ background: '#F8FAFC', padding: '16px', borderRadius: '8px', border: '1px solid var(--border-color)', cursor: 'pointer' }}
                           >
-                            <div>
-                               <strong>{alt.noc_code}</strong> - {alt.noc_title} 
-                               <span style={{ color: alt.match_score >= 80 ? '#059669' : '#D97706', fontWeight: 'bold', fontSize: '0.8rem', marginLeft: '6px' }}>({alt.match_score}%)</span>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: alt.explanation ? '8px' : '0' }}>
+                              <div style={{ fontWeight: 600, fontSize: '0.95rem' }}>NOC {alt.noc_code} — {alt.noc_title}</div>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                                <div style={{ fontWeight: 700, color: alt.match_score >= 80 ? '#059669' : '#D97706', fontSize: '0.9rem' }}>{alt.match_score}% Match</div>
+                                {onUpdate && (
+                                  <span style={{ fontSize: '0.8rem', color: 'var(--primary-color)', fontWeight: 600 }} className="target-btn">Re-evaluate →</span>
+                                )}
+                              </div>
                             </div>
-                            {onUpdate && (
-                               <span style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--primary-color)', padding: '4px 10px', background: 'var(--primary-light)', borderRadius: '20px' }}>
-                                 Run Audit
-                               </span>
+                            {alt.explanation && (
+                              <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', lineHeight: 1.5, margin: 0 }}>{alt.explanation}</p>
                             )}
-                          </li>
+                          </div>
                         ))}
-                      </ul>
+                      </div>
                     </div>
                   )}
                   <p style={{ fontSize: '0.9rem', color: 'var(--text-muted)', marginTop: '12px' }}>{data.noc_analysis.notes}</p>
