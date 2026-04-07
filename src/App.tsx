@@ -137,7 +137,7 @@ function App() {
       <Route path="/dashboard" element={<AppLayout><MyEvaluations onSelectEvaluation={(result) => handleAnalysisResult(result, false)} /></AppLayout>} />
       <Route path="/results" element={
         <AppLayout>
-          {analysisResult ? <Dashboard data={analysisResult} onReset={handleReset} /> : <div style={{textAlign: 'center', padding: '40px'}}>No result found. <button onClick={() => navigate('/audit-employment-letter')} className="btn btn-primary" style={{marginLeft: '10px'}}>Audit a new letter</button></div>}
+          {analysisResult ? <Dashboard data={analysisResult} onReset={handleReset} onUpdate={(res) => handleAnalysisResult(res, true)} /> : <div style={{textAlign: 'center', padding: '40px'}}>No result found. <button onClick={() => navigate('/audit-employment-letter')} className="btn btn-primary" style={{marginLeft: '10px'}}>Audit a new letter</button></div>}
         </AppLayout>
       } />
     </Routes>

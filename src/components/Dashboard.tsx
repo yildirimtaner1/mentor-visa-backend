@@ -2,10 +2,13 @@ import { type FC, useEffect, useState, useRef } from 'react';
 import { useUser, SignInButton, useAuth } from '@clerk/clerk-react';
 import { usePDF } from 'react-to-pdf';
 import type { AnalysisResponse, Risk } from '../types';
+import { reevaluateDocument } from '../services/api';
+import { DynamicLoader } from './common/DynamicLoader';
 
 interface DashboardProps {
   data: AnalysisResponse;
   onReset: () => void;
+  onUpdate?: (newResult: AnalysisResponse) => void;
 }
 
 export const Dashboard: FC<DashboardProps> = ({ data, onReset }) => {
@@ -15,6 +18,7 @@ export const Dashboard: FC<DashboardProps> = ({ data, onReset }) => {
   const { toPDF: toNocPDF, targetRef: nocTargetRef } = usePDF({filename: 'MentorVisa-NOC-Alignment-Sheet.pdf', page: { margin: 15 }});
   const [showToast, setShowToast] = useState(false);
   const [toastDismissed, setToastDismissed] = useState(false);
+  const [isReevaluating, setIsReevaluating] = useState<string | null>(null);
   const breakSpacerRef = useRef<HTMLDivElement>(null);
 
   const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
@@ -39,6 +43,24 @@ export const Dashboard: FC<DashboardProps> = ({ data, onReset }) => {
       URL.revokeObjectURL(url);
     } catch (err) {
       console.error('Failed to download original document:', err);
+    }
+  };
+
+  const handleReevaluate = async (targetNoc: string) => {
+    if (!data.stored_file_id || !onUpdate) {
+        alert("Cannot re-evaluate right now. Please re-upload your document.");
+        return;
+    }
+    const tk = await getToken();
+    try {
+        setIsReevaluating(targetNoc);
+        const newResult = await reevaluateDocument(data.stored_file_id, targetNoc, tk || '');
+        onUpdate(newResult);
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+    } catch (e: any) {
+        alert(e.message || "Failed to re-evaluate document.");
+    } finally {
+        setIsReevaluating(null);
     }
   };
 
@@ -156,6 +178,28 @@ export const Dashboard: FC<DashboardProps> = ({ data, onReset }) => {
         return <span className="badge">{status}</span>;
     }
   };
+
+  if (isReevaluating) {
+    return (
+      <div style={{ maxWidth: '900px', margin: '40px auto', padding: '40px', background: 'white', borderRadius: '12px', boxShadow: '0 4px 24px rgba(0,0,0,0.06)', textAlign: 'center' }}>
+         <div style={{ display: 'inline-block', width: '50px', height: '50px', border: '3px solid var(--primary-light)', borderTopColor: 'var(--primary-color)', borderRadius: '50%', animation: 'spin 1s linear infinite', marginBottom: '20px' }} />
+         <h2 style={{ fontSize: '1.5rem', fontWeight: 700, color: 'var(--text-main)', marginBottom: '12px' }}>
+           Re-evaluating explicitly against NOC {isReevaluating}...
+         </h2>
+         <p style={{ color: 'var(--text-muted)' }}>We are securely re-analyzing your original file against the {isReevaluating} structural guidelines.</p>
+      </div>
+    );
+  }
+
+  if (!data || !data.applicable) {
+    return (
+      <div style={{ maxWidth: '600px', margin: '40px auto', padding: '40px', background: '#FEF2F2', borderRadius: '12px', textAlign: 'center', border: '1px solid #FCA5A5' }}>
+        <h2 style={{ fontSize: '1.5rem', fontWeight: 700, color: '#991b1b', marginBottom: '12px' }}>Document Validation Failed</h2>
+        <p style={{ color: '#7f1d1d' }}>{data?.summary || 'We could not process this document.'}</p>
+        <button className="btn" style={{ marginTop: '20px', background: '#dc2626', borderColor: '#dc2626' }} onClick={onReset}>Try Another Document</button>
+      </div>
+    );
+  }
 
   return (
     <div>
@@ -322,10 +366,33 @@ export const Dashboard: FC<DashboardProps> = ({ data, onReset }) => {
                   {data.noc_analysis.alternative_nocs && data.noc_analysis.alternative_nocs.length > 0 && (
                     <div style={{ marginTop: '12px', padding: '12px', background: 'white', borderRadius: '6px', border: '1px dashed var(--border-color)' }}>
                       <h4 style={{ fontSize: '0.85rem', fontWeight: 'bold', marginBottom: '8px', color: 'var(--text-muted)' }}>ALTERNATIVE NOC CODES:</h4>
+                      <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginBottom: '12px' }}>Want to apply under one of these instead? Click a NOC below to run the audit against it.</p>
                       <ul style={{ listStyle: 'none', padding: 0, margin: 0, fontSize: '0.9rem' }}>
                         {data.noc_analysis.alternative_nocs.map((alt, i) => (
-                          <li key={i} style={{ marginBottom: '6px', borderBottom: i !== data.noc_analysis.alternative_nocs.length - 1 ? '1px solid var(--border-color)' : 'none', paddingBottom: i !== data.noc_analysis.alternative_nocs.length - 1 ? '6px' : '0' }}>
-                            <strong>{alt.noc_code}</strong> - {alt.noc_title} <span style={{ color: alt.match_score >= 80 ? '#059669' : '#D97706', fontWeight: 'bold', fontSize: '0.8rem', marginLeft: '6px' }}>({alt.match_score}%)</span>
+                          <li 
+                            key={i} 
+                            onClick={() => handleReevaluate(alt.noc_code)}
+                            style={{ 
+                              marginBottom: '6px', 
+                              borderBottom: i !== data.noc_analysis.alternative_nocs.length - 1 ? '1px solid var(--border-color)' : 'none', 
+                              paddingBottom: i !== data.noc_analysis.alternative_nocs.length - 1 ? '10px' : '0',
+                              paddingTop: '6px',
+                              cursor: 'pointer',
+                              display: 'flex',
+                              justifyContent: 'space-between',
+                              alignItems: 'center'
+                            }}
+                            className="alternative-noc-card"
+                          >
+                            <div>
+                               <strong>{alt.noc_code}</strong> - {alt.noc_title} 
+                               <span style={{ color: alt.match_score >= 80 ? '#059669' : '#D97706', fontWeight: 'bold', fontSize: '0.8rem', marginLeft: '6px' }}>({alt.match_score}%)</span>
+                            </div>
+                            {onUpdate && (
+                               <span style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--primary-color)', padding: '4px 10px', background: 'var(--primary-light)', borderRadius: '20px' }}>
+                                 Run Audit
+                               </span>
+                            )}
                           </li>
                         ))}
                       </ul>

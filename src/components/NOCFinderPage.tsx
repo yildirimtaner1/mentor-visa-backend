@@ -51,10 +51,11 @@ export const NOCFinderPage: FC<NOCFinderPageProps> = ({ onNavigate }) => {
   const [result, setResult] = useState<NOCResult | null>(null);
   const [error, setError] = useState('');
   const [isDragActive, setIsDragActive] = useState(false);
+  const [targetNocOverride, setTargetNocOverride] = useState<string | null>(null);
   
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const processInput = async (inputFile: File | null, inputTitle: string = '', inputDuties: string = '') => {
+  const processInput = async (inputFile: File | null, inputTitle: string = '', inputDuties: string = '', targetNoc: string = '') => {
     if (!inputFile && (!inputTitle.trim() || !inputDuties.trim())) {
       setError('Please either upload a document OR fill in your job title and duties.');
       return;
@@ -62,13 +63,19 @@ export const NOCFinderPage: FC<NOCFinderPageProps> = ({ onNavigate }) => {
     
     setError('');
     setLoading(true);
-    setResult(null);
+    if (targetNoc) {
+      setTargetNocOverride(targetNoc);
+    } else {
+      setTargetNocOverride(null);
+      setResult(null);
+    }
+
     try {
       let rawData;
       if (inputFile) {
-        rawData = await findNOCCode(undefined, undefined, inputFile);
+        rawData = await findNOCCode(undefined, undefined, inputFile, targetNoc);
       } else {
-        rawData = await findNOCCode(inputTitle.trim(), inputDuties.trim());
+        rawData = await findNOCCode(inputTitle.trim(), inputDuties.trim(), undefined, targetNoc);
       }
       
       if (rawData.document_valid && rawData.noc_analysis) {
@@ -273,7 +280,15 @@ export const NOCFinderPage: FC<NOCFinderPageProps> = ({ onNavigate }) => {
 
               {loading ? (
                 <div style={{ marginTop: '32px' }}>
-                  <DynamicLoader tool="noc" />
+                  {targetNocOverride ? (
+                    <div style={{ padding: '40px', textAlign: 'center', background: '#F8FAFC', borderRadius: '12px', border: '1px solid var(--border-color)' }}>
+                      <div style={{ display: 'inline-block', width: '40px', height: '40px', border: '3px solid var(--primary-light)', borderTopColor: 'var(--primary-color)', borderRadius: '50%', animation: 'spin 1s linear infinite', marginBottom: '16px' }} />
+                      <h3 style={{ fontSize: '1.2rem', fontWeight: 700, marginBottom: '8px' }}>Re-evaluating explicitly against NOC {targetNocOverride}...</h3>
+                      <p style={{ color: 'var(--text-muted)' }}>This analysis ignores other NOC codes and maps duty-by-duty to your requested target.</p>
+                    </div>
+                  ) : (
+                    <DynamicLoader tool="noc" />
+                  )}
                 </div>
               ) : !file && (
                 <button 
@@ -354,12 +369,21 @@ export const NOCFinderPage: FC<NOCFinderPageProps> = ({ onNavigate }) => {
                 {result.alternative_nocs && result.alternative_nocs.length > 0 && (
                   <div style={{ marginBottom: '24px', borderTop: '1px solid var(--border-color)', paddingTop: '20px' }}>
                     <h4 style={{ fontSize: '0.95rem', fontWeight: 700, marginBottom: '12px' }}>Other Potential Matches:</h4>
+                    <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginBottom: '16px' }}>Want to apply under one of these instead? Click a NOC below to re-evaluate your duties strictly against that target code.</p>
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
                       {result.alternative_nocs.map((alt, i) => (
-                        <div key={i} style={{ background: '#F8FAFC', padding: '16px', borderRadius: '8px', border: '1px solid var(--border-color)' }}>
+                        <div 
+                          key={i} 
+                          onClick={() => processInput(file, jobTitle, duties, alt.noc_code)}
+                          className="alternative-noc-card"
+                          style={{ background: '#F8FAFC', padding: '16px', borderRadius: '8px', border: '1px solid var(--border-color)', cursor: 'pointer' }}
+                        >
                           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
                             <div style={{ fontWeight: 600, fontSize: '0.95rem' }}>NOC {alt.noc_code} — {alt.noc_title}</div>
-                            <div style={{ fontWeight: 700, color: getScoreColor(alt.match_score), fontSize: '0.9rem' }}>{alt.match_score}% Match</div>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                              <div style={{ fontWeight: 700, color: getScoreColor(alt.match_score), fontSize: '0.9rem' }}>{alt.match_score}% Match</div>
+                              <span style={{ fontSize: '0.8rem', color: 'var(--primary-color)', fontWeight: 600 }} className="target-btn">Re-evaluate →</span>
+                            </div>
                           </div>
                           <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', lineHeight: 1.5, margin: 0 }}>{alt.explanation}</p>
                         </div>
