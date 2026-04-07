@@ -64,13 +64,53 @@ export const NOCFinderPage: FC<NOCFinderPageProps> = ({ onNavigate }) => {
     setLoading(true);
     setResult(null);
     try {
-      let data;
+      let rawData;
       if (inputFile) {
-        data = await findNOCCode(undefined, undefined, inputFile);
+        rawData = await findNOCCode(undefined, undefined, inputFile);
       } else {
-        data = await findNOCCode(inputTitle.trim(), inputDuties.trim());
+        rawData = await findNOCCode(inputTitle.trim(), inputDuties.trim());
       }
-      setResult(data);
+      
+      if (rawData.document_valid && rawData.noc_analysis) {
+        const ana = rawData.noc_analysis;
+        const firstDigit = ana.detected_code.charAt(0);
+        const secondDigit = ana.detected_code.charAt(1);
+        let teer = firstDigit;
+        if (secondDigit === '0' || secondDigit === '1') teer = '0';
+        const cec = ['0', '1', '2', '3'].includes(teer);
+        
+        const dutiesStrList = ana.duties_match 
+          ? ana.duties_match.map((d: any) => `• ${d.applicant_duty} → NOC: ${d.official_noc_duty} (${d.overlap_description})`)
+          : [];
+
+        setResult({
+          document_valid: true,
+          rejection_reason: '',
+          noc_code: ana.detected_code,
+          noc_title: ana.detected_title,
+          teer_category: teer,
+          match_score: ana.match_score,
+          alternative_nocs: ana.alternative_nocs || [],
+          explanation: ana.notes || '',
+          matched_duties: dutiesStrList,
+          cec_eligible: cec,
+          location_of_experience: ana.location_of_experience
+        });
+      } else {
+        setResult({
+          document_valid: false,
+          rejection_reason: rawData.rejection_reason || 'Could not validate input.',
+          noc_code: '',
+          noc_title: '',
+          teer_category: '',
+          match_score: 0,
+          alternative_nocs: [],
+          explanation: '',
+          matched_duties: [],
+          cec_eligible: false,
+          location_of_experience: 'unknown'
+        });
+      }
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Something went wrong. Please try again.');
     } finally {
