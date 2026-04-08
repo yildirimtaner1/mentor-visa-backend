@@ -2,7 +2,7 @@ import { type FC, useEffect, useState, useRef } from 'react';
 import { useUser, SignInButton, useAuth } from '@clerk/clerk-react';
 import { usePDF } from 'react-to-pdf';
 import type { AnalysisResponse, Risk } from '../types';
-import { reevaluateDocument, fetchUserCredits, createCheckoutSession, consumeCreditToUnlock } from '../services/api';
+import { reevaluateDocument } from '../services/api';
 
 interface DashboardProps {
   data: AnalysisResponse;
@@ -19,79 +19,10 @@ export const Dashboard: FC<DashboardProps> = ({ data, onReset, onUpdate }) => {
   const [toastDismissed, setToastDismissed] = useState(false);
   const [isReevaluating, setIsReevaluating] = useState<string | null>(null);
   
-  // Monetization State
-  const [credits, setCredits] = useState<number>(0);
-  const [isBuying, setIsBuying] = useState(false);
-  const [isUnlocking, setIsUnlocking] = useState(false);
-  const [isPremiumUnlocked, setIsPremiumUnlocked] = useState<boolean>(true);
-
+  const isPremiumUnlocked = !!isSignedIn;
   const breakSpacerRef = useRef<HTMLDivElement>(null);
+  
 
-  useEffect(() => {
-    const loadCredits = async () => {
-       if (isSignedIn) {
-           const tk = await getToken();
-           if (tk) {
-               const c = await fetchUserCredits(tk);
-               setCredits(c.audit_letter_credits || 0);
-           }
-       }
-    };
-    loadCredits();
-  }, [isSignedIn, getToken]);
-
-  const handleCheckout = async () => {
-    setIsBuying(true);
-    try {
-        const tk = await getToken();
-        if (!tk) return;
-        const url = await createCheckoutSession('auditor', tk, '/results');
-        window.location.href = url;
-    } catch (e: any) {
-        alert("Failed to initiate checkout: " + (e.message || "Unknown error"));
-        setIsBuying(false);
-    }
-  };
-
-  const handleUnlock = async () => {
-    if (!data.stored_file_id) return;
-    setIsUnlocking(true);
-    try {
-        const tk = await getToken();
-        if (!tk) return;
-        const res = await consumeCreditToUnlock(data.stored_file_id, 'auditor', tk);
-        setCredits(res.remaining_auditor);
-        setIsPremiumUnlocked(true);
-        if (onUpdate) onUpdate({...data, is_premium_unlocked: true});
-        // Clear payment_success from URL
-        const url = new URL(window.location.href);
-        url.searchParams.delete('payment_success');
-        window.history.replaceState({}, '', url.toString());
-    } catch (e: any) {
-        alert(e.message || "Failed to unlock document");
-    } finally {
-        setIsUnlocking(false);
-    }
-  };
-
-  // Auto-unlock when returning from Stripe checkout with ?payment_success=true
-  useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
-    if (params.get('payment_success') === 'true' && !isPremiumUnlocked && data.stored_file_id) {
-      // Give the webhook 1.5s to land, then retry up to 3 times
-      const attemptUnlock = async (attemptsLeft: number): Promise<void> => {
-        try {
-          await handleUnlock();
-        } catch {
-          if (attemptsLeft > 0) {
-            setTimeout(() => attemptUnlock(attemptsLeft - 1), 2000);
-          }
-        }
-      };
-      setTimeout(() => attemptUnlock(3), 1500);
-    }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
 
 
   const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
@@ -542,24 +473,11 @@ export const Dashboard: FC<DashboardProps> = ({ data, onReset, onUpdate }) => {
                     <p style={{ color: 'var(--text-muted)', marginBottom: '24px', lineHeight: 1.5 }}>
                       Unlock detailed risk analysis, missing elements, recommended fixes, alternative NOC mappings, suggested wordings, and the official alignment sheet.
                     </p>
-                    
-                    {!isSignedIn ? (
-                      <SignInButton mode="modal" forceRedirectUrl={window.location.href} signUpForceRedirectUrl={window.location.href}>
-                        <button className="btn btn-primary" style={{ width: '100%', padding: '12px', fontSize: '1.1rem' }}>
-                          Sign In and Pay to Unlock Insights
-                        </button>
-                      </SignInButton>
-                    ) : credits > 0 ? (
-                      <button className="btn btn-primary" onClick={handleUnlock} disabled={isUnlocking} style={{ width: '100%', padding: '12px', fontSize: '1.1rem' }}>
-                        {isUnlocking ? 'Unlocking...' : `Unlock Full Audit (Cost: 1 Credit. Remaining: ${credits})`}
+                    <SignInButton mode="modal" forceRedirectUrl={window.location.href} signUpForceRedirectUrl={window.location.href}>
+                      <button className="btn btn-primary" style={{ width: '100%', padding: '12px', fontSize: '1.1rem' }}>
+                        Sign In to Unlock Insights
                       </button>
-                    ) : (
-                      <>
-                        <button className="btn btn-primary" onClick={handleCheckout} disabled={isBuying} style={{ width: '100%', padding: '12px', fontSize: '1.1rem', background: '#10b981', borderColor: '#10b981' }}>
-                          {isBuying ? 'Redirecting...' : 'Purchase Audits (2 for $19.90 CAD)'}
-                        </button>
-                      </>
-                    )}
+                    </SignInButton>
                   </div>
                   </div>
                 </div>
