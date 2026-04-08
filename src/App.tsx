@@ -66,7 +66,7 @@ const AppLayout = ({ children }: { children: React.ReactNode }) => {
                   className="btn btn-outline" 
                   style={{ padding: '6px 12px', fontSize: '0.9rem' }}
                 >
-                  My Past Audits
+                  My Past Evaluations
                 </button>
              )}
              <UserButton />
@@ -117,6 +117,45 @@ function App() {
     navigate('/audit-employment-letter');
   };
 
+  const handleHistorySelection = (ev: any) => {
+    if (ev.document_type === "NOC Finder Query") {
+      const rawData = ev.payload;
+      if (rawData && rawData.noc_analysis) {
+        const ana = rawData.noc_analysis;
+        const teer = ana.detected_code ? ana.detected_code.charAt(1) : '';
+        const cec = ['0', '1', '2', '3'].includes(teer);
+        const dutiesStrList = ana.duties_match 
+          ? ana.duties_match.map((d: any) => `• ${d.applicant_duty} → NOC: ${d.official_noc_duty} (${d.overlap_description})`)
+          : [];
+          
+        const nocResult = {
+          document_valid: true,
+          rejection_reason: '',
+          noc_code: ana.detected_code || '',
+          noc_title: ana.detected_title || '',
+          teer_category: teer,
+          match_score: ana.match_score || 0,
+          alternative_nocs: ana.alternative_nocs || [],
+          explanation: ana.notes || '',
+          matched_duties: dutiesStrList,
+          cec_eligible: cec,
+          location_of_experience: ana.location_of_experience || 'unknown',
+          stored_file_id: rawData.stored_file_id || ev.stored_file_id,
+          is_premium_unlocked: rawData.is_premium_unlocked || ev.is_premium_unlocked
+        };
+        sessionStorage.setItem('nocFinderResult', JSON.stringify(nocResult));
+        navigate('/find-my-noc');
+        
+        // Slight delay to allow navigation to complete before triggering a refresh 
+        // to ensure NOCFinderPage mounts with the newly set sessionStorage
+        setTimeout(() => window.location.reload(), 50);
+      }
+    } else {
+      const payload = { ...ev.payload, is_premium_unlocked: ev.is_premium_unlocked };
+      handleAnalysisResult(payload, false);
+    }
+  };
+
   return (
     <Routes>
       {/* Landing Page Route */}
@@ -134,7 +173,7 @@ function App() {
       <Route path="/noc-codes/:code" element={<SharedLayout><NOCDetailsPage /></SharedLayout>} />
 
       {/* App Layout Routes (Dashboard/Results) */}
-      <Route path="/dashboard" element={<AppLayout><MyEvaluations onSelectEvaluation={(result) => handleAnalysisResult(result, false)} /></AppLayout>} />
+      <Route path="/dashboard" element={<AppLayout><MyEvaluations onSelectEvaluation={handleHistorySelection} /></AppLayout>} />
       <Route path="/results" element={
         <AppLayout>
           {analysisResult ? <Dashboard data={analysisResult} onReset={handleReset} onUpdate={(res) => handleAnalysisResult(res, true)} /> : <div style={{textAlign: 'center', padding: '40px'}}>No result found. <button onClick={() => navigate('/audit-employment-letter')} className="btn btn-primary" style={{marginLeft: '10px'}}>Audit a new letter</button></div>}

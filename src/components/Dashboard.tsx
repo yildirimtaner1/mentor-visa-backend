@@ -23,9 +23,7 @@ export const Dashboard: FC<DashboardProps> = ({ data, onReset, onUpdate }) => {
   const [credits, setCredits] = useState<number>(0);
   const [isBuying, setIsBuying] = useState(false);
   const [isUnlocking, setIsUnlocking] = useState(false);
-  const [isPremiumUnlocked, setIsPremiumUnlocked] = useState<boolean>(
-    !!(data.is_premium_unlocked)
-  );
+  const [isPremiumUnlocked, setIsPremiumUnlocked] = useState<boolean>(true);
 
   const breakSpacerRef = useRef<HTMLDivElement>(null);
 
