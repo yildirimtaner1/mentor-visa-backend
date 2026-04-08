@@ -50,7 +50,7 @@ export const Dashboard: FC<DashboardProps> = ({ data, onReset, onUpdate }) => {
         const url = await createCheckoutSession('auditor', tk, '/results');
         window.location.href = url;
     } catch (e: any) {
-        alert("Failed to initiate checkout");
+        alert("Failed to initiate checkout: " + (e.message || "Unknown error"));
         setIsBuying(false);
     }
   };

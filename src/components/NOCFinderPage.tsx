@@ -147,7 +147,7 @@ export const NOCFinderPage: FC<NOCFinderPageProps> = ({ onNavigate }) => {
         const url = await createCheckoutSession('finder', tk, '/find-my-noc');
         window.location.href = url;
     } catch (e: any) {
-        alert("Failed to initiate checkout");
+        alert("Failed to initiate checkout: " + (e.message || "Unknown error"));
         setIsBuying(false);
     }
   };

@@ -110,7 +110,10 @@ export async function createCheckoutSession(passType: 'finder' | 'auditor', toke
     },
     body: JSON.stringify({ pass_type: passType, return_path: returnPath })
   });
-  if (!response.ok) throw new Error("Failed to create checkout session");
+  if (!response.ok) {
+    const err = await response.json().catch(() => ({}));
+    throw new Error(err.detail || "Failed to create checkout session");
+  }
   const data = await response.json();
   return data.session_url;
 }
