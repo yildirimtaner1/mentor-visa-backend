@@ -315,7 +315,7 @@ export const Dashboard: FC<DashboardProps> = ({ data, onReset, onUpdate }) => {
               </>
             ) : (
               <div onClickCapture={() => sessionStorage.setItem('pendingPdfDownload', 'noc')}>
-                <SignInButton mode="modal" forceRedirectUrl={window.location.href}>
+                <SignInButton mode="modal" forceRedirectUrl={window.location.href} signUpForceRedirectUrl={window.location.href}>
                   <button className="btn" style={{ background: '#4285F4', borderColor: '#4285F4', color: 'white' }}>
                     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" style={{ marginRight: '8px', verticalAlign: 'middle', display: 'inline' }}>
                        <path fill="white" fillRule="evenodd" clipRule="evenodd" d="M23.04 12.2614C23.04 11.4459 22.9668 10.662 22.8339 9.91016H12V14.3575H18.1891C17.9224 15.7949 17.1114 17.006 15.8943 17.8202V20.7135H19.6105C21.7855 18.7118 23.04 15.7618 23.04 12.2614Z" />
@@ -530,7 +530,7 @@ export const Dashboard: FC<DashboardProps> = ({ data, onReset, onUpdate }) => {
                     </p>
                     
                     {!isSignedIn ? (
-                      <SignInButton mode="modal" forceRedirectUrl={window.location.href}>
+                      <SignInButton mode="modal" forceRedirectUrl={window.location.href} signUpForceRedirectUrl={window.location.href}>
                         <button className="btn btn-primary" style={{ width: '100%', padding: '12px', fontSize: '1.1rem' }}>
                           Sign In and Pay to Unlock Insights
                         </button>
@@ -687,7 +687,7 @@ export const Dashboard: FC<DashboardProps> = ({ data, onReset, onUpdate }) => {
                 <div style={{ fontSize: '0.9rem', color: '#6b7280' }}>Sign in to save your analysis and track your progress.</div>
               </div>
               <div>
-                <SignInButton mode="modal" forceRedirectUrl={window.location.href}>
+                <SignInButton mode="modal" forceRedirectUrl={window.location.href} signUpForceRedirectUrl={window.location.href}>
                   <button className="btn" style={{ background: '#4285F4', borderColor: '#4285F4', color: 'white', padding: '8px 20px', fontSize: '0.95rem', fontWeight: 500 }}>
                     Sign in
                   </button>

@@ -522,7 +522,7 @@ export const NOCFinderPage: FC<NOCFinderPageProps> = ({ onNavigate }) => {
                         </p>
                         
                         {!isSignedIn ? (
-                          <SignInButton mode="modal" forceRedirectUrl={window.location.href}>
+                          <SignInButton mode="modal" forceRedirectUrl={window.location.href} signUpForceRedirectUrl={window.location.href}>
                             <button className="btn btn-primary" style={{ width: '100%', padding: '12px', fontSize: '1.1rem' }}>
                               Sign In and Pay to Unlock Insights
                             </button>
