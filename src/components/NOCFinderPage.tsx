@@ -1,5 +1,6 @@
-import { type FC, useState, useRef } from 'react';
-import { findNOCCode } from '../services/api';
+import { type FC, useState, useRef, useEffect } from 'react';
+import { useUser, SignInButton, useAuth } from '@clerk/clerk-react';
+import { findNOCCode, fetchUserCredits, createCheckoutSession, consumeCreditToUnlock } from '../services/api';
 import { SEO } from './common/SEO';
 import { DynamicLoader } from './common/DynamicLoader';
 
@@ -22,6 +23,8 @@ interface NOCResult {
   matched_duties: string[];
   cec_eligible: boolean;
   location_of_experience?: 'canada' | 'outside_canada' | 'unknown';
+  stored_file_id?: string;
+  is_premium_unlocked?: boolean;
 }
 
 interface NOCFinderPageProps {
@@ -43,17 +46,127 @@ const nocSchema = JSON.stringify({
 });
 
 export const NOCFinderPage: FC<NOCFinderPageProps> = ({ onNavigate }) => {
+  const { isSignedIn } = useUser();
+  const { getToken } = useAuth();
   const [jobTitle, setJobTitle] = useState('');
   const [duties, setDuties] = useState('');
   const [file, setFile] = useState<File | null>(null);
   
   const [loading, setLoading] = useState(false);
-  const [result, setResult] = useState<NOCResult | null>(null);
+  // Initialize from sessionStorage so result survives a Stripe redirect
+  const [result, setResult] = useState<NOCResult | null>(() => {
+    const saved = sessionStorage.getItem('nocFinderResult');
+    return saved ? JSON.parse(saved) : null;
+  });
   const [error, setError] = useState('');
   const [isDragActive, setIsDragActive] = useState(false);
   const [targetNocOverride, setTargetNocOverride] = useState<string | null>(null);
   
+  // Monetization State
+  const [credits, setCredits] = useState<number>(0);
+  const [isBuying, setIsBuying] = useState(false);
+  const [isUnlocking, setIsUnlocking] = useState(false);
+
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    const loadCredits = async () => {
+       if (isSignedIn) {
+           const tk = await getToken();
+           if (tk) {
+               const c = await fetchUserCredits(tk);
+               setCredits(c.find_noc_credits || 0);
+           }
+       }
+    };
+    loadCredits();
+  }, [isSignedIn, getToken]);
+
+  // Persist result to sessionStorage whenever it changes
+  useEffect(() => {
+    if (result) {
+      sessionStorage.setItem('nocFinderResult', JSON.stringify(result));
+    }
+  }, [result]);
+
+  // Auto-unlock when returning from Stripe with ?payment_success=true
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('payment_success') === 'true') {
+      // Clean URL immediately
+      const cleanUrl = new URL(window.location.href);
+      cleanUrl.searchParams.delete('payment_success');
+      window.history.replaceState({}, '', cleanUrl.toString());
+
+      // Poll for credits (confirms webhook has landed), then unlock
+      const pollAndUnlock = async () => {
+        const savedRaw = sessionStorage.getItem('nocFinderResult');
+        if (!savedRaw) return;
+        const saved: NOCResult = JSON.parse(savedRaw);
+        if (saved.is_premium_unlocked || !saved.stored_file_id) return;
+
+        const tk = await getToken();
+        if (!tk) return;
+
+        // Poll up to 10 times (every 1.5s = 15s total window)
+        for (let i = 0; i < 10; i++) {
+          await new Promise(res => setTimeout(res, 1500));
+          try {
+            const creditData = await fetchUserCredits(tk);
+            const hasCredits = (creditData.find_noc_credits || 0) > 0;
+            if (hasCredits) {
+              // Credits confirmed in DB — now unlock
+              const res = await consumeCreditToUnlock(saved.stored_file_id, 'finder', tk);
+              setCredits(res.remaining_finder);
+              const unlocked = { ...saved, is_premium_unlocked: true };
+              setResult(unlocked);
+              sessionStorage.setItem('nocFinderResult', JSON.stringify(unlocked));
+              return; // done!
+            }
+          } catch (e: any) {
+            console.warn('Poll attempt failed:', e.message);
+          }
+        }
+        console.error('Payment processed but credits never appeared. Check Stripe webhook.');
+      };
+
+      pollAndUnlock();
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const handleCheckout = async () => {
+    setIsBuying(true);
+    try {
+        const tk = await getToken();
+        if (!tk) return;
+        // Persist result before leaving so it survives the Stripe redirect
+        if (result) {
+          sessionStorage.setItem('nocFinderResult', JSON.stringify(result));
+        }
+        const url = await createCheckoutSession('finder', tk, '/find-my-noc');
+        window.location.href = url;
+    } catch (e: any) {
+        alert("Failed to initiate checkout");
+        setIsBuying(false);
+    }
+  };
+
+  const handleUnlock = async () => {
+    if (!result?.stored_file_id) return;
+    setIsUnlocking(true);
+    try {
+        const tk = await getToken();
+        if (!tk) return;
+        const res = await consumeCreditToUnlock(result.stored_file_id, 'finder', tk);
+        setCredits(res.remaining_finder);
+        setResult({...result, is_premium_unlocked: true});
+    } catch (e: any) {
+        alert(e.message || "Failed to unlock result");
+    } finally {
+        setIsUnlocking(false);
+    }
+  };
 
   const processInput = async (inputFile: File | null, inputTitle: string = '', inputDuties: string = '', targetNoc: string = '') => {
     if (!inputFile && (!inputTitle.trim() || !inputDuties.trim())) {
@@ -68,6 +181,7 @@ export const NOCFinderPage: FC<NOCFinderPageProps> = ({ onNavigate }) => {
     } else {
       setTargetNocOverride(null);
       setResult(null);
+      sessionStorage.removeItem('nocFinderResult'); // clear stale cache on new search
     }
 
     try {
@@ -80,10 +194,8 @@ export const NOCFinderPage: FC<NOCFinderPageProps> = ({ onNavigate }) => {
       
       if (rawData.document_valid && rawData.noc_analysis) {
         const ana = rawData.noc_analysis;
-        const firstDigit = ana.detected_code.charAt(0);
-        const secondDigit = ana.detected_code.charAt(1);
-        let teer = firstDigit;
-        if (secondDigit === '0' || secondDigit === '1') teer = '0';
+        // TEER = second digit of the 5-digit NOC code (e.g. NOC 42101 → TEER 2)
+        const teer = ana.detected_code.charAt(1);
         const cec = ['0', '1', '2', '3'].includes(teer);
         
         const dutiesStrList = ana.duties_match 
@@ -101,7 +213,9 @@ export const NOCFinderPage: FC<NOCFinderPageProps> = ({ onNavigate }) => {
           explanation: ana.notes || '',
           matched_duties: dutiesStrList,
           cec_eligible: cec,
-          location_of_experience: ana.location_of_experience
+          location_of_experience: ana.location_of_experience,
+          stored_file_id: rawData.stored_file_id,
+          is_premium_unlocked: !!rawData.is_premium_unlocked
         });
       } else {
         setResult({
@@ -357,40 +471,78 @@ export const NOCFinderPage: FC<NOCFinderPageProps> = ({ onNavigate }) => {
                   <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem', lineHeight: 1.6 }}>{result.explanation}</p>
                 </div>
 
-                {result.matched_duties && result.matched_duties.length > 0 && (
-                  <div style={{ marginBottom: '24px' }}>
-                    <h4 style={{ fontSize: '0.95rem', fontWeight: 700, marginBottom: '8px' }}>Matched Official Duties:</h4>
-                    <ul style={{ paddingLeft: '20px', color: 'var(--text-muted)', fontSize: '0.9rem', lineHeight: 1.7 }}>
-                      {result.matched_duties.map((duty, i) => <li key={i}>{duty}</li>)}
-                    </ul>
-                  </div>
-                )}
-                
-                {result.alternative_nocs && result.alternative_nocs.length > 0 && (
-                  <div style={{ marginBottom: '24px', borderTop: '1px solid var(--border-color)', paddingTop: '20px' }}>
-                    <h4 style={{ fontSize: '0.95rem', fontWeight: 700, marginBottom: '12px' }}>Other Potential Matches:</h4>
-                    <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginBottom: '16px' }}>Want to apply under one of these instead? Click a NOC below to re-evaluate your duties strictly against that target code.</p>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                      {result.alternative_nocs.map((alt, i) => (
-                        <div 
-                          key={i} 
-                          onClick={() => processInput(file, jobTitle, duties, alt.noc_code)}
-                          className="alternative-noc-card"
-                          style={{ background: '#F8FAFC', padding: '16px', borderRadius: '8px', border: '1px solid var(--border-color)', cursor: 'pointer' }}
-                        >
-                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
-                            <div style={{ fontWeight: 600, fontSize: '0.95rem' }}>NOC {alt.noc_code} — {alt.noc_title}</div>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                              <div style={{ fontWeight: 700, color: getScoreColor(alt.match_score), fontSize: '0.9rem' }}>{alt.match_score}% Match</div>
-                              <span style={{ fontSize: '0.8rem', color: 'var(--primary-color)', fontWeight: 600 }} className="target-btn">Re-evaluate →</span>
+                {/* --- PREMIUM LOCKED SECTION --- */}
+                <div style={{ position: 'relative', marginTop: '20px' }}>
+                  <div style={!(result.is_premium_unlocked) ? { filter: 'blur(6px)', pointerEvents: 'none', userSelect: 'none', opacity: 0.6 } : {}}>
+                    {result.matched_duties && result.matched_duties.length > 0 && (
+                      <div style={{ marginBottom: '24px' }}>
+                        <h4 style={{ fontSize: '0.95rem', fontWeight: 700, marginBottom: '8px' }}>Matched Official Duties:</h4>
+                        <ul style={{ paddingLeft: '20px', color: 'var(--text-muted)', fontSize: '0.9rem', lineHeight: 1.7 }}>
+                          {result.matched_duties.map((duty, i) => <li key={i}>{duty}</li>)}
+                        </ul>
+                      </div>
+                    )}
+                    
+                    {result.alternative_nocs && result.alternative_nocs.length > 0 && (
+                      <div style={{ marginBottom: '24px', borderTop: '1px solid var(--border-color)', paddingTop: '20px' }}>
+                        <h4 style={{ fontSize: '0.95rem', fontWeight: 700, marginBottom: '12px' }}>Other Potential Matches:</h4>
+                        <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginBottom: '16px' }}>Want to apply under one of these instead? Click a NOC below to re-evaluate your duties strictly against that target code.</p>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                          {result.alternative_nocs.map((alt, i) => (
+                            <div 
+                              key={i} 
+                              onClick={() => processInput(file, jobTitle, duties, alt.noc_code)}
+                              className="alternative-noc-card"
+                              style={{ background: '#F8FAFC', padding: '16px', borderRadius: '8px', border: '1px solid var(--border-color)', cursor: 'pointer' }}
+                            >
+                              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                                <div style={{ fontWeight: 600, fontSize: '0.95rem' }}>NOC {alt.noc_code} — {alt.noc_title}</div>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                                  <div style={{ fontWeight: 700, color: getScoreColor(alt.match_score), fontSize: '0.9rem' }}>{alt.match_score}% Match</div>
+                                  <span style={{ fontSize: '0.8rem', color: 'var(--primary-color)', fontWeight: 600 }} className="target-btn">Re-evaluate →</span>
+                                </div>
+                              </div>
+                              <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', lineHeight: 1.5, margin: 0 }}>{alt.explanation}</p>
                             </div>
-                          </div>
-                          <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', lineHeight: 1.5, margin: 0 }}>{alt.explanation}</p>
+                          ))}
                         </div>
-                      ))}
+                      </div>
+                    )}
+                  </div> {/* End Blurred Area */}
+                  
+                  {/* Paywall Overlay */}
+                  {!(result.is_premium_unlocked) && (
+                    <div style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, zIndex: 10, pointerEvents: 'none' }}>
+                      <div style={{ position: 'sticky', top: '25vh', display: 'flex', justifyContent: 'center', pointerEvents: 'auto', padding: '0 20px' }}>
+                        <div className="card" style={{ width: '100%', maxWidth: '500px', background: 'white', border: '2px solid var(--primary-color)', textAlign: 'center', boxShadow: '0 20px 40px rgba(0,0,0,0.2)' }}>
+                          <div style={{ fontSize: '2.5rem', marginBottom: '10px' }}>🔒</div>
+                        <h3 style={{ fontSize: '1.4rem', fontWeight: 800, marginBottom: '12px' }}>Premium Insights Locked</h3>
+                        <p style={{ color: 'var(--text-muted)', marginBottom: '24px', lineHeight: 1.5 }}>
+                          Unlock detailed duty-by-duty matching and interactive alternative NOC code exploration.
+                        </p>
+                        
+                        {!isSignedIn ? (
+                          <SignInButton mode="modal" forceRedirectUrl={window.location.href}>
+                            <button className="btn btn-primary" style={{ width: '100%', padding: '12px', fontSize: '1.1rem' }}>
+                              Sign In and Pay to Unlock Insights
+                            </button>
+                          </SignInButton>
+                        ) : credits > 0 ? (
+                          <button className="btn btn-primary" onClick={handleUnlock} disabled={isUnlocking} style={{ width: '100%', padding: '12px', fontSize: '1.1rem' }}>
+                            {isUnlocking ? 'Unlocking...' : `Unlock Full Result (Cost: 1 Credit. Remaining: ${credits})`}
+                          </button>
+                        ) : (
+                          <>
+                            <button className="btn btn-primary" onClick={handleCheckout} disabled={isBuying} style={{ width: '100%', padding: '12px', fontSize: '1.1rem', background: '#10b981', borderColor: '#10b981' }}>
+                              {isBuying ? 'Redirecting...' : 'Purchase Passes (2 for $9.90 CAD)'}
+                            </button>
+                          </>
+                        )}
+                      </div>
+                      </div>
                     </div>
-                  </div>
-                )}
+                  )}
+                </div>
 
                 <div className={`highlight-box ${result.cec_eligible ? 'highlight-box-blue' : ''}`}>
                   {!result.cec_eligible ? (

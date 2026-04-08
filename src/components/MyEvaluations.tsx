@@ -1,10 +1,10 @@
 import { type FC, useEffect, useState } from 'react';
 import { useAuth } from '@clerk/clerk-react';
 import { getEvaluations } from '../services/api';
-import type { AnalysisResponse } from '../types';
+
 
 interface MyEvaluationsProps {
-  onSelectEvaluation: (data: AnalysisResponse) => void;
+  onSelectEvaluation: (data: any) => void;
 }
 
 export const MyEvaluations: FC<MyEvaluationsProps> = ({ onSelectEvaluation }) => {
@@ -43,7 +43,7 @@ export const MyEvaluations: FC<MyEvaluationsProps> = ({ onSelectEvaluation }) =>
           {evaluations.map((ev) => (
             <div 
               key={ev.id} 
-              onClick={() => onSelectEvaluation(ev.payload)}
+              onClick={() => onSelectEvaluation(ev)}
               style={{
                 border: '1px solid var(--border-color)',
                 padding: '16px',
@@ -58,8 +58,19 @@ export const MyEvaluations: FC<MyEvaluationsProps> = ({ onSelectEvaluation }) =>
               onMouseLeave={(e) => e.currentTarget.style.borderColor = 'var(--border-color)'}
             >
               <div>
-                <div style={{ fontWeight: 'bold', fontSize: '1.1rem' }}>
-                    {ev.role_name !== 'Unknown Role' && ev.company_name !== 'Unknown Company' ? `${ev.role_name} - ${ev.company_name}` : ev.document_type}
+                <div style={{ fontWeight: 'bold', fontSize: '1.1rem', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    {ev.is_premium_unlocked ? <span title="Premium Unlocked">🔓</span> : <span title="Premium Locked">🔒</span>}
+                    
+                    {ev.document_type === "NOC Finder Query" ? (
+                      <span style={{ fontSize: '0.8rem', background: '#e0e7ff', color: '#3730a3', padding: '2px 8px', borderRadius: '12px', fontWeight: 600 }}>🎯 NOC Check</span>
+                    ) : (
+                      <span style={{ fontSize: '0.8rem', background: '#f3e8ff', color: '#6b21a8', padding: '2px 8px', borderRadius: '12px', fontWeight: 600 }}>📄 Letter Audit</span>
+                    )}
+
+                    {ev.role_name !== 'Unknown Role' && ev.company_name !== 'Unknown Company' && ev.company_name !== 'N/A' 
+                      ? `${ev.role_name} - ${ev.company_name}` 
+                      : ev.role_name && ev.company_name === 'N/A' ? ev.role_name 
+                      : ev.document_type}
                 </div>
                 <div style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginTop: '4px' }}>
                   Analyzed on: {new Date(ev.timestamp).toLocaleDateString()} at {new Date(ev.timestamp).toLocaleTimeString()}
@@ -68,6 +79,8 @@ export const MyEvaluations: FC<MyEvaluationsProps> = ({ onSelectEvaluation }) =>
               <div>
                 {ev.payload?.noc_analysis?.applicable === false ? (
                   <span className="badge" style={{ background: '#FEF3C7', color: '#92400E', border: '1px solid #F59E0B' }}>Rejected</span>
+                ) : ev.document_type === "NOC Finder Query" ? (
+                  <span className="badge" style={{ background: '#EFF6FF', color: '#1D4ED8', border: '1px solid #BFDBFE' }}>NOC Match</span>
                 ) : (
                   <>
                     {ev.compliance_status === 'compliant' && <span className="badge badge-success">Compliant</span>}

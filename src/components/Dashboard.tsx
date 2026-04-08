@@ -2,8 +2,7 @@ import { type FC, useEffect, useState, useRef } from 'react';
 import { useUser, SignInButton, useAuth } from '@clerk/clerk-react';
 import { usePDF } from 'react-to-pdf';
 import type { AnalysisResponse, Risk } from '../types';
-import { reevaluateDocument } from '../services/api';
-
+import { reevaluateDocument, fetchUserCredits, createCheckoutSession, consumeCreditToUnlock } from '../services/api';
 
 interface DashboardProps {
   data: AnalysisResponse;
@@ -19,7 +18,83 @@ export const Dashboard: FC<DashboardProps> = ({ data, onReset, onUpdate }) => {
   const [showToast, setShowToast] = useState(false);
   const [toastDismissed, setToastDismissed] = useState(false);
   const [isReevaluating, setIsReevaluating] = useState<string | null>(null);
+  
+  // Monetization State
+  const [credits, setCredits] = useState<number>(0);
+  const [isBuying, setIsBuying] = useState(false);
+  const [isUnlocking, setIsUnlocking] = useState(false);
+  const [isPremiumUnlocked, setIsPremiumUnlocked] = useState<boolean>(
+    !!(data.is_premium_unlocked)
+  );
+
   const breakSpacerRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const loadCredits = async () => {
+       if (isSignedIn) {
+           const tk = await getToken();
+           if (tk) {
+               const c = await fetchUserCredits(tk);
+               setCredits(c.audit_letter_credits || 0);
+           }
+       }
+    };
+    loadCredits();
+  }, [isSignedIn, getToken]);
+
+  const handleCheckout = async () => {
+    setIsBuying(true);
+    try {
+        const tk = await getToken();
+        if (!tk) return;
+        const url = await createCheckoutSession('auditor', tk, '/results');
+        window.location.href = url;
+    } catch (e: any) {
+        alert("Failed to initiate checkout");
+        setIsBuying(false);
+    }
+  };
+
+  const handleUnlock = async () => {
+    if (!data.stored_file_id) return;
+    setIsUnlocking(true);
+    try {
+        const tk = await getToken();
+        if (!tk) return;
+        const res = await consumeCreditToUnlock(data.stored_file_id, 'auditor', tk);
+        setCredits(res.remaining_auditor);
+        setIsPremiumUnlocked(true);
+        if (onUpdate) onUpdate({...data, is_premium_unlocked: true});
+        // Clear payment_success from URL
+        const url = new URL(window.location.href);
+        url.searchParams.delete('payment_success');
+        window.history.replaceState({}, '', url.toString());
+    } catch (e: any) {
+        alert(e.message || "Failed to unlock document");
+    } finally {
+        setIsUnlocking(false);
+    }
+  };
+
+  // Auto-unlock when returning from Stripe checkout with ?payment_success=true
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('payment_success') === 'true' && !isPremiumUnlocked && data.stored_file_id) {
+      // Give the webhook 1.5s to land, then retry up to 3 times
+      const attemptUnlock = async (attemptsLeft: number): Promise<void> => {
+        try {
+          await handleUnlock();
+        } catch {
+          if (attemptsLeft > 0) {
+            setTimeout(() => attemptUnlock(attemptsLeft - 1), 2000);
+          }
+        }
+      };
+      setTimeout(() => attemptUnlock(3), 1500);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
 
   const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
 
@@ -215,12 +290,25 @@ export const Dashboard: FC<DashboardProps> = ({ data, onReset, onUpdate }) => {
           {data.noc_analysis?.applicable && (
             isSignedIn ? (
               <>
-                <button onClick={() => handleDownloadNoc()} className="btn" style={{ background: 'var(--primary-color)', borderColor: 'var(--primary-color)', color: 'white' }}>
-                  📄 Download NOC Sheet
-                </button>
-                <button onClick={() => handleDownloadFull()} className="btn btn-outline" style={{ borderColor: 'var(--text-muted)' }}>
-                  📥 Download Full Audit
-                </button>
+                {isPremiumUnlocked ? (
+                  <>
+                    <button onClick={() => handleDownloadNoc()} className="btn" style={{ background: 'var(--primary-color)', borderColor: 'var(--primary-color)', color: 'white' }}>
+                      📄 Download NOC Sheet
+                    </button>
+                    <button onClick={() => handleDownloadFull()} className="btn btn-outline" style={{ borderColor: 'var(--text-muted)' }}>
+                      📥 Download Full Audit
+                    </button>
+                  </>
+                ) : (
+                  <>
+                    <button onClick={() => document.getElementById('paywall-overlay')?.scrollIntoView({ behavior: 'smooth', block: 'center' })} className="btn" style={{ background: '#9ca3af', borderColor: '#9ca3af', color: 'white' }}>
+                      🔒 Download NOC Sheet
+                    </button>
+                    <button onClick={() => document.getElementById('paywall-overlay')?.scrollIntoView({ behavior: 'smooth', block: 'center' })} className="btn btn-outline" style={{ borderColor: '#9ca3af', color: '#9ca3af' }}>
+                      🔒 Download Full Audit
+                    </button>
+                  </>
+                )}
                 {data.stored_file_id && (
                   <button onClick={handleDownloadOriginal} className="btn btn-outline" style={{ borderColor: '#10b981', color: '#10b981' }}>
                     📎 Original Letter
@@ -228,7 +316,7 @@ export const Dashboard: FC<DashboardProps> = ({ data, onReset, onUpdate }) => {
                 )}
               </>
             ) : (
-              <div onClickCapture={() => sessionStorage.setItem('pendingPdfDownload', 'full')}>
+              <div onClickCapture={() => sessionStorage.setItem('pendingPdfDownload', 'noc')}>
                 <SignInButton mode="modal" forceRedirectUrl={window.location.href}>
                   <button className="btn" style={{ background: '#4285F4', borderColor: '#4285F4', color: 'white' }}>
                     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" style={{ marginRight: '8px', verticalAlign: 'middle', display: 'inline' }}>
@@ -237,7 +325,7 @@ export const Dashboard: FC<DashboardProps> = ({ data, onReset, onUpdate }) => {
                        <path fill="white" fillRule="evenodd" clipRule="evenodd" d="M5.56432 14.1851C5.33318 13.4944 5.20364 12.7584 5.20364 12.0001C5.20364 11.2418 5.33318 10.5058 5.56432 9.81514V6.83655H1.7225C0.942727 8.38973 0.5 10.1424 0.5 12.0001C0.5 13.8578 0.942727 15.6106 1.7225 17.1638L5.56432 14.1851Z" />
                        <path fill="white" fillRule="evenodd" clipRule="evenodd" d="M12 5.07455C13.6909 5.07455 15.2082 5.65727 16.4027 6.79364L20.0168 3.17955C17.7082 1.02955 15.105 0 12 0C7.50455 0 3.615 3.07682 1.7225 6.83636L5.56432 9.81495C6.46955 7.09841 9.00477 5.07455 12 5.07455Z" />
                     </svg>
-                    Sign in to Download Info
+                    Sign in to Save
                   </button>
                 </SignInButton>
               </div>
@@ -302,46 +390,6 @@ export const Dashboard: FC<DashboardProps> = ({ data, onReset, onUpdate }) => {
                 <div className="card">
                   <h3 className="card-title">Overall Assessment {renderBadge(data.compliance_status)}</h3>
                   <p>{data.summary}</p>
-                  {data.strengths.length > 0 && (
-                     <div style={{ marginTop: '16px' }}>
-                       <strong style={{ color: 'var(--success-color)' }}>✅ Strengths:</strong>
-                       <ul style={{ paddingLeft: '20px', marginTop: '8px', fontSize: '14px' }}>
-                         {data.strengths.map((s, idx) => <li key={idx}>{s}</li>)}
-                       </ul>
-                     </div>
-                  )}
-                </div>
-
-                <div className="card">
-                  <h3 className="card-title">⚠️ Identified Risks ({data.risks.length})</h3>
-                  {data.risks.length === 0 ? <p>No significant risks found in the document.</p> : null}
-                  {data.risks.map((risk: Risk, idx: number) => (
-                    <div key={idx} className={`risk-item ${risk.severity === 'high' ? 'high' : ''}`}>
-                      <div className="risk-title">{risk.issue}</div>
-                      <div className="risk-impact">Impact: {risk.impact}</div>
-                      <strong>Recommendation:</strong> {risk.recommendation}
-                    </div>
-                  ))}
-                </div>
-
-                <div className="card">
-                  <h3 className="card-title">❌ Missing Elements</h3>
-                  {data.missing_elements.length > 0 ? (
-                    <ul className="missing-elements">
-                      {data.missing_elements.map((item, idx) => (
-                        <li key={idx}>{item}</li>
-                      ))}
-                    </ul>
-                  ) : <p>All essential elements are present in the document.</p>}
-                </div>
-                
-                <div className="card">
-                  <h3 className="card-title">🔧 Recommended Fixes</h3>
-                  <ul style={{ paddingLeft: '20px' }}>
-                    {data.recommended_fixes.map((fix, idx) => (
-                      <li key={idx} style={{ marginBottom: '8px' }}>{fix}</li>
-                    ))}
-                  </ul>
                 </div>
               </div>
 
@@ -363,47 +411,8 @@ export const Dashboard: FC<DashboardProps> = ({ data, onReset, onUpdate }) => {
                       {data.noc_analysis.match_score}% Match
                     </span>
                   </div>
-                  {data.noc_analysis.alternative_nocs && data.noc_analysis.alternative_nocs.length > 0 && (
-                    <div style={{ marginTop: '12px', padding: '12px', background: 'white', borderRadius: '6px', border: '1px dashed var(--border-color)' }}>
-                      <h4 style={{ fontSize: '0.85rem', fontWeight: 'bold', marginBottom: '8px', color: 'var(--text-muted)' }}>ALTERNATIVE NOC CODES:</h4>
-                      <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginBottom: '12px' }}>Want to apply under one of these instead? Click a NOC below to run the audit against it.</p>
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                        {data.noc_analysis.alternative_nocs.map((alt, i) => (
-                          <div 
-                            key={i} 
-                            onClick={() => handleReevaluate(alt.noc_code)}
-                            className="alternative-noc-card"
-                            style={{ background: '#F8FAFC', padding: '16px', borderRadius: '8px', border: '1px solid var(--border-color)', cursor: 'pointer' }}
-                          >
-                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: alt.explanation ? '8px' : '0' }}>
-                              <div style={{ fontWeight: 600, fontSize: '0.95rem' }}>NOC {alt.noc_code} — {alt.noc_title}</div>
-                              <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                                <div style={{ fontWeight: 700, color: alt.match_score >= 80 ? '#059669' : '#D97706', fontSize: '0.9rem' }}>{alt.match_score}% Match</div>
-                                {onUpdate && (
-                                  <span style={{ fontSize: '0.8rem', color: 'var(--primary-color)', fontWeight: 600 }} className="target-btn">Re-evaluate →</span>
-                                )}
-                              </div>
-                            </div>
-                            {alt.explanation && (
-                              <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', lineHeight: 1.5, margin: 0 }}>{alt.explanation}</p>
-                            )}
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-                  <p style={{ fontSize: '0.9rem', color: 'var(--text-muted)', marginTop: '12px' }}>{data.noc_analysis.notes}</p>
                 </div>
-
-                <div className="card">
-                  <h3 className="card-title">✍️ Suggested Wording</h3>
-                  {data.suggested_wording.map((text, idx) => (
-                    <div key={idx} className="recommendation-box" style={{ fontStyle: 'italic', color: 'var(--primary-dark)' }}>
-                      "{text}"
-                    </div>
-                  ))}
-                </div>
-
+                
                 <div className="card" style={{ background: 'var(--bg-color)', border: '2px solid var(--primary-color)' }}>
                   <h3 className="card-title">🟢 Final Verdict</h3>
                   <p style={{ fontSize: '1.1rem', fontWeight: 600, marginBottom: '10px' }}>
@@ -417,10 +426,136 @@ export const Dashboard: FC<DashboardProps> = ({ data, onReset, onUpdate }) => {
                   </p>
                 </div>
               </div>
+            </div> {/* End Free Dashboard Grid */}
+
+            {/* --- PREMIUM LOCKED SECTION --- */}
+            <div style={{ position: 'relative', marginTop: '20px' }}>
+              <div style={!isPremiumUnlocked ? { filter: 'blur(8px)', pointerEvents: 'none', userSelect: 'none', opacity: 0.6 } : {}}>
+                <div className="dashboard">
+                  <div>
+                    {data.strengths.length > 0 && (
+                      <div className="card">
+                        <h3 className="card-title">✅ Strengths</h3>
+                        <ul style={{ paddingLeft: '20px', fontSize: '14px' }}>
+                          {data.strengths.map((s, idx) => <li key={idx}>{s}</li>)}
+                        </ul>
+                      </div>
+                    )}
+
+                    <div className="card">
+                      <h3 className="card-title">⚠️ Identified Risks ({data.risks.length})</h3>
+                      {data.risks.length === 0 ? <p>No significant risks found in the document.</p> : null}
+                      {data.risks.map((risk: Risk, idx: number) => (
+                        <div key={idx} className={`risk-item ${risk.severity === 'high' ? 'high' : ''}`}>
+                          <div className="risk-title">{risk.issue}</div>
+                          <div className="risk-impact">Impact: {risk.impact}</div>
+                          <strong>Recommendation:</strong> {risk.recommendation}
+                        </div>
+                      ))}
+                    </div>
+
+                    <div className="card">
+                      <h3 className="card-title">❌ Missing Elements</h3>
+                      {data.missing_elements.length > 0 ? (
+                        <ul className="missing-elements">
+                          {data.missing_elements.map((item, idx) => (
+                            <li key={idx}>{item}</li>
+                          ))}
+                        </ul>
+                      ) : <p>All essential elements are present in the document.</p>}
+                    </div>
+                    
+                    <div className="card">
+                      <h3 className="card-title">🔧 Recommended Fixes</h3>
+                      <ul style={{ paddingLeft: '20px' }}>
+                        {data.recommended_fixes.map((fix, idx) => (
+                          <li key={idx} style={{ marginBottom: '8px' }}>{fix}</li>
+                        ))}
+                      </ul>
+                    </div>
+                  </div>
+                  <div>
+                    <div className="card">
+                      {data.noc_analysis.alternative_nocs && data.noc_analysis.alternative_nocs.length > 0 && (
+                        <div style={{ background: 'white', borderRadius: '6px', border: '1px dashed var(--border-color)' }}>
+                          <h4 style={{ fontSize: '0.85rem', fontWeight: 'bold', marginBottom: '8px', color: 'var(--text-muted)' }}>ALTERNATIVE NOC CODES:</h4>
+                          <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginBottom: '12px' }}>Want to apply under one of these instead? Click a NOC below to run the audit against it.</p>
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                            {data.noc_analysis.alternative_nocs.map((alt, i) => (
+                              <div 
+                                key={i} 
+                                onClick={() => handleReevaluate(alt.noc_code)}
+                                className="alternative-noc-card"
+                                style={{ background: '#F8FAFC', padding: '16px', borderRadius: '8px', border: '1px solid var(--border-color)', cursor: 'pointer' }}
+                              >
+                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: alt.explanation ? '8px' : '0' }}>
+                                  <div style={{ fontWeight: 600, fontSize: '0.95rem' }}>NOC {alt.noc_code} — {alt.noc_title}</div>
+                                  <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                                    <div style={{ fontWeight: 700, color: alt.match_score >= 80 ? '#059669' : '#D97706', fontSize: '0.9rem' }}>{alt.match_score}% Match</div>
+                                    {onUpdate && (
+                                      <span style={{ fontSize: '0.8rem', color: 'var(--primary-color)', fontWeight: 600 }} className="target-btn">Re-evaluate →</span>
+                                    )}
+                                  </div>
+                                </div>
+                                {alt.explanation && (
+                                  <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', lineHeight: 1.5, margin: 0 }}>{alt.explanation}</p>
+                                )}
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                      <p style={{ fontSize: '0.9rem', color: 'var(--text-muted)', marginTop: '12px' }}>{data.noc_analysis.notes}</p>
+                    </div>
+
+                    <div className="card">
+                      <h3 className="card-title">✍️ Suggested Wording</h3>
+                      {data.suggested_wording.map((text, idx) => (
+                        <div key={idx} className="recommendation-box" style={{ fontStyle: 'italic', color: 'var(--primary-dark)' }}>
+                          "{text}"
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              </div> {/* End Blurred Section */}
+
+              {/* Paywall Overlay */}
+              {!isPremiumUnlocked && (
+                <div style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, zIndex: 10, pointerEvents: 'none' }}>
+                  <div style={{ position: 'sticky', top: '25vh', display: 'flex', justifyContent: 'center', pointerEvents: 'auto', padding: '0 20px' }}>
+                    <div id="paywall-overlay" className="card" style={{ maxWidth: '500px', background: 'white', border: '2px solid var(--primary-color)', textAlign: 'center', boxShadow: '0 20px 40px rgba(0,0,0,0.2)' }}>
+                    <div style={{ fontSize: '2.5rem', marginBottom: '10px' }}>🔒</div>
+                    <h3 style={{ fontSize: '1.4rem', fontWeight: 800, marginBottom: '12px' }}>Premium Audit Locked</h3>
+                    <p style={{ color: 'var(--text-muted)', marginBottom: '24px', lineHeight: 1.5 }}>
+                      Unlock detailed risk analysis, missing elements, recommended fixes, alternative NOC mappings, suggested wordings, and the official alignment sheet.
+                    </p>
+                    
+                    {!isSignedIn ? (
+                      <SignInButton mode="modal" forceRedirectUrl={window.location.href}>
+                        <button className="btn btn-primary" style={{ width: '100%', padding: '12px', fontSize: '1.1rem' }}>
+                          Sign In and Pay to Unlock Insights
+                        </button>
+                      </SignInButton>
+                    ) : credits > 0 ? (
+                      <button className="btn btn-primary" onClick={handleUnlock} disabled={isUnlocking} style={{ width: '100%', padding: '12px', fontSize: '1.1rem' }}>
+                        {isUnlocking ? 'Unlocking...' : `Unlock Full Audit (Cost: 1 Credit. Remaining: ${credits})`}
+                      </button>
+                    ) : (
+                      <>
+                        <button className="btn btn-primary" onClick={handleCheckout} disabled={isBuying} style={{ width: '100%', padding: '12px', fontSize: '1.1rem', background: '#10b981', borderColor: '#10b981' }}>
+                          {isBuying ? 'Redirecting...' : 'Purchase Audits (2 for $19.90 CAD)'}
+                        </button>
+                      </>
+                    )}
+                  </div>
+                  </div>
+                </div>
+              )}
             </div>
 
             {data.noc_analysis?.duties_match && data.noc_analysis.duties_match.length > 0 && (
-               <>
+               <div style={!isPremiumUnlocked ? { filter: 'blur(8px)', pointerEvents: 'none', userSelect: 'none', opacity: 0.6 } : {}}>
                  <div ref={breakSpacerRef} style={{ transition: 'height 0.1s ease-in-out' }}></div>
                  <div style={{ pageBreakBefore: 'always', margin: '40px 0 0 0' }} className="html2pdf__page-break"></div>
                  <div ref={nocTargetRef} className="card" style={{ marginTop: '0' }}>
@@ -503,7 +638,7 @@ export const Dashboard: FC<DashboardProps> = ({ data, onReset, onUpdate }) => {
                       </ul>
                     </div>
                  </div>
-               </>
+               </div>
             )}
           </div>
 
@@ -515,7 +650,7 @@ export const Dashboard: FC<DashboardProps> = ({ data, onReset, onUpdate }) => {
               </p>
             </div>
             <div style={{ display: 'flex', gap: '16px', justifyContent: 'center', flexWrap: 'wrap' }}>
-               {isSignedIn ? (
+                {isPremiumUnlocked ? (
                   <>
                     <button onClick={() => handleDownloadNoc()} className="btn btn-lg" style={{ background: 'var(--primary-color)', borderColor: 'var(--primary-color)', color: 'white', padding: '12px 32px' }}>
                       📄 Download NOC Sheet
@@ -524,25 +659,20 @@ export const Dashboard: FC<DashboardProps> = ({ data, onReset, onUpdate }) => {
                       📥 Download Full Audit
                     </button>
                   </>
-               ) : (
+                ) : (
                   <>
-                    <div onClickCapture={() => sessionStorage.setItem('pendingPdfDownload', 'noc')}>
-                      <SignInButton mode="modal" forceRedirectUrl={window.location.href}>
-                        <button className="btn btn-lg" style={{ background: 'var(--primary-color)', borderColor: 'var(--primary-color)', color: 'white', padding: '12px 32px' }}>
-                          📄 Sign In & Download NOC Sheet
-                        </button>
-                      </SignInButton>
-                    </div>
-                    <div onClickCapture={() => sessionStorage.setItem('pendingPdfDownload', 'full')}>
-                      <SignInButton mode="modal" forceRedirectUrl={window.location.href}>
-                        <button className="btn btn-lg btn-outline" style={{ padding: '12px 32px' }}>
-                          📥 Sign In for Full Audit
-                        </button>
-                      </SignInButton>
-                    </div>
+                    <button onClick={() => document.getElementById('paywall-overlay')?.scrollIntoView({ behavior: 'smooth', block: 'center' })} className="btn btn-lg" style={{ background: '#9ca3af', borderColor: '#9ca3af', color: 'white', padding: '12px 32px' }}>
+                      🔒 Download NOC Sheet
+                    </button>
+                    <button onClick={() => document.getElementById('paywall-overlay')?.scrollIntoView({ behavior: 'smooth', block: 'center' })} className="btn btn-lg btn-outline" style={{ color: '#9ca3af', borderColor: '#9ca3af', padding: '12px 32px' }}>
+                      🔒 Download Full Audit
+                    </button>
                   </>
-               )}
+                )}
             </div>
+            {!isPremiumUnlocked && (
+              <p style={{ marginTop: '16px', fontSize: '0.9rem', color: 'var(--text-muted)' }}>Unlock the premium audit above to download your custom PDFs.</p>
+            )}
           </div>
 
           {!isSignedIn && showToast && !toastDismissed && (
@@ -556,9 +686,9 @@ export const Dashboard: FC<DashboardProps> = ({ data, onReset, onUpdate }) => {
             }}>
               <div>
                 <div style={{ fontWeight: 600, color: '#1f2937', marginBottom: '4px', fontSize: '1rem' }}>Don't lose this report!</div>
-                <div style={{ fontSize: '0.9rem', color: '#6b7280' }}>Sign in to safely download your PDF.</div>
+                <div style={{ fontSize: '0.9rem', color: '#6b7280' }}>Sign in to save your analysis and track your progress.</div>
               </div>
-              <div onClickCapture={() => sessionStorage.setItem('pendingPdfDownload', 'full')}>
+              <div>
                 <SignInButton mode="modal" forceRedirectUrl={window.location.href}>
                   <button className="btn" style={{ background: '#4285F4', borderColor: '#4285F4', color: 'white', padding: '8px 20px', fontSize: '0.95rem', fontWeight: 500 }}>
                     Sign in

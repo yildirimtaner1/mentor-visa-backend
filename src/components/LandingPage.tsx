@@ -222,6 +222,56 @@ export const LandingPage: FC<LandingPageProps> = ({ onGetStarted, onNavigate }) 
         </div>
       </section>
 
+      {/* Pricing */}
+      <section id="pricing" className="section" style={{ backgroundColor: '#f8fafc' }}>
+        <div style={{ textAlign: 'center', marginBottom: '48px' }}>
+          <h2 className="section-title">Accessible Pricing</h2>
+          <p className="section-subtitle">Stop guessing with your Express Entry application. Pay per use, no recurring subscriptions.</p>
+        </div>
+        <div className="pricing-grid" style={{ display: 'flex', gap: '32px', justifyContent: 'center', flexWrap: 'wrap', maxWidth: '1000px', margin: '0 auto' }}>
+          
+          {/* NOC Finder Tier */}
+          <div className="card" style={{ flex: '1 1 300px', textAlign: 'left', display: 'flex', flexDirection: 'column' }}>
+            <h3 style={{ fontSize: '1.25rem', color: 'var(--text-muted)', marginBottom: '8px', fontWeight: 500 }}>NOC Finder Pass</h3>
+            <div style={{ fontSize: '2.5rem', fontWeight: 800, color: 'var(--text-color)', marginBottom: '16px' }}>
+              $9.90 <span style={{ fontSize: '1rem', color: 'var(--text-muted)', fontWeight: 400 }}>CAD</span>
+            </div>
+            <p style={{ color: 'var(--text-muted)', marginBottom: '24px', flex: 1 }}>Match your job duties to the exact NOC code required for Express Entry.</p>
+            <ul style={{ listStyleType: 'none', padding: 0, margin: '0 0 32px 0', display: 'grid', gap: '12px' }}>
+              <li style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>✅ <strong>2 Uses</strong> Included</li>
+              <li style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>✅ Searches all 516 unit groups</li>
+              <li style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>✅ Exact TEER Validation</li>
+              <li style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>✅ Alternative Matches</li>
+            </ul>
+            <button className="btn btn-primary btn-outline" style={{ width: '100%' }} onClick={() => onNavigate('find-my-noc')}>
+              Find My NOC
+            </button>
+          </div>
+
+          {/* Letter Auditor Tier */}
+          <div className="card" style={{ flex: '1 1 300px', textAlign: 'left', border: '2px solid var(--primary-color)', transform: 'translateY(-10px)', boxShadow: '0 20px 25px -5px rgba(37, 99, 235, 0.1), 0 10px 10px -5px rgba(37, 99, 235, 0.04)', display: 'flex', flexDirection: 'column' }}>
+            <div style={{ background: 'var(--primary-color)', color: 'white', position: 'absolute', top: 0, left: '50%', transform: 'translate(-50%, -50%)', padding: '4px 16px', borderRadius: '16px', fontSize: '0.85rem', fontWeight: 600 }}>
+              MOST POPULAR
+            </div>
+            <h3 style={{ fontSize: '1.25rem', color: 'var(--text-muted)', marginBottom: '8px', fontWeight: 500, marginTop: '8px' }}>Letter Auditor Pass</h3>
+            <div style={{ fontSize: '2.5rem', fontWeight: 800, color: 'var(--text-color)', marginBottom: '16px' }}>
+              $19.90 <span style={{ fontSize: '1rem', color: 'var(--text-muted)', fontWeight: 400 }}>CAD</span>
+            </div>
+            <p style={{ color: 'var(--text-muted)', marginBottom: '24px', flex: 1 }}>Full IRCC compliance audit for your employment reference letter.</p>
+            <ul style={{ listStyleType: 'none', padding: 0, margin: '0 0 32px 0', display: 'grid', gap: '12px' }}>
+              <li style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>✅ <strong>2 Uses</strong> Included</li>
+              <li style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>✅ 9-Point IRCC Checklist</li>
+              <li style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>✅ Duty Alignment Checking</li>
+              <li style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>✅ Downloadable PDF Sheets</li>
+            </ul>
+            <button className="btn btn-primary" style={{ width: '100%' }} onClick={onGetStarted}>
+              Audit My Letter
+            </button>
+          </div>
+
+        </div>
+      </section>
+
       {/* FAQ */}
       <section className="section section-dark">
         <h2 className="section-title">Frequently Asked Questions</h2>
