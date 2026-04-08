@@ -92,3 +92,51 @@ export async function findNOCCode(jobTitle?: string, dutiesDescription?: string,
   }
   return response.json();
 }
+
+export async function fetchUserCredits(token: string) {
+  const response = await fetch(`${API_BASE_URL}/api/v1/user/credits`, {
+    headers: { 'Authorization': `Bearer ${token}` }
+  });
+  if (!response.ok) return { find_noc_credits: 0, audit_letter_credits: 0 };
+  return response.json();
+}
+
+export async function createCheckoutSession(passType: 'finder' | 'auditor', token: string, returnPath: string = '/dashboard') {
+  const response = await fetch(`${API_BASE_URL}/api/v1/create-checkout-session`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${token}`
+    },
+    body: JSON.stringify({ pass_type: passType, return_path: returnPath })
+  });
+  if (!response.ok) throw new Error("Failed to create checkout session");
+  const data = await response.json();
+  return data.session_url;
+}
+
+export async function consumeCreditToUnlock(fileId: string, passType: 'finder' | 'auditor', token: string) {
+  const response = await fetch(`${API_BASE_URL}/api/v1/unlock-evaluation`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${token}`
+    },
+    body: JSON.stringify({ file_id: fileId, pass_type: passType })
+  });
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({}));
+    throw new Error(errorData.detail || "Failed to unlock document");
+  }
+  return response.json();
+}
+
+/** LOCAL DEV ONLY — hits the dev endpoint to instantly grant test credits. */
+export async function devGrantCredits(token: string) {
+  const response = await fetch(`${API_BASE_URL}/api/v1/dev/grant-credits`, {
+    method: 'POST',
+    headers: { 'Authorization': `Bearer ${token}` }
+  });
+  if (!response.ok) throw new Error('Failed to grant credits');
+  return response.json();
+}

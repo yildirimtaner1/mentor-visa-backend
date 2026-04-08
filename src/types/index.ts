@@ -64,4 +64,5 @@ export interface AnalysisResponse {
   noc_analysis: NOCAnalysis;
   mandatory_requirements: MandatoryRequirements;
   final_verdict: FinalVerdict;
+  is_premium_unlocked?: boolean | number;
 }
