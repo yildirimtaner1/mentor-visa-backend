@@ -135,7 +135,7 @@ export const NOCFinderPage: FC<NOCFinderPageProps> = ({ onNavigate }) => {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Auto-scroll when the user successfully signs in
+  // Auto-scroll and auto-save when the user successfully signs in
   const prevSignedIn = useRef(isSignedIn);
   useEffect(() => {
     // If user just transitioned from signed out to signed in, and we have a result
@@ -143,9 +143,21 @@ export const NOCFinderPage: FC<NOCFinderPageProps> = ({ onNavigate }) => {
       setTimeout(() => {
         document.getElementById('primary-match-section')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
       }, 300);
+
+      // Silently save to their account
+      getToken().then((token) => {
+        if (token) {
+          const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
+          fetch(`${API_BASE_URL}/api/v1/evaluations`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+            body: JSON.stringify({ ...result, evaluation_type: 'noc_finder' })
+          }).catch(console.error);
+        }
+      });
     }
     prevSignedIn.current = isSignedIn;
-  }, [isSignedIn, result]);
+  }, [isSignedIn, result, getToken]);
 
   const handleCheckout = async () => {
     setIsBuying(true);

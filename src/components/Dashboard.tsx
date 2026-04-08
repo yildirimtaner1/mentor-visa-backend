@@ -145,9 +145,18 @@ export const Dashboard: FC<DashboardProps> = ({ data, onReset, onUpdate }) => {
       setTimeout(() => {
         document.getElementById('primary-match-section')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
       }, 300);
+
+      // Auto-save the evaluation to their profile silently
+      getToken().then((token) => {
+         if (token) {
+            import('../services/api').then(({ saveEvaluation }) => {
+               saveEvaluation(data, token).catch(console.error);
+            });
+         }
+      });
     }
     prevSignedIn.current = isSignedIn;
-  }, [isSignedIn, data]);
+  }, [isSignedIn, data, getToken]);
 
   const handleDownloadFull = async () => {
     const originalWidth = fullTargetRef.current?.style.width || '';
@@ -216,14 +225,7 @@ export const Dashboard: FC<DashboardProps> = ({ data, onReset, onUpdate }) => {
       if (pending) {
         sessionStorage.removeItem('pendingPdfDownload');
         
-        // Silently claim the document for the user
-        getToken().then((token: string | null) => {
-           if (token) {
-              import('../services/api').then(({ saveEvaluation }) => {
-                 saveEvaluation(data, token).catch(console.error);
-              });
-           }
-        });
+        // The main auth hook already handled saving the evaluation.
 
         if (pending === 'noc') {
           setTimeout(() => handleDownloadNoc(), 1000);
