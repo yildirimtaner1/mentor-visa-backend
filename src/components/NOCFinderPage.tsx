@@ -135,6 +135,18 @@ export const NOCFinderPage: FC<NOCFinderPageProps> = ({ onNavigate }) => {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // Auto-scroll when the user successfully signs in
+  const prevSignedIn = useRef(isSignedIn);
+  useEffect(() => {
+    // If user just transitioned from signed out to signed in, and we have a result
+    if (!prevSignedIn.current && isSignedIn && result) {
+      setTimeout(() => {
+        document.getElementById('primary-match-section')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }, 300);
+    }
+    prevSignedIn.current = isSignedIn;
+  }, [isSignedIn, result]);
+
   const handleCheckout = async () => {
     setIsBuying(true);
     try {
@@ -440,7 +452,7 @@ export const NOCFinderPage: FC<NOCFinderPageProps> = ({ onNavigate }) => {
 
             {/* Result */}
             {result && result.document_valid && (
-              <div className="result-card" style={{ marginTop: '32px' }}>
+              <div id="primary-match-section" className="result-card" style={{ marginTop: '32px' }}>
                 <h3 style={{ fontSize: '1.2rem', fontWeight: 700, marginBottom: '20px', color: 'var(--text-color)', borderBottom: '1px solid var(--border-color)', paddingBottom: '12px' }}>
                   Primary match
                 </h3>

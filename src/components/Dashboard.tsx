@@ -137,6 +137,18 @@ export const Dashboard: FC<DashboardProps> = ({ data, onReset, onUpdate }) => {
     }
   };
 
+  // Auto-scroll when the user successfully signs in
+  const prevSignedIn = useRef(isSignedIn);
+  useEffect(() => {
+    // If user just transitioned from signed out to signed in, and we have data
+    if (!prevSignedIn.current && isSignedIn && data) {
+      setTimeout(() => {
+        document.getElementById('primary-match-section')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }, 300);
+    }
+    prevSignedIn.current = isSignedIn;
+  }, [isSignedIn, data]);
+
   const handleDownloadFull = async () => {
     const originalWidth = fullTargetRef.current?.style.width || '';
     const originalMaxWidth = fullTargetRef.current?.style.maxWidth || '';
@@ -382,7 +394,7 @@ export const Dashboard: FC<DashboardProps> = ({ data, onReset, onUpdate }) => {
         </div>
       ) : (
         <>
-          <div ref={fullTargetRef} style={{ background: 'var(--bg-color)', padding: '20px', borderRadius: '8px' }}>
+          <div id="primary-match-section" ref={fullTargetRef} style={{ background: 'var(--bg-color)', padding: '20px', borderRadius: '8px' }}>
             <div className="dashboard">
               <div>
                 <div className="card">
