@@ -132,9 +132,13 @@ function App() {
 
   const handleHistorySelection = (ev: any) => {
     if (ev.document_type === "NOC Finder Query") {
-      const rawData = ev.payload;
-      if (rawData && rawData.noc_analysis) {
-        const ana = rawData.noc_analysis;
+      let rawData = ev.payload;
+      if (typeof rawData === 'string') {
+        try { rawData = JSON.parse(rawData); } catch(e) {}
+      }
+
+      if (rawData) {
+        const ana = rawData.noc_analysis || {};
         const teer = ana.detected_code ? ana.detected_code.charAt(1) : '';
         const cec = ['0', '1', '2', '3'].includes(teer);
         const dutiesStrList = ana.duties_match 
@@ -142,8 +146,8 @@ function App() {
           : [];
           
         const nocResult = {
-          document_valid: true,
-          rejection_reason: '',
+          document_valid: rawData.document_valid !== false,
+          rejection_reason: rawData.rejection_reason || '',
           noc_code: ana.detected_code || '',
           noc_title: ana.detected_title || '',
           teer_category: teer,
@@ -164,7 +168,11 @@ function App() {
         setTimeout(() => window.location.reload(), 50);
       }
     } else {
-      const payload = { ...ev.payload, is_premium_unlocked: ev.is_premium_unlocked };
+      let payload = ev.payload;
+      if (typeof payload === 'string') {
+        try { payload = JSON.parse(payload); } catch(e) {}
+      }
+      payload = { ...payload, is_premium_unlocked: ev.is_premium_unlocked };
       handleAnalysisResult(payload, false);
     }
   };
