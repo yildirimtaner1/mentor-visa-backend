@@ -10,6 +10,9 @@ import { CECChecklistPage } from './components/CECChecklistPage';
 import { CRSCalculatorPage } from './components/CRSCalculatorPage';
 import { NOCDirectoryPage } from './components/NOCDirectoryPage';
 import { NOCDetailsPage } from './components/NOCDetailsPage';
+import { PrivacyPolicyPage } from './components/PrivacyPolicyPage';
+import { TermsOfServicePage } from './components/TermsOfServicePage';
+import { RefundPolicyPage } from './components/RefundPolicyPage';
 import { useAuth, UserButton } from '@clerk/clerk-react';
 import { saveEvaluation } from './services/api';
 import { Navbar } from './components/common/Navbar';
@@ -30,10 +33,15 @@ const SharedLayout = ({ children }: { children: React.ReactNode }) => {
             <img src="/logo.png" alt="Mentor Visa" style={{ height: '28px', width: '28px', objectFit: 'contain' }} />
             <span>Mentor Visa</span>
           </div>
-          <p className="landing-footer-disclaimer">
+          <p className="landing-footer-disclaimer" style={{ marginBottom: '12px' }}>
             © 2026 Mentor Visa Services. All rights reserved.<br />
             This tool is for informational purposes only and does not constitute legal or immigration advice.
           </p>
+          <div style={{ display: 'flex', gap: '16px', justifyContent: 'center', fontSize: '12px', flexWrap: 'wrap' }}>
+            <a href="/privacy-policy" style={{ color: 'var(--text-muted)', textDecoration: 'none' }}>Privacy Policy</a>
+            <a href="/terms-of-service" style={{ color: 'var(--text-muted)', textDecoration: 'none' }}>Terms of Service</a>
+            <a href="/refund-policy" style={{ color: 'var(--text-muted)', textDecoration: 'none' }}>Refund Policy</a>
+          </div>
         </div>
       </footer>
     </div>
@@ -80,7 +88,12 @@ const AppLayout = ({ children }: { children: React.ReactNode }) => {
 
       <footer style={{ textAlign: 'center', marginTop: '60px', color: 'var(--text-muted)', fontSize: '13px', paddingBottom: '24px' }}>
         <p>&copy; 2026 Mentor Visa Services. All rights reserved.</p>
-        <p style={{ marginTop: '4px', fontSize: '11px' }}>This tool is for informational purposes only and does not constitute legal or immigration advice.</p>
+        <p style={{ marginTop: '4px', fontSize: '11px', marginBottom: '12px' }}>This tool is for informational purposes only and does not constitute legal or immigration advice.</p>
+        <div style={{ display: 'flex', gap: '16px', justifyContent: 'center', fontSize: '12px', flexWrap: 'wrap' }}>
+          <a href="/privacy-policy" style={{ color: 'var(--text-muted)', textDecoration: 'none' }}>Privacy Policy</a>
+          <a href="/terms-of-service" style={{ color: 'var(--text-muted)', textDecoration: 'none' }}>Terms of Service</a>
+          <a href="/refund-policy" style={{ color: 'var(--text-muted)', textDecoration: 'none' }}>Refund Policy</a>
+        </div>
       </footer>
     </div>
   );
@@ -171,6 +184,11 @@ function App() {
       {/* Content Silos */}
       <Route path="/noc-codes" element={<SharedLayout><NOCDirectoryPage onNavigate={(p) => navigate(`/${p}`)} /></SharedLayout>} />
       <Route path="/noc-codes/:code" element={<SharedLayout><NOCDetailsPage /></SharedLayout>} />
+
+      {/* Legal Pages */}
+      <Route path="/privacy-policy" element={<SharedLayout><PrivacyPolicyPage /></SharedLayout>} />
+      <Route path="/terms-of-service" element={<SharedLayout><TermsOfServicePage /></SharedLayout>} />
+      <Route path="/refund-policy" element={<SharedLayout><RefundPolicyPage /></SharedLayout>} />
 
       {/* App Layout Routes (Dashboard/Results) */}
       <Route path="/dashboard" element={<AppLayout><MyEvaluations onSelectEvaluation={handleHistorySelection} /></AppLayout>} />
