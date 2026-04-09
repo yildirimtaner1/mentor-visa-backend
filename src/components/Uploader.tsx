@@ -65,6 +65,11 @@ export const Uploader: FC<UploaderProps> = ({ onAnalysisResult }) => {
       return;
     }
 
+    if (file.size > 5 * 1024 * 1024) {
+      setError('File is too large. The maximum file size allowed is 5MB.');
+      return;
+    }
+
     setError(null);
     setLoading(true);
     try {

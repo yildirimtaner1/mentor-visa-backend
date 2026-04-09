@@ -199,6 +199,11 @@ export const NOCFinderPage: FC<NOCFinderPageProps> = ({ onNavigate }) => {
       return;
     }
     
+    if (inputFile && inputFile.size > 5 * 1024 * 1024) {
+      setError('File is too large. The maximum file size allowed is 5MB.');
+      return;
+    }
+
     setError('');
     setLoading(true);
     if (targetNoc) {
