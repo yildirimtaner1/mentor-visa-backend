@@ -138,28 +138,40 @@ function App() {
       }
 
       if (rawData) {
-        const ana = rawData.noc_analysis || {};
-        const teer = ana.detected_code ? ana.detected_code.charAt(1) : '';
-        const cec = ['0', '1', '2', '3'].includes(teer);
-        const dutiesStrList = ana.duties_match 
-          ? ana.duties_match.map((d: any) => `• ${d.applicant_duty} → NOC: ${d.official_noc_duty} (${d.overlap_description})`)
-          : [];
-          
-        const nocResult = {
-          document_valid: rawData.document_valid !== false,
-          rejection_reason: rawData.rejection_reason || '',
-          noc_code: ana.detected_code || '',
-          noc_title: ana.detected_title || '',
-          teer_category: teer,
-          match_score: ana.match_score || 0,
-          alternative_nocs: ana.alternative_nocs || [],
-          explanation: ana.notes || '',
-          matched_duties: dutiesStrList,
-          cec_eligible: cec,
-          location_of_experience: ana.location_of_experience || 'unknown',
-          stored_file_id: rawData.stored_file_id || ev.stored_file_id,
-          is_premium_unlocked: rawData.is_premium_unlocked || ev.is_premium_unlocked
-        };
+        let nocResult;
+        
+        if (typeof rawData.noc_code === 'string') {
+          // Payload is already flattened NOCResult from frontend autosave
+          nocResult = {
+            ...rawData,
+            stored_file_id: rawData.stored_file_id || ev.stored_file_id,
+            is_premium_unlocked: rawData.is_premium_unlocked || ev.is_premium_unlocked
+          };
+        } else {
+          // Payload is raw Gemini NOCFinderResponseSchema from backend direct save
+          const ana = rawData.noc_analysis || {};
+          const teer = ana.detected_code ? ana.detected_code.charAt(1) : '';
+          const cec = ['0', '1', '2', '3'].includes(teer);
+          const dutiesStrList = ana.duties_match 
+            ? ana.duties_match.map((d: any) => `• ${d.applicant_duty} → NOC: ${d.official_noc_duty} (${d.overlap_description})`)
+            : [];
+            
+          nocResult = {
+            document_valid: rawData.document_valid !== false,
+            rejection_reason: rawData.rejection_reason || '',
+            noc_code: ana.detected_code || '',
+            noc_title: ana.detected_title || '',
+            teer_category: teer,
+            match_score: ana.match_score || 0,
+            alternative_nocs: ana.alternative_nocs || [],
+            explanation: ana.notes || '',
+            matched_duties: dutiesStrList,
+            cec_eligible: cec,
+            location_of_experience: ana.location_of_experience || 'unknown',
+            stored_file_id: rawData.stored_file_id || ev.stored_file_id,
+            is_premium_unlocked: rawData.is_premium_unlocked || ev.is_premium_unlocked
+          };
+        }
         sessionStorage.setItem('nocFinderResult', JSON.stringify(nocResult));
         navigate('/find-my-noc');
         
