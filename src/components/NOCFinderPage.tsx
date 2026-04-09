@@ -1,6 +1,6 @@
 import { type FC, useState, useRef, useEffect } from 'react';
 import { useUser, SignInButton, useAuth } from '@clerk/clerk-react';
-import { findNOCCode } from '../services/api';
+import { findNOCCode, fetchUserCredits, createCheckoutSession, consumeCreditToUnlock } from '../services/api';
 import { SEO } from './common/SEO';
 import { DynamicLoader } from './common/DynamicLoader';
 
@@ -64,6 +64,24 @@ export const NOCFinderPage: FC<NOCFinderPageProps> = ({ onNavigate }) => {
   
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  // Monetization State
+  const [credits, setCredits] = useState<number>(0);
+  const [isBuying, setIsBuying] = useState(false);
+  const [isUnlocking, setIsUnlocking] = useState(false);
+
+  useEffect(() => {
+    const loadCredits = async () => {
+       if (isSignedIn) {
+           const tk = await getToken();
+           if (tk) {
+               const c = await fetchUserCredits(tk);
+               setCredits(c.find_noc_credits || 0);
+           }
+       }
+    };
+    loadCredits();
+  }, [isSignedIn, getToken]);
+
   // Persist result to sessionStorage whenever it changes
   useEffect(() => {
     if (result) {
@@ -71,10 +89,52 @@ export const NOCFinderPage: FC<NOCFinderPageProps> = ({ onNavigate }) => {
     }
   }, [result]);
 
+  // Auto-unlock when returning from Stripe with ?payment_success=true
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('payment_success') === 'true') {
+      // Clean URL immediately
+      const cleanUrl = new URL(window.location.href);
+      cleanUrl.searchParams.delete('payment_success');
+      window.history.replaceState({}, '', cleanUrl.toString());
+
+      const pollAndUnlock = async () => {
+        const savedRaw = sessionStorage.getItem('nocFinderResult');
+        if (!savedRaw) return;
+        const saved: NOCResult = JSON.parse(savedRaw);
+        if (saved.is_premium_unlocked || !saved.stored_file_id) return;
+
+        const tk = await getToken();
+        if (!tk) return;
+
+        for (let i = 0; i < 10; i++) {
+          await new Promise(res => setTimeout(res, 1500));
+          try {
+            const creditData = await fetchUserCredits(tk);
+            const hasCredits = (creditData.find_noc_credits || 0) > 0;
+            if (hasCredits) {
+              const res = await consumeCreditToUnlock(saved.stored_file_id, 'finder', tk);
+              setCredits(res.remaining_finder);
+              const unlocked = { ...saved, is_premium_unlocked: true };
+              setResult(unlocked);
+              sessionStorage.setItem('nocFinderResult', JSON.stringify(unlocked));
+              return;
+            }
+          } catch (e: any) {
+            console.warn('Poll attempt failed:', e.message);
+          }
+        }
+        console.error('Payment processed but credits never appeared. Check Stripe webhook.');
+      };
+
+      pollAndUnlock();
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   // Auto-scroll and auto-save when the user successfully signs in
   const prevSignedIn = useRef(isSignedIn);
   useEffect(() => {
-    // If user just transitioned from signed out to signed in, and we have a result
     if (!prevSignedIn.current && isSignedIn && result) {
       setTimeout(() => {
         document.getElementById('primary-match-section')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
@@ -94,6 +154,43 @@ export const NOCFinderPage: FC<NOCFinderPageProps> = ({ onNavigate }) => {
     }
     prevSignedIn.current = isSignedIn;
   }, [isSignedIn, result, getToken]);
+
+  const handleCheckout = async () => {
+    setIsBuying(true);
+    try {
+        const tk = await getToken();
+        if (!tk) return;
+        if (result) {
+          sessionStorage.setItem('nocFinderResult', JSON.stringify(result));
+        }
+        const url = await createCheckoutSession('finder', tk, '/find-my-noc');
+        window.location.href = url;
+    } catch (e: any) {
+        alert("Failed to initiate checkout: " + (e.message || "Unknown error"));
+        setIsBuying(false);
+    }
+  };
+
+  const handleUnlock = async () => {
+    if (!result?.stored_file_id) return;
+    setIsUnlocking(true);
+    try {
+        const tk = await getToken();
+        if (!tk) return;
+        const res = await consumeCreditToUnlock(result.stored_file_id, 'finder', tk);
+        setCredits(res.remaining_finder);
+        const unlocked = {...result, is_premium_unlocked: true};
+        setResult(unlocked);
+        sessionStorage.setItem('nocFinderResult', JSON.stringify(unlocked));
+        const url = new URL(window.location.href);
+        url.searchParams.delete('payment_success');
+        window.history.replaceState({}, '', url.toString());
+    } catch (e: any) {
+        alert(e.message || "Failed to unlock insights.");
+    } finally {
+        setIsUnlocking(false);
+    }
+  };
 
 
   const processInput = async (inputFile: File | null, inputTitle: string = '', inputDuties: string = '', targetNoc: string = '') => {
@@ -401,7 +498,7 @@ export const NOCFinderPage: FC<NOCFinderPageProps> = ({ onNavigate }) => {
 
                 {/* --- PREMIUM LOCKED SECTION --- */}
                 <div style={{ position: 'relative', marginTop: '20px' }}>
-                  <div style={!isSignedIn ? { filter: 'blur(6px)', pointerEvents: 'none', userSelect: 'none', opacity: 0.6 } : {}}>
+                  <div style={!(result.is_premium_unlocked) ? { filter: 'blur(6px)', pointerEvents: 'none', userSelect: 'none', opacity: 0.6 } : {}}>
                     {result.matched_duties && result.matched_duties.length > 0 && (
                       <div style={{ marginBottom: '24px' }}>
                         <h4 style={{ fontSize: '0.95rem', fontWeight: 700, marginBottom: '8px' }}>Matched Official Duties:</h4>
@@ -438,8 +535,8 @@ export const NOCFinderPage: FC<NOCFinderPageProps> = ({ onNavigate }) => {
                     )}
                   </div> {/* End Blurred Area */}
                   
-                  {/* Sign-In Overlay */}
-                  {!isSignedIn && (
+                  {/* Paywall Overlay */}
+                  {!(result.is_premium_unlocked) && (
                     <div style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, zIndex: 10, pointerEvents: 'none' }}>
                       <div style={{ position: 'sticky', top: '25vh', display: 'flex', justifyContent: 'center', pointerEvents: 'auto', padding: '0 20px' }}>
                         <div className="card" style={{ width: '100%', maxWidth: '500px', background: 'white', border: '2px solid var(--primary-color)', textAlign: 'center', boxShadow: '0 20px 40px rgba(0,0,0,0.2)' }}>
@@ -449,11 +546,21 @@ export const NOCFinderPage: FC<NOCFinderPageProps> = ({ onNavigate }) => {
                           Unlock detailed duty-by-duty matching and interactive alternative NOC code exploration.
                         </p>
                         
-                        <SignInButton mode="modal" forceRedirectUrl={window.location.href} signUpForceRedirectUrl={window.location.href}>
-                          <button className="btn btn-primary" style={{ width: '100%', padding: '12px', fontSize: '1.1rem' }}>
-                            Sign In to Unlock Insights
+                        {!isSignedIn ? (
+                          <SignInButton mode="modal" forceRedirectUrl={window.location.href} signUpForceRedirectUrl={window.location.href}>
+                            <button className="btn btn-primary" style={{ width: '100%', padding: '12px', fontSize: '1.1rem' }}>
+                              Sign In to Unlock Insights
+                            </button>
+                          </SignInButton>
+                        ) : credits > 0 ? (
+                          <button className="btn btn-primary" onClick={handleUnlock} disabled={isUnlocking} style={{ width: '100%', padding: '12px', fontSize: '1.1rem' }}>
+                            {isUnlocking ? 'Unlocking...' : `Unlock Full Result (1 Credit — ${credits} remaining)`}
                           </button>
-                        </SignInButton>
+                        ) : (
+                          <button className="btn btn-primary" onClick={handleCheckout} disabled={isBuying} style={{ width: '100%', padding: '12px', fontSize: '1.1rem', background: '#10b981', borderColor: '#10b981' }}>
+                            {isBuying ? 'Redirecting to Stripe...' : 'Purchase NOC Pass (2 for $9.90 CAD)'}
+                          </button>
+                        )}
                       </div>
                       </div>
                     </div>
