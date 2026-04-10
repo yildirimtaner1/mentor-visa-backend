@@ -573,6 +573,55 @@ export const NOCFinderPage: FC<NOCFinderPageProps> = ({ onNavigate }) => {
                   ⚠️ This is your strongest match based on your duties — but IRCC approval depends on detailed duty-to-NOC alignment. Unlock the full analysis below to confirm this is the right code for your application.
                 </div>
 
+                {/* --- TEASER/UNLOCKED SECTION --- */}
+                {result.matched_duties && result.matched_duties.length > 0 && (
+                  <div style={{ marginBottom: '24px' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+                      <h4 style={{ fontSize: '1rem', fontWeight: 700, margin: 0 }}>Duty-by-Duty Alignment</h4>
+                      <span style={{ fontSize: '0.7rem', color: '#059669', background: '#D1FAE5', padding: '4px 8px', borderRadius: '4px', fontWeight: 700 }}>
+                        ✓ VERIFIED DRAFT
+                      </span>
+                    </div>
+                    <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginBottom: '16px' }}>
+                      We cross-reference your exact wording exclusively against the official IRCC NOC 2021 Version 1.0 database. No hallucinations, no generic AI guessing.
+                    </p>
+                    
+                    {/* Render the FIRST duty (index 0) completely unblurred as a teaser */}
+                    <div style={{
+                      background: '#F8FAFC',
+                      border: '1px solid var(--border-color)',
+                      borderRadius: '12px',
+                      padding: '16px 18px',
+                      fontSize: '0.88rem',
+                      lineHeight: 1.6
+                    }}>
+                      <div style={{ display: 'flex', alignItems: 'flex-start', gap: '8px', marginBottom: '10px' }}>
+                        <span style={{ 
+                          background: 'var(--primary-color)', color: 'white', 
+                          borderRadius: '50%', width: '22px', height: '22px', minWidth: '22px',
+                          display: 'flex', alignItems: 'center', justifyContent: 'center',
+                          fontSize: '0.7rem', fontWeight: 700, marginTop: '1px'
+                        }}>1</span>
+                        <div>
+                          <div style={{ fontSize: '0.7rem', textTransform: 'uppercase', letterSpacing: '0.5px', color: 'var(--text-muted)', fontWeight: 600, marginBottom: '3px' }}>Your Duty</div>
+                          <div style={{ color: 'var(--text-color)', fontWeight: 500 }}>{result.matched_duties[0].applicant_duty}</div>
+                        </div>
+                      </div>
+                      <div style={{ borderLeft: '2px solid #C7D2FE', paddingLeft: '14px', marginLeft: '10px' }}>
+                        <div style={{ fontSize: '0.7rem', textTransform: 'uppercase', letterSpacing: '0.5px', color: '#4338CA', fontWeight: 600, marginBottom: '3px' }}>Matching Official NOC Duty</div>
+                        <div style={{ color: 'var(--text-muted)', marginBottom: '8px' }}>{result.matched_duties[0].official_noc_duty}</div>
+                        <div style={{ 
+                          fontSize: '0.82rem', color: '#059669', fontStyle: 'italic',
+                          background: '#F0FDF4', padding: '8px 12px', borderRadius: '8px',
+                          border: '1px solid #BBF7D0'
+                        }}>
+                          💡 {result.matched_duties[0].overlap_description}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
                 {/* --- PREMIUM LOCKED SECTION --- */}
                 <div style={{ position: 'relative', marginTop: '20px' }}>
                   <div style={!(result.is_premium_unlocked) ? { filter: 'blur(6px)', pointerEvents: 'none', userSelect: 'none', opacity: 0.6 } : {}}>
@@ -583,12 +632,12 @@ export const NOCFinderPage: FC<NOCFinderPageProps> = ({ onNavigate }) => {
                         <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem', lineHeight: 1.6 }}>{result.explanation}</p>
                       </div>
                     )}
-                    {result.matched_duties && result.matched_duties.length > 0 && (
+                    {/* Render the REST of the duties (index 1 and beyond) inside the blur */}
+                    {result.matched_duties && result.matched_duties.length > 1 && (
                       <div style={{ marginBottom: '24px' }}>
-                        <h4 style={{ fontSize: '1rem', fontWeight: 700, marginBottom: '16px' }}>Duty-by-Duty Alignment</h4>
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                          {result.matched_duties.map((duty, i) => (
-                            <div key={i} style={{
+                          {result.matched_duties.slice(1).map((duty, i) => (
+                            <div key={i+1} style={{
                               background: '#F8FAFC',
                               border: '1px solid var(--border-color)',
                               borderRadius: '12px',
@@ -602,7 +651,7 @@ export const NOCFinderPage: FC<NOCFinderPageProps> = ({ onNavigate }) => {
                                   borderRadius: '50%', width: '22px', height: '22px', minWidth: '22px',
                                   display: 'flex', alignItems: 'center', justifyContent: 'center',
                                   fontSize: '0.7rem', fontWeight: 700, marginTop: '1px'
-                                }}>{i + 1}</span>
+                                }}>{i + 2}</span>
                                 <div>
                                   <div style={{ fontSize: '0.7rem', textTransform: 'uppercase', letterSpacing: '0.5px', color: 'var(--text-muted)', fontWeight: 600, marginBottom: '3px' }}>Your Duty</div>
                                   <div style={{ color: 'var(--text-color)', fontWeight: 500 }}>{duty.applicant_duty}</div>
@@ -663,6 +712,7 @@ export const NOCFinderPage: FC<NOCFinderPageProps> = ({ onNavigate }) => {
                           A wrong NOC code can get your application refused. Unlock the full analysis to:
                         </p>
                         <ul style={{ textAlign: 'left', listStyleType: 'none', padding: 0, margin: '0 0 20px 0', fontSize: '0.9rem', display: 'grid', gap: '8px' }}>
+                          <li>✅ See the remaining {result.matched_duties ? result.matched_duties.length - 1 : 0} duty alignments</li>
                           <li>✅ Confirm this NOC is safe for your PR application</li>
                           <li>✅ See exactly why it matches your duties</li>
                           <li>✅ Identify risks or weak alignment before submission</li>
