@@ -371,15 +371,15 @@
 
 .trust-badge {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   background: white;
   border: 1px solid var(--border-color);
-  padding: 10px 20px;
-  border-radius: 9999px;
+  padding: 16px 24px;
+  border-radius: 12px;
   box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03);
   gap: 12px;
-  flex-wrap: wrap;
-  justify-content: center;
+  text-align: left;
+  max-width: 600px;
 }
 
 .trust-avatars {
@@ -413,12 +413,15 @@
   justify-content: center;
   width: 24px;
   height: 24px;
+  min-width: 24px;
+  flex-shrink: 0;
   background: transparent;
   border: 2px solid #10B981;
   color: #10B981;
   border-radius: 50%;
   font-size: 0.9rem;
   font-weight: bold;
+  margin-top: 1px;
 }
 
 .trust-text {
