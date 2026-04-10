@@ -90,6 +90,14 @@ export const LandingPage: FC<LandingPageProps> = ({ onNavigate }) => {
               <div className="trust-icon-check">✓</div>
               <span className="trust-text"><strong>516 NOC codes.</strong> Every single one checked against your duties — in seconds, not hours.</span>
             </div>
+            <div className="trust-badge">
+              <div className="trust-icon-check">✓</div>
+              <span className="trust-text"><strong>Strict IRCC Compliance.</strong> 100% based on the official NOC 2021 Version 1.0 Matrix. No AI hallucinations.</span>
+            </div>
+            <div className="trust-badge">
+              <div className="trust-icon-check">✓</div>
+              <span className="trust-text"><strong>Proven Accuracy.</strong> Model developed using thousands of real, successful PR employment letters.</span>
+            </div>
           </div>
           <div className="hero-stats">
             <div className="hero-stat">

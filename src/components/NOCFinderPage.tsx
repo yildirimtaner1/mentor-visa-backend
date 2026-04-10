@@ -468,6 +468,17 @@ export const NOCFinderPage: FC<NOCFinderPageProps> = ({ onNavigate }) => {
                     <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>✅ Results in under 60 seconds</span>
                     <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>✅ Built for Express Entry applications</span>
                   </div>
+                  <div style={{ marginTop: '24px', padding: '16px', background: '#F0FDF4', borderRadius: '12px', border: '1px solid #BBF7D0', textAlign: 'left' }}>
+                    <div style={{ display: 'flex', alignItems: 'flex-start', gap: '10px' }}>
+                      <span style={{ fontSize: '1.2rem' }}>🛡️</span>
+                      <div>
+                        <div style={{ fontSize: '0.85rem', fontWeight: 700, color: '#065F46', marginBottom: '4px' }}>100% Official IRCC Data. Zero Hallucinations.</div>
+                        <div style={{ fontSize: '0.8rem', color: '#047857', lineHeight: 1.5 }}>
+                          Our model strictly cross-references your duties against the official NOC 2021 Version 1.0 Matrix. It was developed using thousands of real, successful PR employment letters to guarantee Express Entry compliance.
+                        </div>
+                      </div>
+                    </div>
+                  </div>
                 </div>
               )}
             </div>
