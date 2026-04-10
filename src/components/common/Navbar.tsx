@@ -57,8 +57,8 @@ export const Navbar: FC = () => {
 
         {/* Desktop Nav Links */}
         <div className="nav-links-desktop">
-          <Link to="/audit-employment-letter" className={`nav-link ${pagePath === '/audit-employment-letter' ? 'active' : ''}`} style={{ textDecoration: 'none' }}>Audit Employment Letter</Link>
           <Link to="/find-my-noc" className={`nav-link ${pagePath === '/find-my-noc' ? 'active' : ''}`} style={{ textDecoration: 'none' }}>Find My NOC</Link>
+          <Link to="/audit-employment-letter" className={`nav-link ${pagePath === '/audit-employment-letter' ? 'active' : ''}`} style={{ textDecoration: 'none' }}>Audit Employment Letter</Link>
           <Link to="/express-entry-cec-guide" className={`nav-link ${pagePath === '/express-entry-cec-guide' ? 'active' : ''}`} style={{ textDecoration: 'none' }}>Express Entry CEC Guide</Link>
           <Link to="/crs-calculator" className={`nav-link ${pagePath === '/crs-calculator' ? 'active' : ''}`} style={{ textDecoration: 'none' }}>CRS Calculator</Link>
           <Link to="/cec-checklist" className={`nav-link ${pagePath === '/cec-checklist' ? 'active' : ''}`} style={{ textDecoration: 'none' }}>CEC Application Checklist</Link>
@@ -102,8 +102,8 @@ export const Navbar: FC = () => {
       {/* Mobile Menu */}
       {mobileMenuOpen && (
         <div className="mobile-menu">
-          <button className="mobile-menu-link" onClick={() => { navigate('/audit-employment-letter'); setMobileMenuOpen(false); }}>📄 Audit Employment Letter</button>
           <button className="mobile-menu-link" onClick={() => { navigate('/find-my-noc'); setMobileMenuOpen(false); }}>🎯 Find My NOC</button>
+          <button className="mobile-menu-link" onClick={() => { navigate('/audit-employment-letter'); setMobileMenuOpen(false); }}>📄 Audit Employment Letter</button>
           <button className="mobile-menu-link" onClick={() => { navigate('/express-entry-cec-guide'); setMobileMenuOpen(false); }}>📘 Express Entry CEC Guide</button>
           <button className="mobile-menu-link" onClick={() => { navigate('/crs-calculator'); setMobileMenuOpen(false); }}>📊 CRS Calculator</button>
           <button className="mobile-menu-link" onClick={() => { navigate('/cec-checklist'); setMobileMenuOpen(false); }}>✅ CEC Application Checklist</button>

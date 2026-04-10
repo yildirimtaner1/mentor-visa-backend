@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import type { AnalysisResponse } from './types';
 import { LandingPage } from './components/LandingPage';
-import { Uploader } from './components/Uploader';
+import { AuditorPage } from './components/AuditorPage';
 import { Dashboard } from './components/Dashboard';
 import { MyEvaluations } from './components/MyEvaluations';
 import { CECGuidePage } from './components/CECGuidePage';
@@ -195,7 +195,7 @@ function App() {
       <Route path="/" element={<LandingPage onGetStarted={() => navigate('/audit-employment-letter')} onNavigate={(page) => navigate(`/${page}`)} />} />
 
       {/* Shared Nav Routes (Tools) */}
-      <Route path="/audit-employment-letter" element={<SharedLayout><Uploader onAnalysisResult={(result) => handleAnalysisResult(result, true)} /></SharedLayout>} />
+      <Route path="/audit-employment-letter" element={<SharedLayout><AuditorPage /></SharedLayout>} />
       <Route path="/find-my-noc" element={<SharedLayout><NOCFinderPage onNavigate={(p) => navigate(`/${p}`)} /></SharedLayout>} />
       <Route path="/express-entry-cec-guide" element={<SharedLayout><CECGuidePage onNavigate={(p) => navigate(`/${p}`)} /></SharedLayout>} />
       <Route path="/crs-calculator" element={<SharedLayout><CRSCalculatorPage onNavigate={(p) => navigate(`/${p}`)} /></SharedLayout>} />
