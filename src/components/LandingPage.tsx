@@ -209,14 +209,13 @@ export const LandingPage: FC<LandingPageProps> = ({ onNavigate }) => {
             padding: '40px 32px'
           }}>
             <div style={{ fontSize: '2.5rem', fontWeight: 800, color: 'var(--text-color)', marginBottom: '8px' }}>
-              $9.90 <span style={{ fontSize: '1rem', color: 'var(--text-muted)', fontWeight: 400 }}>CAD</span>
+              $4.90 <span style={{ fontSize: '1rem', color: 'var(--text-muted)', fontWeight: 400 }}>CAD</span>
             </div>
             <p style={{ color: 'var(--text-muted)', marginBottom: '24px', fontSize: '1rem' }}>
-              One-time purchase. Two full NOC analyses included.
+              One-time purchase. One full NOC analysis.
             </p>
             <ul style={{ listStyleType: 'none', padding: 0, margin: '0 0 32px 0', display: 'grid', gap: '12px', textAlign: 'left' }}>
-              <li style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>✅ <strong>2 Uses</strong> — enough for your primary role + one alternative</li>
-              <li style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>✅ Full duty-by-duty breakdown</li>
+              <li style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>✅ Detailed explanation of why the NOC fits</li>
               <li style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>✅ TEER category + CEC eligibility</li>
               <li style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>✅ Alternative NOC matches with re-evaluate</li>
               <li style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>✅ Saved to your account for future reference</li>

@@ -45,7 +45,7 @@ const nocSchema = JSON.stringify({
   "applicationCategory": "WebApplication",
   "offers": {
     "@type": "Offer",
-    "price": "9.90",
+    "price": "4.90",
     "priceCurrency": "CAD"
   },
   "description": "AI-powered tool that matches your job duties to the correct Canadian NOC 2021 code for Express Entry. Analyzes all 516 unit groups in seconds."
@@ -681,10 +681,10 @@ export const NOCFinderPage: FC<NOCFinderPageProps> = ({ onNavigate }) => {
                           </button>
                         ) : (
                           <button className="btn btn-primary" onClick={handleCheckout} disabled={isBuying} style={{ width: '100%', padding: '14px', fontSize: '1.05rem', background: '#10b981', borderColor: '#10b981' }}>
-                            {isBuying ? 'Redirecting to Stripe...' : 'Avoid Costly Mistakes — $9.90 CAD'}
+                            {isBuying ? 'Redirecting to Stripe...' : 'Unlock Full Analysis — $4.90 CAD'}
                           </button>
                         )}
-                        <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '12px', marginBottom: 0 }}>One-time purchase. 2 full analyses included. No subscription.</p>
+                        <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '12px', marginBottom: 0 }}>One-time purchase. No subscription.</p>
                       </div>
                       </div>
                     </div>
@@ -725,22 +725,41 @@ export const NOCFinderPage: FC<NOCFinderPageProps> = ({ onNavigate }) => {
                   )}
                 </div>
 
-                {/* Cross-sell CTA */}
+                {/* Cross-sell CTA — shows different messaging based on unlock status */}
                 <div style={{ 
                   marginTop: '24px', 
                   padding: '28px', 
                   textAlign: 'center',
-                  background: 'linear-gradient(135deg, #EEF2FF, #E0E7FF)',
+                  background: result.is_premium_unlocked 
+                    ? 'linear-gradient(135deg, #FEF3C7, #FDE68A)'
+                    : 'linear-gradient(135deg, #EEF2FF, #E0E7FF)',
                   borderRadius: '14px',
-                  border: '1px solid #C7D2FE'
+                  border: result.is_premium_unlocked ? '1px solid #F59E0B' : '1px solid #C7D2FE'
                 }}>
-                  <h4 style={{ fontSize: '1rem', fontWeight: 700, marginBottom: '8px', color: '#312E81' }}>Next Step: Audit Your Employment Letter</h4>
-                  <p style={{ fontSize: '0.9rem', color: '#4338CA', marginBottom: '16px', lineHeight: 1.5 }}>
-                    Now that you know your NOC code, make sure your letter has all 9 IRCC mandatory requirements. Missing even one can delay your application.
-                  </p>
-                  <button className="btn btn-primary btn-lg" onClick={() => onNavigate('audit-employment-letter')}>
-                    📄 Audit My Employment Letter
-                  </button>
+                  {result.is_premium_unlocked ? (
+                    <>
+                      <h4 style={{ fontSize: '1.05rem', fontWeight: 700, marginBottom: '8px', color: '#92400E' }}>
+                        Your NOC is {result.noc_code}. But does your employment letter actually prove it?
+                      </h4>
+                      <p style={{ fontSize: '0.9rem', color: '#78350F', marginBottom: '16px', lineHeight: 1.5 }}>
+                        IRCC won't accept your NOC claim if your letter doesn't list duties that match. Our AI auditor checks your letter against all 9 mandatory requirements — missing even one can delay or refuse your application.
+                      </p>
+                      <button className="btn btn-primary btn-lg" onClick={() => onNavigate('audit-employment-letter')} style={{ background: '#D97706', borderColor: '#D97706' }}>
+                        📄 Audit My Letter — $4.90 CAD
+                      </button>
+                      <p style={{ fontSize: '0.75rem', color: '#92400E', marginTop: '10px', marginBottom: 0 }}>One-time purchase. Instant results.</p>
+                    </>
+                  ) : (
+                    <>
+                      <h4 style={{ fontSize: '1rem', fontWeight: 700, marginBottom: '8px', color: '#312E81' }}>Next Step: Audit Your Employment Letter</h4>
+                      <p style={{ fontSize: '0.9rem', color: '#4338CA', marginBottom: '16px', lineHeight: 1.5 }}>
+                        Now that you know your NOC code, make sure your letter has all 9 IRCC mandatory requirements. Missing even one can delay your application.
+                      </p>
+                      <button className="btn btn-primary btn-lg" onClick={() => onNavigate('audit-employment-letter')}>
+                        📄 Audit My Employment Letter
+                      </button>
+                    </>
+                  )}
                 </div>
               </div>
             )}

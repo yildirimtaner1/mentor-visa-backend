@@ -556,7 +556,7 @@ export const Dashboard: FC<DashboardProps> = ({ data, onReset, onUpdate }) => {
                       </button>
                     ) : (
                       <button className="btn btn-primary" onClick={handleCheckout} disabled={isBuying} style={{ width: '100%', padding: '12px', fontSize: '1.1rem', background: '#10b981', borderColor: '#10b981' }}>
-                        {isBuying ? 'Redirecting to Stripe...' : 'Purchase Audit Pass (2 for $19.90 CAD)'}
+                        {isBuying ? 'Redirecting to Stripe...' : 'Unlock Full Audit \u2014 $4.90 CAD'}
                       </button>
                     )}
                   </div>
