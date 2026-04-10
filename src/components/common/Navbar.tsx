@@ -1,15 +1,51 @@
-import { type FC, useState } from 'react';
+import { type FC, useState, useEffect } from 'react';
 import { SignInButton, SignUpButton, useAuth, UserButton } from '@clerk/clerk-react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useSmartNav } from '../../hooks/useSmartNav';
+import { fetchUserCredits } from '../../services/api';
 
 export const Navbar: FC = () => {
-  const { isSignedIn } = useAuth();
+  const { isSignedIn, getToken } = useAuth();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const { scrolled, hidden } = useSmartNav();
   const location = useLocation();
   const navigate = useNavigate();
   const pagePath = location.pathname;
+
+  // Credit balance
+  const [credits, setCredits] = useState<{ noc: number; audit: number } | null>(null);
+
+  useEffect(() => {
+    if (!isSignedIn) { setCredits(null); return; }
+    const load = async () => {
+      const tk = await getToken();
+      if (!tk) return;
+      const c = await fetchUserCredits(tk);
+      setCredits({ noc: c.find_noc_credits || 0, audit: c.audit_letter_credits || 0 });
+    };
+    load();
+  }, [isSignedIn, getToken]);
+
+  const totalCredits = credits ? credits.noc + credits.audit : 0;
+
+  const CreditBadge = () => credits !== null ? (
+    <div
+      onClick={() => navigate('/dashboard')}
+      title={`NOC Finder: ${credits.noc} credits | Letter Auditor: ${credits.audit} credits`}
+      style={{
+        display: 'flex', alignItems: 'center', gap: '5px',
+        background: totalCredits > 0 ? 'linear-gradient(135deg, #EEF2FF, #E0E7FF)' : '#F3F4F6',
+        padding: '5px 12px', borderRadius: '20px', cursor: 'pointer',
+        border: totalCredits > 0 ? '1px solid #C7D2FE' : '1px solid #E5E7EB',
+        fontSize: '0.8rem', fontWeight: 600,
+        color: totalCredits > 0 ? '#4338CA' : '#9CA3AF',
+        transition: 'all 0.2s ease',
+      }}
+    >
+      <span style={{ fontSize: '0.9rem' }}>🎟️</span>
+      <span>{totalCredits} credit{totalCredits !== 1 ? 's' : ''}</span>
+    </div>
+  ) : null;
 
   return (
     <nav className={`landing-nav ${scrolled ? 'nav-scrolled' : ''} ${hidden ? 'nav-hidden' : ''}`}>
@@ -39,6 +75,7 @@ export const Navbar: FC = () => {
               </>
             ) : (
               <>
+                <CreditBadge />
                 <button 
                   className="btn btn-outline" 
                   onClick={() => navigate('/dashboard')} 
@@ -92,7 +129,7 @@ export const Navbar: FC = () => {
                 </button>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '12px', paddingLeft: '8px' }}>
                   <UserButton />
-                  <span style={{ fontSize: '0.9rem', color: 'var(--text-muted)' }}>My Account</span>
+                  <CreditBadge />
                 </div>
               </div>
             )}
@@ -102,3 +139,4 @@ export const Navbar: FC = () => {
     </nav>
   );
 };
+

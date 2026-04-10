@@ -167,9 +167,9 @@ export const CECGuidePage: FC<CECGuidePageProps> = ({ onNavigate }) => {
         {/* CTA */}
         <section className="page-section" style={{ textAlign: 'center', paddingBottom: '40px' }}>
           <h2 className="page-section-title">Ready to Check Your Employment Letter?</h2>
-          <p className="page-section-subtitle">Let our AI audit your letter against all IRCC requirements and 516 NOC codes — for free.</p>
+          <p className="page-section-subtitle">Let our AI audit your letter against all IRCC requirements and 516 NOC codes — in seconds.</p>
           <button className="btn btn-primary btn-lg" onClick={() => onNavigate('audit-employment-letter')}>
-            Audit Employment Letter — Free
+            Audit My Employment Letter
           </button>
         </section>
       </div>

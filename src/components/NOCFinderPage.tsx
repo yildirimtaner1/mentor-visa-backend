@@ -11,6 +11,12 @@ interface AlternativeNOC {
   explanation: string;
 }
 
+interface DutyMatch {
+  applicant_duty: string;
+  official_noc_duty: string;
+  overlap_description: string;
+}
+
 interface NOCResult {
   document_valid: boolean;
   rejection_reason: string;
@@ -20,7 +26,7 @@ interface NOCResult {
   match_score: number;
   alternative_nocs: AlternativeNOC[];
   explanation: string;
-  matched_duties: string[];
+  matched_duties: DutyMatch[];
   cec_eligible: boolean;
   location_of_experience?: 'canada' | 'outside_canada' | 'unknown';
   stored_file_id?: string;
@@ -39,10 +45,10 @@ const nocSchema = JSON.stringify({
   "applicationCategory": "WebApplication",
   "offers": {
     "@type": "Offer",
-    "price": "0",
+    "price": "9.90",
     "priceCurrency": "CAD"
   },
-  "description": "An AI-powered tool to automatically find and match your job duties to official Canadian NOC 2021 codes for Express Entry."
+  "description": "AI-powered tool that matches your job duties to the correct Canadian NOC 2021 code for Express Entry. Analyzes all 516 unit groups in seconds."
 });
 
 export const NOCFinderPage: FC<NOCFinderPageProps> = ({ onNavigate }) => {
@@ -228,8 +234,12 @@ export const NOCFinderPage: FC<NOCFinderPageProps> = ({ onNavigate }) => {
         const teer = ana.detected_code.charAt(1);
         const cec = ['0', '1', '2', '3'].includes(teer);
         
-        const dutiesStrList = ana.duties_match 
-          ? ana.duties_match.map((d: any) => `• ${d.applicant_duty} → NOC: ${d.official_noc_duty} (${d.overlap_description})`)
+        const dutiesList: DutyMatch[] = ana.duties_match 
+          ? ana.duties_match.map((d: any) => ({
+              applicant_duty: d.applicant_duty || '',
+              official_noc_duty: d.official_noc_duty || '',
+              overlap_description: d.overlap_description || ''
+            }))
           : [];
 
         setResult({
@@ -241,7 +251,7 @@ export const NOCFinderPage: FC<NOCFinderPageProps> = ({ onNavigate }) => {
           match_score: ana.match_score,
           alternative_nocs: ana.alternative_nocs || [],
           explanation: ana.notes || '',
-          matched_duties: dutiesStrList,
+          matched_duties: dutiesList,
           cec_eligible: cec,
           location_of_experience: ana.location_of_experience,
           stored_file_id: rawData.stored_file_id,
@@ -319,28 +329,34 @@ export const NOCFinderPage: FC<NOCFinderPageProps> = ({ onNavigate }) => {
   return (
     <div>
       <SEO 
-        title="Find My NOC Code 2021 | Free AI Matching Tool for Canada PR" 
-        description="Not sure what your Express Entry NOC code is? Paste your job duties and our AI will automatically match them to the correct NOC 2021 TEER category instantly."
+        title="Find My NOC Code 2021 | AI NOC Matching Tool for Canada PR" 
+        description="Don't guess your NOC code. Paste your job duties and our AI matches them to the correct NOC 2021 code for Express Entry. Results in under 60 seconds."
         canonical="/find-my-noc"
         schema={nocSchema}
       />
       <section className="page-hero">
         <div className="page-hero-content">
-          <div className="page-hero-badge">🎯 AI-Powered NOC Detection</div>
-          <h1>Find Your<br /><span className="hero-highlight">NOC Code</span></h1>
-          <p>Upload your employment letter or paste your duties. Our AI will analyze the contents to find your precise NOC 2021 code from all 516 unit groups.</p>
+          <div className="page-hero-badge">🎯 Trusted by Express Entry applicants</div>
+          <h1>Wrong NOC Code =<br /><span className="hero-highlight">PR Refusal.</span></h1>
+          <p>IRCC doesn't match your NOC by job title — they match it by your actual duties. If the duties on your letter don't align with the code you claim, your application gets refused. Paste your duties below and find the right code in under 60 seconds.</p>
+          <a href="#noc-input" className="btn btn-primary btn-lg" style={{ textDecoration: 'none', display: 'inline-block', marginTop: '8px' }}>
+            Find My NOC Now
+          </a>
+          <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginTop: '12px', marginBottom: 0 }}>Takes less than 60 seconds. No sign-up required.</p>
         </div>
       </section>
 
       <div className="page-container">
         <section className="page-section">
           <div style={{ maxWidth: '720px', margin: '0 auto' }}>
-            <div className="info-card" style={{ padding: '36px 32px' }}>
+
+            {/* Input Card */}
+            <div id="noc-input" className="info-card" style={{ padding: '36px 32px' }}>
               
               <div style={{ marginBottom: '32px' }}>
-                <h3 style={{ fontSize: '1.2rem', fontWeight: 700, marginBottom: '8px' }}>Option 1: Upload Document</h3>
-                <p style={{ fontSize: '0.95rem', color: '#64748B', marginBottom: '16px' }}>
-                  Upload your official employment letter (PDF, Word, or Image). We'll extract the duties automatically.
+                <h3 style={{ fontSize: '1.2rem', fontWeight: 700, marginBottom: '4px' }}>Upload your employment letter <span style={{ fontWeight: 400, color: '#64748B', fontSize: '0.9rem' }}>(fastest & most accurate)</span></h3>
+                <p style={{ fontSize: '0.9rem', color: '#64748B', marginBottom: '16px' }}>
+                  We'll automatically extract your job title and duties for the most accurate NOC match.
                 </p>
                 <div 
                   onClick={() => fileInputRef.current?.click()}
@@ -384,9 +400,9 @@ export const NOCFinderPage: FC<NOCFinderPageProps> = ({ onNavigate }) => {
                   </div>
 
                   <div style={{ marginBottom: '24px' }}>
-                    <h3 style={{ fontSize: '1.2rem', fontWeight: 700, marginBottom: '8px' }}>Option 2: Type Manually</h3>
-                    <p style={{ fontSize: '0.95rem', color: '#64748B', marginBottom: '20px' }}>
-                      If you don't have a document handy, you can paste the information manually. 
+                    <h3 style={{ fontSize: '1.2rem', fontWeight: 700, marginBottom: '4px' }}>Or paste your job duties</h3>
+                    <p style={{ fontSize: '0.9rem', color: '#64748B', marginBottom: '20px' }}>
+                      Don't have your letter handy? Just type your title and paste your duties. 
                     </p>
                     <div className="form-group">
                       <label className="form-label">Job Title</label>
@@ -402,11 +418,11 @@ export const NOCFinderPage: FC<NOCFinderPageProps> = ({ onNavigate }) => {
                     <div className="form-group">
                       <label className="form-label">
                         Main Duties & Responsibilities
-                        <span className="form-label-hint"> — paste the exact duties written on your letter</span>
+                        <span className="form-label-hint"> — paste the exact duties from your letter</span>
                       </label>
                       <textarea 
                         className="form-textarea"
-                        placeholder="Paste the duties exactly as they appear on your employment letter here..."
+                        placeholder="Paste your job duties here (from your employment letter if available)..."
                         value={duties}
                         onChange={e => { setDuties(e.target.value); setFile(null); }}
                         rows={6}
@@ -427,24 +443,71 @@ export const NOCFinderPage: FC<NOCFinderPageProps> = ({ onNavigate }) => {
                   {targetNocOverride ? (
                     <div style={{ padding: '40px', textAlign: 'center', background: '#F8FAFC', borderRadius: '12px', border: '1px solid var(--border-color)' }}>
                       <div style={{ display: 'inline-block', width: '40px', height: '40px', border: '3px solid var(--primary-light)', borderTopColor: 'var(--primary-color)', borderRadius: '50%', animation: 'spin 1s linear infinite', marginBottom: '16px' }} />
-                      <h3 style={{ fontSize: '1.2rem', fontWeight: 700, marginBottom: '8px' }}>Re-evaluating explicitly against NOC {targetNocOverride}...</h3>
-                      <p style={{ color: 'var(--text-muted)' }}>This analysis ignores other NOC codes and maps duty-by-duty to your requested target.</p>
+                      <h3 style={{ fontSize: '1.2rem', fontWeight: 700, marginBottom: '8px' }}>Re-evaluating against NOC {targetNocOverride}...</h3>
+                      <p style={{ color: 'var(--text-muted)' }}>Mapping your duties strictly against this target code.</p>
                     </div>
                   ) : (
                     <DynamicLoader tool="noc" />
                   )}
                 </div>
               ) : !file && (
-                <button 
-                  className="btn btn-primary btn-lg" 
-                  onClick={handleSubmit}
-                  disabled={loading}
-                  style={{ width: '100%', marginTop: '8px' }}
-                >
-                  🔍 Find My NOC Code
-                </button>
+                <div>
+                  <p style={{ textAlign: 'center', fontSize: '0.85rem', color: 'var(--text-main)', fontWeight: 600, marginBottom: '8px', marginTop: '16px' }}>
+                    Get your NOC code + match score instantly
+                  </p>
+                  <button 
+                    className="btn btn-primary btn-lg" 
+                    onClick={handleSubmit}
+                    disabled={loading}
+                    style={{ width: '100%', padding: '16px', fontSize: '1.05rem' }}
+                  >
+                    🔍 Find My NOC Now
+                  </button>
+                  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '6px', marginTop: '14px' }}>
+                    <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>✅ No sign-up required</span>
+                    <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>✅ Results in under 60 seconds</span>
+                    <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>✅ Built for Express Entry applications</span>
+                  </div>
+                </div>
               )}
             </div>
+
+            {/* What You'll Get — shown only before a result */}
+            {!result && !loading && (
+              <div style={{ marginTop: '32px', padding: '28px 24px', background: '#F8FAFC', borderRadius: '14px', border: '1px solid var(--border-color)' }}>
+                <h3 style={{ fontSize: '1.1rem', fontWeight: 700, marginBottom: '16px', textAlign: 'center' }}>What You'll Get</h3>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '16px' }}>
+                  <div style={{ display: 'flex', alignItems: 'flex-start', gap: '10px' }}>
+                    <span style={{ fontSize: '1.2rem' }}>🎯</span>
+                    <div>
+                      <div style={{ fontWeight: 600, fontSize: '0.9rem', marginBottom: '2px' }}>Your Correct NOC Code</div>
+                      <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>The single most accurate code for your duties</div>
+                    </div>
+                  </div>
+                  <div style={{ display: 'flex', alignItems: 'flex-start', gap: '10px' }}>
+                    <span style={{ fontSize: '1.2rem' }}>📊</span>
+                    <div>
+                      <div style={{ fontWeight: 600, fontSize: '0.9rem', marginBottom: '2px' }}>Match Score (How Strong Your Case Is)</div>
+                      <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>See how closely your duties align with the NOC</div>
+                    </div>
+                  </div>
+                  <div style={{ display: 'flex', alignItems: 'flex-start', gap: '10px' }}>
+                    <span style={{ fontSize: '1.2rem' }}>💡</span>
+                    <div>
+                      <div style={{ fontWeight: 600, fontSize: '0.9rem', marginBottom: '2px' }}>Why This NOC Fits Your Duties</div>
+                      <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>Clear explanation of why this NOC was chosen</div>
+                    </div>
+                  </div>
+                  <div style={{ display: 'flex', alignItems: 'flex-start', gap: '10px' }}>
+                    <span style={{ fontSize: '1.2rem' }}>🔄</span>
+                    <div>
+                      <div style={{ fontWeight: 600, fontSize: '0.9rem', marginBottom: '2px' }}>Backup NOC Options (If Needed)</div>
+                      <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>Other NOC codes that could also apply</div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
 
             {/* Rejection Warning */}
             {result && !result.document_valid && (
@@ -472,7 +535,7 @@ export const NOCFinderPage: FC<NOCFinderPageProps> = ({ onNavigate }) => {
             {result && result.document_valid && (
               <div id="primary-match-section" className="result-card" style={{ marginTop: '32px' }}>
                 <h3 style={{ fontSize: '1.2rem', fontWeight: 700, marginBottom: '20px', color: 'var(--text-color)', borderBottom: '1px solid var(--border-color)', paddingBottom: '12px' }}>
-                  Primary match
+                  Top NOC Match Identified
                 </h3>
                   
                 <div className="result-card-header" style={{ marginBottom: '20px' }}>
@@ -496,27 +559,76 @@ export const NOCFinderPage: FC<NOCFinderPageProps> = ({ onNavigate }) => {
                   </div>
                 </div>
 
-                <div style={{ marginBottom: '20px' }}>
-                  <h4 style={{ fontSize: '0.95rem', fontWeight: 700, marginBottom: '8px' }}>Why this NOC matches:</h4>
-                  <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem', lineHeight: 1.6 }}>{result.explanation}</p>
+                {/* Strategic uncertainty + move explanation behind paywall */}
+                <div style={{ 
+                  padding: '14px 16px', 
+                  background: '#FFFBEB', 
+                  border: '1px solid #FDE68A', 
+                  borderRadius: '10px', 
+                  marginBottom: '20px',
+                  fontSize: '0.88rem',
+                  color: '#92400E',
+                  lineHeight: 1.6
+                }}>
+                  ⚠️ This is your strongest match based on your duties — but IRCC approval depends on detailed duty-to-NOC alignment. Unlock the full analysis below to confirm this is the right code for your application.
                 </div>
 
                 {/* --- PREMIUM LOCKED SECTION --- */}
                 <div style={{ position: 'relative', marginTop: '20px' }}>
                   <div style={!(result.is_premium_unlocked) ? { filter: 'blur(6px)', pointerEvents: 'none', userSelect: 'none', opacity: 0.6 } : {}}>
+                    {/* Explanation — now premium */}
+                    {result.explanation && (
+                      <div style={{ marginBottom: '24px' }}>
+                        <h4 style={{ fontSize: '0.95rem', fontWeight: 700, marginBottom: '8px' }}>Why This NOC Fits Your Duties:</h4>
+                        <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem', lineHeight: 1.6 }}>{result.explanation}</p>
+                      </div>
+                    )}
                     {result.matched_duties && result.matched_duties.length > 0 && (
                       <div style={{ marginBottom: '24px' }}>
-                        <h4 style={{ fontSize: '0.95rem', fontWeight: 700, marginBottom: '8px' }}>Matched Official Duties:</h4>
-                        <ul style={{ paddingLeft: '20px', color: 'var(--text-muted)', fontSize: '0.9rem', lineHeight: 1.7 }}>
-                          {result.matched_duties.map((duty, i) => <li key={i}>{duty}</li>)}
-                        </ul>
+                        <h4 style={{ fontSize: '1rem', fontWeight: 700, marginBottom: '16px' }}>Duty-by-Duty Alignment</h4>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                          {result.matched_duties.map((duty, i) => (
+                            <div key={i} style={{
+                              background: '#F8FAFC',
+                              border: '1px solid var(--border-color)',
+                              borderRadius: '12px',
+                              padding: '16px 18px',
+                              fontSize: '0.88rem',
+                              lineHeight: 1.6
+                            }}>
+                              <div style={{ display: 'flex', alignItems: 'flex-start', gap: '8px', marginBottom: '10px' }}>
+                                <span style={{ 
+                                  background: 'var(--primary-color)', color: 'white', 
+                                  borderRadius: '50%', width: '22px', height: '22px', minWidth: '22px',
+                                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                  fontSize: '0.7rem', fontWeight: 700, marginTop: '1px'
+                                }}>{i + 1}</span>
+                                <div>
+                                  <div style={{ fontSize: '0.7rem', textTransform: 'uppercase', letterSpacing: '0.5px', color: 'var(--text-muted)', fontWeight: 600, marginBottom: '3px' }}>Your Duty</div>
+                                  <div style={{ color: 'var(--text-color)', fontWeight: 500 }}>{duty.applicant_duty}</div>
+                                </div>
+                              </div>
+                              <div style={{ borderLeft: '2px solid #C7D2FE', paddingLeft: '14px', marginLeft: '10px' }}>
+                                <div style={{ fontSize: '0.7rem', textTransform: 'uppercase', letterSpacing: '0.5px', color: '#4338CA', fontWeight: 600, marginBottom: '3px' }}>Matching Official NOC Duty</div>
+                                <div style={{ color: 'var(--text-muted)', marginBottom: '8px' }}>{duty.official_noc_duty}</div>
+                                <div style={{ 
+                                  fontSize: '0.82rem', color: '#059669', fontStyle: 'italic',
+                                  background: '#F0FDF4', padding: '8px 12px', borderRadius: '8px',
+                                  border: '1px solid #BBF7D0'
+                                }}>
+                                  💡 {duty.overlap_description}
+                                </div>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
                       </div>
                     )}
                     
                     {result.alternative_nocs && result.alternative_nocs.length > 0 && (
                       <div style={{ marginBottom: '24px', borderTop: '1px solid var(--border-color)', paddingTop: '20px' }}>
                         <h4 style={{ fontSize: '0.95rem', fontWeight: 700, marginBottom: '12px' }}>Other Potential Matches:</h4>
-                        <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginBottom: '16px' }}>Want to apply under one of these instead? Click a NOC below to re-evaluate your duties strictly against that target code.</p>
+                        <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginBottom: '16px' }}>Not sure about the primary match? Click any code below to re-evaluate your duties strictly against that target NOC.</p>
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
                           {result.alternative_nocs.map((alt, i) => (
                             <div 
@@ -545,27 +657,34 @@ export const NOCFinderPage: FC<NOCFinderPageProps> = ({ onNavigate }) => {
                     <div style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, zIndex: 10, pointerEvents: 'none' }}>
                       <div style={{ position: 'sticky', top: '25vh', display: 'flex', justifyContent: 'center', pointerEvents: 'auto', padding: '0 20px' }}>
                         <div className="card" style={{ width: '100%', maxWidth: '500px', background: 'white', border: '2px solid var(--primary-color)', textAlign: 'center', boxShadow: '0 20px 40px rgba(0,0,0,0.2)' }}>
-                          <div style={{ fontSize: '2.5rem', marginBottom: '10px' }}>🔒</div>
-                        <h3 style={{ fontSize: '1.4rem', fontWeight: 800, marginBottom: '12px' }}>Premium Insights Locked</h3>
-                        <p style={{ color: 'var(--text-muted)', marginBottom: '24px', lineHeight: 1.5 }}>
-                          Unlock detailed duty-by-duty matching and interactive alternative NOC code exploration.
+                          <div style={{ fontSize: '2.5rem', marginBottom: '10px' }}>🛡️</div>
+                        <h3 style={{ fontSize: '1.3rem', fontWeight: 800, marginBottom: '8px' }}>Don't Submit Until You're Sure</h3>
+                        <p style={{ color: 'var(--text-muted)', marginBottom: '16px', lineHeight: 1.5, fontSize: '0.93rem' }}>
+                          A wrong NOC code can get your application refused. Unlock the full analysis to:
                         </p>
+                        <ul style={{ textAlign: 'left', listStyleType: 'none', padding: 0, margin: '0 0 20px 0', fontSize: '0.9rem', display: 'grid', gap: '8px' }}>
+                          <li>✅ Confirm this NOC is safe for your PR application</li>
+                          <li>✅ See exactly why it matches your duties</li>
+                          <li>✅ Identify risks or weak alignment before submission</li>
+                          <li>✅ Discover backup NOC options (if applicable)</li>
+                        </ul>
                         
                         {!isSignedIn ? (
                           <SignInButton mode="modal" forceRedirectUrl={window.location.href} signUpForceRedirectUrl={window.location.href}>
-                            <button className="btn btn-primary" style={{ width: '100%', padding: '12px', fontSize: '1.1rem' }}>
-                              Sign In to Unlock Insights
+                            <button className="btn btn-primary" style={{ width: '100%', padding: '14px', fontSize: '1.05rem' }}>
+                              Get Confidence Before Submitting
                             </button>
                           </SignInButton>
                         ) : credits > 0 ? (
-                          <button className="btn btn-primary" onClick={handleUnlock} disabled={isUnlocking} style={{ width: '100%', padding: '12px', fontSize: '1.1rem' }}>
-                            {isUnlocking ? 'Unlocking...' : `Unlock Full Result (1 Credit — ${credits} remaining)`}
+                          <button className="btn btn-primary" onClick={handleUnlock} disabled={isUnlocking} style={{ width: '100%', padding: '14px', fontSize: '1.05rem' }}>
+                            {isUnlocking ? 'Unlocking...' : `Unlock Full Analysis (1 Credit — ${credits} left)`}
                           </button>
                         ) : (
-                          <button className="btn btn-primary" onClick={handleCheckout} disabled={isBuying} style={{ width: '100%', padding: '12px', fontSize: '1.1rem', background: '#10b981', borderColor: '#10b981' }}>
-                            {isBuying ? 'Redirecting to Stripe...' : 'Purchase NOC Pass (2 for $9.90 CAD)'}
+                          <button className="btn btn-primary" onClick={handleCheckout} disabled={isBuying} style={{ width: '100%', padding: '14px', fontSize: '1.05rem', background: '#10b981', borderColor: '#10b981' }}>
+                            {isBuying ? 'Redirecting to Stripe...' : 'Avoid Costly Mistakes — $9.90 CAD'}
                           </button>
                         )}
+                        <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '12px', marginBottom: 0 }}>One-time purchase. 2 full analyses included. No subscription.</p>
                       </div>
                       </div>
                     </div>
@@ -606,14 +725,52 @@ export const NOCFinderPage: FC<NOCFinderPageProps> = ({ onNavigate }) => {
                   )}
                 </div>
 
-                <div style={{ marginTop: '24px', textAlign: 'center' }}>
-                  <p style={{ fontSize: '0.95rem', color: 'var(--text-muted)', marginBottom: '16px' }}>
-                    Now that you have your NOC code possibilities, make sure your letter complies with all IRCC formatting requirements:
+                {/* Cross-sell CTA */}
+                <div style={{ 
+                  marginTop: '24px', 
+                  padding: '28px', 
+                  textAlign: 'center',
+                  background: 'linear-gradient(135deg, #EEF2FF, #E0E7FF)',
+                  borderRadius: '14px',
+                  border: '1px solid #C7D2FE'
+                }}>
+                  <h4 style={{ fontSize: '1rem', fontWeight: 700, marginBottom: '8px', color: '#312E81' }}>Next Step: Audit Your Employment Letter</h4>
+                  <p style={{ fontSize: '0.9rem', color: '#4338CA', marginBottom: '16px', lineHeight: 1.5 }}>
+                    Now that you know your NOC code, make sure your letter has all 9 IRCC mandatory requirements. Missing even one can delay your application.
                   </p>
                   <button className="btn btn-primary btn-lg" onClick={() => onNavigate('audit-employment-letter')}>
-                    📄 Audit Employment Letter
+                    📄 Audit My Employment Letter
                   </button>
                 </div>
+              </div>
+            )}
+
+            {/* Bottom CTA — only shown when no result yet */}
+            {!result && !loading && (
+              <div style={{ 
+                marginTop: '48px', 
+                padding: '36px 28px', 
+                textAlign: 'center',
+                background: 'linear-gradient(135deg, #0F172A, #1E3A8A)',
+                borderRadius: '16px',
+                color: 'white'
+              }}>
+                <h3 style={{ fontSize: '1.3rem', fontWeight: 700, marginBottom: '12px', color: 'white' }}>Don't Risk Your PR Application — Get Your NOC Right</h3>
+                <p style={{ fontSize: '0.95rem', opacity: 0.85, marginBottom: '24px', lineHeight: 1.6 }}>
+                  A wrong NOC code can cost you your filing fee and months of waiting. Your duties determine your NOC — not your job title. Find the right one now.
+                </p>
+                <div style={{ display: 'flex', gap: '12px', justifyContent: 'center', flexWrap: 'wrap' }}>
+                  <button 
+                    className="btn btn-lg" 
+                    onClick={() => document.getElementById('noc-input')?.scrollIntoView({ behavior: 'smooth' })}
+                    style={{ background: 'white', color: '#1E3A8A', fontWeight: 600, border: 'none', cursor: 'pointer' }}
+                  >
+                    Find My NOC Now
+                  </button>
+                </div>
+                <p style={{ fontSize: '0.75rem', opacity: 0.6, marginTop: '16px', marginBottom: 0 }}>
+                  No sign-up required. Initial NOC match + score shown before purchase.
+                </p>
               </div>
             )}
           </div>

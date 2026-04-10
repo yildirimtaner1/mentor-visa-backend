@@ -13,42 +13,42 @@ const faqSchema = JSON.stringify({
   "mainEntity": [
     {
       "@type": "Question",
-      "name": "What is a NOC code and why does it matter?",
+      "name": "What happens if I choose the wrong NOC code?",
       "acceptedAnswer": {
         "@type": "Answer",
-        "text": "The National Occupational Classification (NOC) is Canada's system for classifying jobs. For Express Entry (CEC), your employment letter must demonstrate duties that align with your claimed NOC code. A mismatch can lead to application refusal."
+        "text": "If the duties in your employment letter don't match the NOC code you claim, IRCC can refuse your Express Entry application. You may lose your filing fee and have to re-apply, which can take months."
       }
     },
     {
       "@type": "Question",
-      "name": "Do I need to know my NOC code before using this tool?",
+      "name": "Why can't I just use my job title to find my NOC?",
       "acceptedAnswer": {
         "@type": "Answer",
-        "text": "No! Our AI automatically reads the duties in your employment letter and identifies the best-matching NOC 2021 code from all 516 unit groups. You can also use our dedicated 'Find My NOC' tool to look up your code before auditing your letter."
+        "text": "Job titles vary between companies — 'Project Coordinator' at one company might be NOC 13100, while at another it could be NOC 11102. IRCC matches based on your actual duties, not your title. That's why duty-matching is critical."
       }
     },
     {
       "@type": "Question",
-      "name": "What elements does IRCC require in an employment letter?",
+      "name": "How does this tool match my NOC code?",
       "acceptedAnswer": {
         "@type": "Answer",
-        "text": "IRCC requires: company letterhead, your full name, company contact information, job title, employment dates, hours per week, salary/compensation, detailed duties, and a signatory (supervisor or HR officer)."
+        "text": "Our AI reads the duties from your employment letter or pasted text and compares them against the official duties of all 516 NOC 2021 unit groups. It returns the best match with a confidence score and shows you exactly which duties align."
       }
     },
     {
       "@type": "Question",
-      "name": "Is my document stored on your servers?",
+      "name": "Is this tool a replacement for an immigration consultant?",
       "acceptedAnswer": {
         "@type": "Answer",
-        "text": "Your document is securely processed by our AI. If you create an account, you can optionally save your evaluations for future reference. All data is encrypted and protected."
+        "text": "No. This tool helps you identify your NOC code quickly and accurately. For complex cases, we recommend consulting a licensed RCIC. But for straightforward NOC matching, this AI tool gives you the same answer in seconds instead of days."
       }
     },
     {
       "@type": "Question",
-      "name": "Does this replace an immigration consultant?",
+      "name": "What TEER categories are eligible for Express Entry CEC?",
       "acceptedAnswer": {
         "@type": "Answer",
-        "text": "No. This tool is designed to help you catch common issues before you submit your application. It is not legal advice. We recommend consulting a licensed RCIC or immigration lawyer for complex cases."
+        "text": "Express Entry's Canadian Experience Class (CEC) requires work experience in TEER 0, 1, 2, or 3 occupations. TEER 4 and 5 are generally not eligible. Our tool automatically tells you your TEER category and CEC eligibility."
       }
     }
   ]
@@ -58,53 +58,37 @@ export const LandingPage: FC<LandingPageProps> = ({ onGetStarted, onNavigate }) 
   return (
     <div className="landing">
       <SEO 
-        title="Mentor Visa — Free AI Document Auditor for Canadian Express Entry" 
-        description="Get your employment reference letter checked against official IRCC requirements and 516 NOC 2021 codes. Spot rejection risks instantly before applying for permanent residency."
-        keywords="Canadian Experience Class, CEC document checklist, Express Entry employment letter format, NOC code finder"
+        title="Find My NOC Code | AI-Powered NOC Matcher for Express Entry Canada" 
+        description="Don't risk your PR application. Match your job duties to the correct NOC 2021 code in seconds. AI-powered duty matching across all 516 unit groups."
+        keywords="NOC code finder, Express Entry NOC, find my NOC code 2021, NOC code for PR Canada, Canadian Experience Class NOC, TEER category finder"
         canonical="/"
         schema={faqSchema}
       />
       {/* Navigation */}
       <Navbar />
 
-
       {/* Hero Section */}
       <section className="hero">
         <div className="hero-content">
-          <div className="hero-badge">🤖 Powered by AI &amp; Official NOC 2021 Database</div>
+          <div className="hero-badge">🎯 AI-Powered NOC 2021 Matching</div>
           <h1 className="hero-title">
-            Don't Let a Small Mistake<br />
-            <span className="hero-highlight">Cost You Your PR</span>
+            Wrong NOC Code?<br />
+            <span className="hero-highlight">Your PR Gets Refused.</span>
           </h1>
           <p className="hero-subtitle">
-            Get your Express Entry employment letter instantly audited against official IRCC requirements and all 516 NOC 2021 codes — before the officer reviews it.
+            Your job title doesn't determine your NOC code — your duties do. 
+            Our AI reads your actual job duties and matches them against all 516 official NOC 2021 codes, so you don't have to guess.
           </p>
           <div className="hero-actions" style={{ marginBottom: '24px' }}>
-            <button className="btn btn-primary btn-lg" onClick={onGetStarted}>
-              Audit Employment Letter — Free
+            <button className="btn btn-primary btn-lg" onClick={() => onNavigate('find-my-noc')}>
+              🔍 Find My NOC Code Now
             </button>
-            <a href="#tools" className="btn btn-ghost btn-lg">
-              Explore Our Tools ↓
-            </a>
           </div>
 
           <div className="hero-trust-badges">
             <div className="trust-badge">
-              <div className="trust-avatars">
-                <img src="https://i.pravatar.cc/100?img=1" alt="user" />
-                <img src="https://i.pravatar.cc/100?img=2" alt="user" />
-                <img src="https://i.pravatar.cc/100?img=3" alt="user" />
-                <img src="https://i.pravatar.cc/100?img=4" alt="user" />
-              </div>
-              <div className="trust-stars">
-                ⭐⭐⭐⭐⭐
-              </div>
-              <span className="trust-text"><strong>4.9/5 Match accuracy</strong> rated by 10,000+ Express Entry applicants.</span>
-            </div>
-            
-            <div className="trust-badge badge-secondary">
               <div className="trust-icon-check">✓</div>
-              <span className="trust-text"><strong>Calibrated by Regulated Canadian Immigration Consultants (RCIC).</strong> Generates an IRCC-ready NOC Alignment Sheet to expedite your officer's review.</span>
+              <span className="trust-text"><strong>516 NOC codes.</strong> Every single one checked against your duties — in seconds, not hours.</span>
             </div>
           </div>
           <div className="hero-stats">
@@ -115,186 +99,188 @@ export const LandingPage: FC<LandingPageProps> = ({ onGetStarted, onNavigate }) 
             <div className="hero-stat-divider" />
             <div className="hero-stat">
               <div className="hero-stat-number">4,974</div>
-              <div className="hero-stat-label">Official Duties Matched</div>
+              <div className="hero-stat-label">Official Duties Compared</div>
             </div>
             <div className="hero-stat-divider" />
             <div className="hero-stat">
-              <div className="hero-stat-number">9</div>
-              <div className="hero-stat-label">IRCC Criteria Checked</div>
+              <div className="hero-stat-number">~30s</div>
+              <div className="hero-stat-label">Average Result Time</div>
             </div>
           </div>
         </div>
       </section>
 
-      {/* Tools Section */}
-      <section id="tools" className="section">
-        <h2 className="section-title">Your AI-Powered CEC Toolkit</h2>
-        <p className="section-subtitle">Everything you need to build a bulletproof Canadian Experience Class application — completely free.</p>
-        <div className="tools-grid">
-          <div className="tool-card" onClick={onGetStarted}>
-            <div className="tool-card-icon">📄</div>
-            <h3>AI Employment Letter Auditor</h3>
-            <p>Upload your employment letter and get an instant AI audit against all 9 IRCC requirements and 516 NOC codes.</p>
-            <span className="tool-card-tag">Most Popular</span>
+      {/* Why This Matters */}
+      <section className="section">
+        <h2 className="section-title">Why Getting Your NOC Right Matters</h2>
+        <p className="section-subtitle">IRCC doesn't care about your job title. They care about what you actually did.</p>
+        <div className="features-grid">
+          <div className="feature-card" style={{ borderLeft: '4px solid #EF4444' }}>
+            <div className="feature-icon">❌</div>
+            <h3>Wrong NOC = Application Refused</h3>
+            <p>If the duties on your employment letter don't match the NOC code you claim, IRCC will refuse your application. No second chances — you lose your filing fee and months of waiting.</p>
           </div>
-          <div className="tool-card" onClick={() => onNavigate('find-my-noc')}>
-            <div className="tool-card-icon">🎯</div>
-            <h3>AI NOC Code Matcher</h3>
-            <p>Describe your job duties and our AI will match you to the best NOC 2021 code from all 516 unit groups.</p>
-            <span className="tool-card-tag">AI-Powered</span>
+          <div className="feature-card" style={{ borderLeft: '4px solid #F59E0B' }}>
+            <div className="feature-icon">⚠️</div>
+            <h3>Job Titles Are Misleading</h3>
+            <p>"Project Manager" at your company could be NOC 10019, 20012, or 13100 depending on what you actually do. IRCC officers match your duties, not your title. Guessing is risky.</p>
           </div>
-          <div className="tool-card" onClick={() => onNavigate('crs-calculator')}>
-            <div className="tool-card-icon">📊</div>
-            <h3>CRS Score Estimator</h3>
-            <p>Calculate your Comprehensive Ranking System score and compare it against recent Express Entry draw cutoffs.</p>
-            <span className="tool-card-tag">Real-Time</span>
-          </div>
-          <div className="tool-card" onClick={() => onNavigate('cec-checklist')}>
-            <div className="tool-card-icon">✅</div>
-            <h3>Interactive CEC Checklist</h3>
-            <p>Track every document and requirement for your application with our interactive, auto-saving checklist.</p>
-            <span className="tool-card-tag">Interactive</span>
+          <div className="feature-card" style={{ borderLeft: '4px solid #10B981' }}>
+            <div className="feature-icon">✅</div>
+            <h3>Duty-Based Matching Is the Only Way</h3>
+            <p>Our AI does exactly what an IRCC officer does: reads your actual duties and compares them line-by-line against the official NOC 2021 database. No guessing, no gut feeling.</p>
           </div>
         </div>
       </section>
 
       {/* How It Works */}
       <section id="how-it-works" className="section section-dark">
-        <h2 className="section-title">How the Letter Auditor Works</h2>
-        <p className="section-subtitle">Three simple steps to a bulletproof employment letter</p>
+        <h2 className="section-title">How It Works</h2>
+        <p className="section-subtitle">Three steps. Under 60 seconds. No immigration knowledge needed.</p>
         <div className="steps-grid">
           <div className="step-card">
             <div className="step-number">1</div>
             <div className="step-icon">📄</div>
-            <h3>Upload Your Letter</h3>
-            <p>Drop your employment reference letter in any format — PDF, Word, or even a photo of the document.</p>
+            <h3>Upload or Paste Your Duties</h3>
+            <p>Upload your employment letter (PDF, Word, or photo). Or just paste your job title and duties directly — whatever is faster.</p>
           </div>
           <div className="step-card">
             <div className="step-number">2</div>
-            <div className="step-icon">🔍</div>
-            <h3>AI Analyzes Everything</h3>
-            <p>Our AI reads your letter, auto-detects the matching NOC code, and audits it against all 9 IRCC mandatory requirements.</p>
+            <div className="step-icon">🧠</div>
+            <h3>AI Matches Your Duties to NOC</h3>
+            <p>Our AI compares your duties against the official duties of all 516 NOC 2021 unit groups and finds the strongest match — with a confidence score.</p>
           </div>
           <div className="step-card">
             <div className="step-number">3</div>
-            <div className="step-icon">✅</div>
-            <h3>Get Your Report</h3>
-            <p>Receive a detailed compliance report with risks, missing elements, and suggested fixes — in seconds, not days.</p>
+            <div className="step-icon">🎯</div>
+            <h3>Get Your NOC Code + TEER</h3>
+            <p>See your matched NOC code, TEER category, CEC eligibility, and alternative matches. Know exactly which code to claim on your application.</p>
           </div>
         </div>
       </section>
 
-      {/* Features */}
+      {/* What You Get */}
       <section className="section">
-        <h2 className="section-title">What Makes Us Different</h2>
-        <p className="section-subtitle">Built specifically for Canadian Experience Class applicants</p>
+        <h2 className="section-title">What You Get</h2>
+        <p className="section-subtitle">Everything you need to confidently choose your NOC code.</p>
         <div className="features-grid">
           <div className="feature-card">
             <div className="feature-icon">🎯</div>
-            <h3>Automatic NOC Detection</h3>
-            <p>No need to know your NOC code. Our AI reads your duties and matches them against all 516 unit groups in the official NOC 2021 database.</p>
+            <h3>Best-Match NOC Code</h3>
+            <p>Your primary NOC match with a percentage score showing exactly how well your duties align with the official NOC description.</p>
+          </div>
+          <div className="feature-card">
+            <div className="feature-icon">📊</div>
+            <h3>TEER Category + CEC Check</h3>
+            <p>Instantly know your TEER level and whether your occupation qualifies for the Canadian Experience Class — no manual lookup needed.</p>
+          </div>
+          <div className="feature-card">
+            <div className="feature-icon">🔄</div>
+            <h3>Alternative Matches</h3>
+            <p>See other NOC codes that also match your duties. Click any alternative to re-evaluate your duties strictly against that target code.</p>
           </div>
           <div className="feature-card">
             <div className="feature-icon">📋</div>
-            <h3>9-Point IRCC Checklist</h3>
-            <p>We check for every mandatory element IRCC requires: letterhead, dates, hours, salary, duties, signatory, and more.</p>
-          </div>
-          <div className="feature-card">
-            <div className="feature-icon">👁️</div>
-            <h3>Sees Your Actual Document</h3>
-            <p>Our hybrid AI reads both the text and the visual layout — it can verify your company logo, letterhead, and signature are present.</p>
-          </div>
-          <div className="feature-card">
-            <div className="feature-icon">✍️</div>
-            <h3>Suggested Wording</h3>
-            <p>Get AI-recommended improvements to your duty descriptions that better align with NOC requirements — without copy-pasting from the NOC guide.</p>
+            <h3>Duty-by-Duty Breakdown</h3>
+            <p>See exactly which of your duties match which official NOC duties — the same comparison an IRCC officer would do.</p>
           </div>
           <div className="feature-card">
             <div className="feature-icon">📎</div>
-            <h3>Any Format Accepted</h3>
-            <p>Upload PDF, Word (.docx), or image files. Scanned documents and photos of letters work too — our vision AI reads them all.</p>
+            <h3>Works With Any Format</h3>
+            <p>Upload a PDF, Word doc, or photo of your letter. Or skip the upload entirely and just type your duties. We handle it all.</p>
           </div>
           <div className="feature-card">
-            <div className="feature-icon">🔒</div>
-            <h3>Private & Secure</h3>
-            <p>Your documents are processed securely and protected with enterprise-grade encryption. Your personal information stays private.</p>
+            <div className="feature-icon">⚡</div>
+            <h3>Results in Seconds</h3>
+            <p>No waiting days for a consultant. Get your NOC match immediately. Re-evaluate against different codes as many times as you need.</p>
           </div>
         </div>
       </section>
 
       {/* Pricing */}
-      <section id="pricing" className="section" style={{ backgroundColor: '#f8fafc' }}>
-        <div style={{ textAlign: 'center', marginBottom: '48px' }}>
-          <h2 className="section-title">Accessible Pricing</h2>
-          <p className="section-subtitle">Stop guessing with your Express Entry application. Pay per use, no recurring subscriptions.</p>
-        </div>
-        <div className="pricing-grid" style={{ display: 'flex', gap: '32px', justifyContent: 'center', flexWrap: 'wrap', maxWidth: '1000px', margin: '0 auto' }}>
-          
-          {/* NOC Finder Tier */}
-          <div className="card" style={{ flex: '1 1 300px', textAlign: 'left', display: 'flex', flexDirection: 'column' }}>
-            <h3 style={{ fontSize: '1.25rem', color: 'var(--text-muted)', marginBottom: '8px', fontWeight: 500 }}>NOC Finder Pass</h3>
-            <div style={{ fontSize: '2.5rem', fontWeight: 800, color: 'var(--text-color)', marginBottom: '16px' }}>
+      <section className="section section-dark">
+        <h2 className="section-title">Simple Pricing</h2>
+        <p className="section-subtitle">Find your NOC code for less than a coffee. No subscriptions, no hidden fees.</p>
+        <div style={{ maxWidth: '480px', margin: '0 auto' }}>
+          <div className="feature-card" style={{ 
+            textAlign: 'center', 
+            border: '2px solid var(--primary-color)', 
+            boxShadow: '0 20px 40px rgba(37, 99, 235, 0.1)',
+            padding: '40px 32px'
+          }}>
+            <div style={{ fontSize: '2.5rem', fontWeight: 800, color: 'var(--text-color)', marginBottom: '8px' }}>
               $9.90 <span style={{ fontSize: '1rem', color: 'var(--text-muted)', fontWeight: 400 }}>CAD</span>
             </div>
-            <p style={{ color: 'var(--text-muted)', marginBottom: '24px', flex: 1 }}>Match your job duties to the exact NOC code required for Express Entry.</p>
-            <ul style={{ listStyleType: 'none', padding: 0, margin: '0 0 32px 0', display: 'grid', gap: '12px' }}>
-              <li style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>✅ <strong>2 Uses</strong> Included</li>
-              <li style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>✅ Searches all 516 unit groups</li>
-              <li style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>✅ Exact TEER Validation</li>
-              <li style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>✅ Alternative Matches</li>
+            <p style={{ color: 'var(--text-muted)', marginBottom: '24px', fontSize: '1rem' }}>
+              One-time purchase. Two full NOC analyses included.
+            </p>
+            <ul style={{ listStyleType: 'none', padding: 0, margin: '0 0 32px 0', display: 'grid', gap: '12px', textAlign: 'left' }}>
+              <li style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>✅ <strong>2 Uses</strong> — enough for your primary role + one alternative</li>
+              <li style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>✅ Full duty-by-duty breakdown</li>
+              <li style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>✅ TEER category + CEC eligibility</li>
+              <li style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>✅ Alternative NOC matches with re-evaluate</li>
+              <li style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>✅ Saved to your account for future reference</li>
             </ul>
-            <button className="btn btn-primary btn-outline" style={{ width: '100%' }} onClick={() => onNavigate('find-my-noc')}>
-              Find My NOC
+            <button className="btn btn-primary btn-lg" onClick={() => onNavigate('find-my-noc')} style={{ width: '100%' }}>
+              Find My NOC Code Now
             </button>
+            <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginTop: '16px' }}>
+              Initial NOC match + confidence score is visible before purchase.
+            </p>
           </div>
+        </div>
+      </section>
 
-          {/* Letter Auditor Tier */}
-          <div className="card" style={{ flex: '1 1 300px', textAlign: 'left', border: '2px solid var(--primary-color)', transform: 'translateY(-10px)', boxShadow: '0 20px 25px -5px rgba(37, 99, 235, 0.1), 0 10px 10px -5px rgba(37, 99, 235, 0.04)', display: 'flex', flexDirection: 'column' }}>
-            <div style={{ background: 'var(--primary-color)', color: 'white', position: 'absolute', top: 0, left: '50%', transform: 'translate(-50%, -50%)', padding: '4px 16px', borderRadius: '16px', fontSize: '0.85rem', fontWeight: 600 }}>
-              MOST POPULAR
-            </div>
-            <h3 style={{ fontSize: '1.25rem', color: 'var(--text-muted)', marginBottom: '8px', fontWeight: 500, marginTop: '8px' }}>Letter Auditor Pass</h3>
-            <div style={{ fontSize: '2.5rem', fontWeight: 800, color: 'var(--text-color)', marginBottom: '16px' }}>
-              $19.90 <span style={{ fontSize: '1rem', color: 'var(--text-muted)', fontWeight: 400 }}>CAD</span>
-            </div>
-            <p style={{ color: 'var(--text-muted)', marginBottom: '24px', flex: 1 }}>Full IRCC compliance audit for your employment reference letter.</p>
-            <ul style={{ listStyleType: 'none', padding: 0, margin: '0 0 32px 0', display: 'grid', gap: '12px' }}>
-              <li style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>✅ <strong>2 Uses</strong> Included</li>
-              <li style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>✅ 9-Point IRCC Checklist</li>
-              <li style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>✅ Duty Alignment Checking</li>
-              <li style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>✅ Downloadable PDF Sheets</li>
-            </ul>
-            <button className="btn btn-primary" style={{ width: '100%' }} onClick={onGetStarted}>
-              Audit My Letter
-            </button>
+      {/* Also Available */}
+      <section className="section">
+        <h2 className="section-title">Also Available</h2>
+        <p className="section-subtitle">Tools built specifically for Express Entry applicants.</p>
+        <div className="steps-grid">
+          <div className="step-card" onClick={() => onNavigate('audit-employment-letter')} style={{ cursor: 'pointer' }}>
+            <div className="step-icon">📄</div>
+            <h3>Employment Letter Auditor</h3>
+            <p>Upload your employment letter and check it against all 9 IRCC mandatory requirements. Catches missing elements before your officer does.</p>
           </div>
-
+          <div className="step-card" onClick={() => onNavigate('crs-calculator')} style={{ cursor: 'pointer' }}>
+            <div className="step-icon">📊</div>
+            <h3>CRS Score Calculator</h3>
+            <p>Estimate your Comprehensive Ranking System score and compare against recent Express Entry draw cutoffs.</p>
+          </div>
+          <div className="step-card" onClick={() => onNavigate('cec-checklist')} style={{ cursor: 'pointer' }}>
+            <div className="step-icon">✅</div>
+            <h3>CEC Application Checklist</h3>
+            <p>Interactive checklist to track every document and requirement for your Canadian Experience Class application.</p>
+          </div>
         </div>
       </section>
 
       {/* FAQ */}
       <section className="section section-dark">
-        <h2 className="section-title">Frequently Asked Questions</h2>
+        <h2 className="section-title">Common Questions</h2>
         <div className="faq-list">
           <details className="faq-item">
-            <summary>What is a NOC code and why does it matter?</summary>
-            <p>The National Occupational Classification (NOC) is Canada's system for classifying jobs. For Express Entry (CEC), your employment letter must demonstrate duties that align with your claimed NOC code. A mismatch can lead to application refusal.</p>
+            <summary>What happens if I choose the wrong NOC code?</summary>
+            <p>If the duties on your employment letter don't match the NOC code you claim, IRCC can refuse your application. You may lose your filing fee ($1,365 CAD for a single applicant) and have to re-apply, which can set you back months.</p>
           </details>
           <details className="faq-item">
-            <summary>Do I need to know my NOC code before using this tool?</summary>
-            <p>No! Our AI automatically reads the duties in your employment letter and identifies the best-matching NOC 2021 code from all 516 unit groups. You can also use our dedicated "Find My NOC" tool to look up your code before auditing your letter.</p>
+            <summary>Why can't I just use my job title to find my NOC?</summary>
+            <p>Job titles vary wildly between companies. "Project Coordinator" at one company might involve completely different duties than at another. IRCC officers match based on your actual duties, not your title. That's why duty-based matching is the only reliable approach.</p>
           </details>
           <details className="faq-item">
-            <summary>What elements does IRCC require in an employment letter?</summary>
-            <p>IRCC requires: company letterhead, your full name, company contact information, job title, employment dates, hours per week, salary/compensation, detailed duties, and a signatory (supervisor or HR officer).</p>
+            <summary>How does the AI match my NOC code?</summary>
+            <p>Our AI reads the duties from your employment letter (or pasted text) and compares them against the official duties of all 516 NOC 2021 unit groups. It returns the best match with a confidence score and shows you exactly which of your duties align with which official NOC duties.</p>
           </details>
           <details className="faq-item">
-            <summary>Is my document stored on your servers?</summary>
-            <p>Your document is securely processed by our AI. If you create an account, you can optionally save your evaluations for future reference. All data is encrypted and protected.</p>
+            <summary>What TEER categories qualify for Express Entry CEC?</summary>
+            <p>The Canadian Experience Class (CEC) requires work experience in TEER 0, 1, 2, or 3 occupations. TEER 4 and 5 are generally not eligible for CEC. Our tool automatically identifies your TEER category and tells you if you're eligible.</p>
           </details>
           <details className="faq-item">
-            <summary>Does this replace an immigration consultant?</summary>
-            <p>No. This tool is designed to help you catch common issues before you submit your application. It is not legal advice. We recommend consulting a licensed RCIC or immigration lawyer for complex cases.</p>
+            <summary>Is this a replacement for an immigration consultant?</summary>
+            <p>No. This tool is purpose-built for one thing: finding your correct NOC code based on your duties. For complex immigration cases, consult a licensed RCIC. But for straightforward NOC matching, this gives you the same answer in seconds instead of waiting days for a consultation.</p>
+          </details>
+          <details className="faq-item">
+            <summary>Can I try before I buy?</summary>
+            <p>Yes. The initial NOC match — your primary code, match score, and TEER category — is visible before purchase. The detailed duty-by-duty breakdown, alternative matches, and re-evaluation features are unlocked with a pass.</p>
           </details>
         </div>
       </section>
@@ -302,15 +288,14 @@ export const LandingPage: FC<LandingPageProps> = ({ onGetStarted, onNavigate }) 
       {/* CTA Section */}
       <section className="section cta-section">
         <h2 className="cta-title">
-          Get Your Employment Letter<br />
-          Audited Before IRCC Does
+          Stop Guessing Your NOC Code.
         </h2>
         <p className="cta-subtitle">
-          A missing element or duty mismatch in your employment letter can delay or even derail your Express Entry application. 
-          Catch issues before IRCC does.
+          One wrong code can cost you your PR application. 
+          Find the right one in 30 seconds.
         </p>
-        <button className="btn btn-primary btn-lg" onClick={onGetStarted}>
-          Audit Employment Letter Now — Free
+        <button className="btn btn-primary btn-lg" onClick={() => onNavigate('find-my-noc')}>
+          Find My NOC Code Now
         </button>
       </section>
 
@@ -322,7 +307,7 @@ export const LandingPage: FC<LandingPageProps> = ({ onGetStarted, onNavigate }) 
             <span>Mentor Visa</span>
           </div>
           <div className="landing-footer-links">
-            <button onClick={() => onNavigate('express-entry-cec-guide')}>Express Entry CEC Guide</button>
+            <button onClick={() => onNavigate('audit-employment-letter')}>Audit Employment Letter</button>
             <button onClick={() => onNavigate('find-my-noc')}>Find My NOC</button>
             <button onClick={() => onNavigate('crs-calculator')}>CRS Calculator</button>
             <button onClick={() => onNavigate('cec-checklist')}>CEC Application Checklist</button>
@@ -331,6 +316,11 @@ export const LandingPage: FC<LandingPageProps> = ({ onGetStarted, onNavigate }) 
             © 2026 Mentor Visa Services. All rights reserved.<br />
             This tool is for informational purposes only and does not constitute legal or immigration advice.
           </p>
+          <div style={{ display: 'flex', gap: '16px', fontSize: '12px', flexWrap: 'wrap' }}>
+            <a href="/privacy-policy" style={{ color: 'var(--text-muted)', textDecoration: 'none' }}>Privacy Policy</a>
+            <a href="/terms-of-service" style={{ color: 'var(--text-muted)', textDecoration: 'none' }}>Terms of Service</a>
+            <a href="/refund-policy" style={{ color: 'var(--text-muted)', textDecoration: 'none' }}>Refund Policy</a>
+          </div>
         </div>
       </footer>
     </div>
