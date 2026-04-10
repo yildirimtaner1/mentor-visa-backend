@@ -143,7 +143,8 @@ export const AuditorPage: FC = () => {
           <section className="page-hero">
             <div className="page-hero-content">
               <div className="page-hero-badge">📄 AI-Powered Letter Auditor</div>
-              <h1>Is Your Employment Letter<br /><span className="hero-highlight">Safe from Refusal?</span></h1>
+              <h1>One Missing Sentence =<br /><span className="hero-highlight">PR Refusal.</span></h1>
+              <div style={{ fontSize: '1.05rem', fontWeight: 500, color: 'var(--text-main)', marginTop: '-8px', marginBottom: '16px', opacity: 0.9 }}>(or an Additional Document Request, if you're lucky)</div>
               <p>IRCC rejects thousands of applications yearly because of a single missing sentence or formatting error on the employment reference letter. Drop your document below to instantly audit it against all 9 mandatory IRCC requirements.</p>
               <a href="#audit-input" className="btn btn-primary btn-lg" style={{ textDecoration: 'none', display: 'inline-block', marginTop: '8px' }}>
                 Audit My Letter Now
