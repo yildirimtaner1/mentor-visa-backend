@@ -54,7 +54,7 @@ const faqSchema = JSON.stringify({
   ]
 });
 
-export const LandingPage: FC<LandingPageProps> = ({ onGetStarted, onNavigate }) => {
+export const LandingPage: FC<LandingPageProps> = ({ onNavigate }) => {
   return (
     <div className="landing">
       <SEO 
