@@ -426,6 +426,20 @@ export const Dashboard: FC<DashboardProps> = ({ data, onReset, onUpdate }) => {
               </div>
             </div>
 
+            {!isPremiumUnlocked && data.risks.length > 0 && (
+              <div style={{ marginBottom: '20px', padding: '16px', background: '#FEF2F2', border: '1px solid #FCA5A5', borderRadius: '10px' }}>
+                <div style={{ fontSize: '0.75rem', color: '#B91C1C', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '6px', fontWeight: 700 }}>
+                  ⚠️ Priority Risk Identified
+                </div>
+                <div style={{ fontSize: '1.05rem', fontWeight: 700, color: '#991B1B', marginBottom: '8px' }}>
+                  {data.risks[0].issue}
+                </div>
+                <div style={{ fontSize: '0.9rem', color: '#7F1D1D' }}>
+                  <strong style={{ opacity: 0.8 }}>Impact:</strong> {data.risks[0].impact}
+                </div>
+              </div>
+            )}
+
             <div style={{ 
               padding: '16px 20px', 
               background: 'white', 
@@ -435,11 +449,14 @@ export const Dashboard: FC<DashboardProps> = ({ data, onReset, onUpdate }) => {
               color: 'var(--text-main)',
               lineHeight: 1.6
             }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px', fontWeight: 700, color: '#111827' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '12px', fontWeight: 700, color: '#111827' }}>
                 <span style={{ fontSize: '1.1rem' }}>📝</span>
                 Actionable Summary
+                {!isPremiumUnlocked && <span style={{ fontSize: '0.75rem', fontWeight: 600, color: '#6B7280', background: '#F3F4F6', padding: '4px 8px', borderRadius: '6px', marginLeft: 'auto' }}>🔒 Locked</span>}
               </div>
-              {data.summary}
+              <div style={!isPremiumUnlocked ? { filter: 'blur(5px)', userSelect: 'none', pointerEvents: 'none', opacity: 0.8 } : {}}>
+                {data.summary}
+              </div>
             </div>
 
             {/* --- PREMIUM LOCKED SECTION --- */}
