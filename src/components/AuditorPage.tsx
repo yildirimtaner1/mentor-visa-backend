@@ -180,23 +180,27 @@ export const AuditorPage: FC = () => {
         schema={uploaderSchema}
       />
       
-      {!result ? (
-        <>
-          <section className="page-hero">
-            <div className="page-hero-content">
-              <div className="page-hero-badge">📄 AI-Powered Letter Auditor</div>
-              <h1>One Missing Sentence =<br /><span className="hero-highlight">PR Refusal.</span></h1>
+      <section className="page-hero" style={result ? { paddingBottom: '30px' } : {}}>
+        <div className="page-hero-content">
+          <div className="page-hero-badge">📄 AI-Powered Letter Auditor</div>
+          <h1>One Missing Sentence =<br /><span className="hero-highlight">PR Refusal.</span></h1>
+          
+          {!result && (
+            <>
               <div style={{ fontSize: '1.05rem', fontWeight: 500, color: 'var(--text-main)', marginTop: '-8px', marginBottom: '16px', opacity: 0.9 }}>(or an Additional Document Request, if you're lucky)</div>
               <p>IRCC rejects thousands of applications yearly because of a single missing sentence or formatting error on the employment reference letter. Drop your document below to instantly audit it against all 9 mandatory IRCC requirements.</p>
               <a href="#audit-input" className="btn btn-primary btn-lg" style={{ textDecoration: 'none', display: 'inline-block', marginTop: '8px' }}>
                 Audit My Letter Now
               </a>
               <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginTop: '12px', marginBottom: 0 }}>Takes less than 60 seconds. No sign-up required.</p>
-            </div>
-          </section>
+            </>
+          )}
+        </div>
+      </section>
 
-          <div className="page-container">
-            <section className="page-section">
+      <div className="page-container" style={result ? { paddingTop: 0 } : {}}>
+        {!result ? (
+          <section className="page-section">
               <div style={{ maxWidth: '720px', margin: '0 auto' }}>
                 
                 {/* Input Card */}
@@ -330,19 +334,19 @@ export const AuditorPage: FC = () => {
                 )}
               </div>
             </section>
-          </div>
-        </>
-      ) : (
-        /* Render Dashboard (Auditor Results) directly down below */
-        <Dashboard 
-          data={result} 
-          onReset={handleReset} 
-          onUpdate={(res) => {
-            setResult(res);
-            sessionStorage.setItem('mentorVisaAnalysisResult', JSON.stringify(res));
-          }} 
-        />
-      )}
+        ) : (
+          <section className="page-section" style={{ paddingTop: '20px' }}>
+            <Dashboard 
+              data={result} 
+              onReset={handleReset} 
+              onUpdate={(res) => {
+                setResult(res);
+                sessionStorage.setItem('mentorVisaAnalysisResult', JSON.stringify(res));
+              }} 
+            />
+          </section>
+        )}
+      </div>
     </div>
   );
 };
