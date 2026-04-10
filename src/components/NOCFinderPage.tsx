@@ -34,7 +34,7 @@ interface NOCResult {
 }
 
 interface NOCFinderPageProps {
-  onNavigate: (page: string) => void;
+  onNavigate: (page: string, state?: any) => void;
 }
 
 const nocSchema = JSON.stringify({
@@ -805,7 +805,7 @@ export const NOCFinderPage: FC<NOCFinderPageProps> = ({ onNavigate }) => {
                       <p style={{ fontSize: '0.9rem', color: '#78350F', marginBottom: '16px', lineHeight: 1.5 }}>
                         IRCC won't accept your NOC claim if your letter doesn't list duties that match. Our AI auditor checks your letter against all 9 mandatory requirements — missing even one can delay or refuse your application.
                       </p>
-                      <button className="btn btn-primary btn-lg" onClick={() => onNavigate('audit-employment-letter')} style={{ background: '#D97706', borderColor: '#D97706' }}>
+                      <button className="btn btn-primary btn-lg" onClick={() => onNavigate('audit-employment-letter', { fileId: result.stored_file_id, targetNoc: result.noc_code })} style={{ background: '#D97706', borderColor: '#D97706' }}>
                         📄 Audit My Letter — $4.90 CAD
                       </button>
                       <p style={{ fontSize: '0.75rem', color: '#92400E', marginTop: '10px', marginBottom: 0 }}>One-time purchase. Instant results.</p>
@@ -816,7 +816,7 @@ export const NOCFinderPage: FC<NOCFinderPageProps> = ({ onNavigate }) => {
                       <p style={{ fontSize: '0.9rem', color: '#4338CA', marginBottom: '16px', lineHeight: 1.5 }}>
                         Now that you know your NOC code, make sure your letter has all 9 IRCC mandatory requirements. Missing even one can delay your application.
                       </p>
-                      <button className="btn btn-primary btn-lg" onClick={() => onNavigate('audit-employment-letter')}>
+                      <button className="btn btn-primary btn-lg" onClick={() => onNavigate('audit-employment-letter', { fileId: result.stored_file_id, targetNoc: result.noc_code })}>
                         📄 Audit My Employment Letter
                       </button>
                     </>

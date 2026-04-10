@@ -196,7 +196,7 @@ function App() {
 
       {/* Shared Nav Routes (Tools) */}
       <Route path="/audit-employment-letter" element={<SharedLayout><AuditorPage /></SharedLayout>} />
-      <Route path="/find-my-noc" element={<SharedLayout><NOCFinderPage onNavigate={(p) => navigate(`/${p}`)} /></SharedLayout>} />
+      <Route path="/find-my-noc" element={<SharedLayout><NOCFinderPage onNavigate={(p, state) => navigate(`/${p}`, { state })} /></SharedLayout>} />
       <Route path="/express-entry-cec-guide" element={<SharedLayout><CECGuidePage onNavigate={(p) => navigate(`/${p}`)} /></SharedLayout>} />
       <Route path="/crs-calculator" element={<SharedLayout><CRSCalculatorPage onNavigate={(p) => navigate(`/${p}`)} /></SharedLayout>} />
       <Route path="/cec-checklist" element={<SharedLayout><CECChecklistPage onNavigate={(p) => navigate(`/${p}`)} /></SharedLayout>} />

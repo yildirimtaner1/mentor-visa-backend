@@ -1,12 +1,12 @@
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import type { DragEvent, ChangeEvent, FC } from 'react';
 import type { AnalysisResponse } from '../types';
-import { uploadDocument } from '../services/api';
+import { uploadDocument, reevaluateDocument, saveEvaluation } from '../services/api';
 import { SEO } from './common/SEO';
 import { DynamicLoader } from './common/DynamicLoader';
 import { Dashboard } from './Dashboard';
 import { useAuth } from '@clerk/clerk-react';
-import { saveEvaluation } from '../services/api';
+import { useLocation } from 'react-router-dom';
 
 const ACCEPTED_TYPES = [
   'application/pdf',
@@ -52,6 +52,48 @@ export const AuditorPage: FC = () => {
       return null;
     }
   });
+
+  const location = useLocation();
+
+  useEffect(() => {
+    // If navigating from NOC Finder with an already stored file
+    if (location.state?.fileId) {
+      const performAutoAudit = async () => {
+        setLoading(true);
+        setError(null);
+        try {
+          // get token if signed in (though reevaluate handles missing token if user is guest)
+          const token = await getToken() || '';
+          
+          const res = await reevaluateDocument(
+            location.state.fileId, 
+            location.state.targetNoc || 'auto', 
+            token
+          );
+          
+          setResult(res);
+          sessionStorage.setItem('mentorVisaAnalysisResult', JSON.stringify(res));
+
+          if (token && isSignedIn) {
+            try {
+              await saveEvaluation(res, token);
+            } catch (e) {
+              console.error("Failed to auto-save evaluation:", e);
+            }
+          }
+        } catch (err) {
+          const message = err instanceof Error ? err.message : 'An error occurred during auto-analysis.';
+          setError(message);
+        } finally {
+          setLoading(false);
+          // Clear history state to prevent looping on page refresh
+          window.history.replaceState({}, document.title, window.location.pathname);
+        }
+      };
+
+      performAutoAudit();
+    }
+  }, [location.state, getToken, isSignedIn]);
 
   const handleDragOver = (e: DragEvent) => {
     e.preventDefault();
