@@ -251,22 +251,6 @@ export const Dashboard: FC<DashboardProps> = ({ data, onReset, onUpdate }) => {
     return () => window.removeEventListener('scroll', handleScroll);
   }, [toastDismissed]);
 
-  const renderBadge = (status: string) => {
-    switch (status) {
-      case 'compliant':
-      case 'ready':
-        return <span className="badge badge-success">Compliant</span>;
-      case 'risk':
-      case 'revise_minor':
-        return <span className="badge badge-warning">Risk / Minor Revision</span>;
-      case 'non_compliant':
-      case 'revise_major':
-        return <span className="badge badge-danger">Non-Compliant / Major Revision</span>;
-      default:
-        return <span className="badge">{status}</span>;
-    }
-  };
-
   if (isReevaluating) {
     return (
       <div style={{ maxWidth: '900px', margin: '40px auto', padding: '40px', background: 'white', borderRadius: '12px', boxShadow: '0 4px 24px rgba(0,0,0,0.06)', textAlign: 'center' }}>
@@ -397,49 +381,66 @@ export const Dashboard: FC<DashboardProps> = ({ data, onReset, onUpdate }) => {
         </div>
       ) : (
         <>
-          <div id="primary-match-section" ref={fullTargetRef} style={{ background: 'var(--bg-color)', padding: '20px', borderRadius: '8px' }}>
-            <div className="dashboard">
+          <div id="primary-match-section" ref={fullTargetRef} className="result-card" style={{ marginTop: '12px', marginBottom: '32px' }}>
+            <h3 style={{ fontSize: '1.2rem', fontWeight: 700, marginBottom: '20px', color: 'var(--text-color)', borderBottom: '1px solid var(--border-color)', paddingBottom: '12px' }}>
+              Employment Letter Audit Complete
+            </h3>
+              
+            <div className="result-card-header" style={{ marginBottom: '24px' }}>
+              <div className="result-card-icon" style={{ 
+                background: data.final_verdict === 'ready' ? '#10B981' : data.final_verdict === 'revise_minor' ? '#F59E0B' : '#EF4444',
+                boxShadow: data.final_verdict === 'ready' ? '0 4px 12px rgba(16, 185, 129, 0.3)' : '0 4px 12px rgba(245, 158, 11, 0.3)'
+              }}>
+                {data.final_verdict === 'ready' ? '✅' : data.final_verdict === 'revise_minor' ? '⚠️' : '❌'}
+              </div>
               <div>
-                <div className="card">
-                  <h3 className="card-title">Overall Assessment {renderBadge(data.compliance_status)}</h3>
-                  <p>{data.summary}</p>
+                <div className="result-card-title">
+                  {data.final_verdict === 'ready' ? 'Ready to Submit' : 
+                   data.final_verdict === 'revise_minor' ? 'Minor Revisions Recommended' : 
+                   'Major Issues Found'}
+                </div>
+                <div className="result-card-subtitle" style={{ color: '#4B5563', fontSize: '1.05rem', marginTop: '4px' }}>
+                  Target: NOC {data.noc_analysis.detected_code} — {data.noc_analysis.detected_title}
                 </div>
               </div>
+            </div>
 
-              <div>
-                <div className="card">
-                  <h3 className="card-title">NOC Compliance Analysis</h3>
-                  <div style={{ background: 'var(--bg-color)', borderRadius: '8px', padding: '16px', marginBottom: '16px', border: '1px solid var(--border-color)' }}>
-                    <div style={{ fontSize: '13px', color: 'var(--text-muted)', marginBottom: '4px' }}>Detected NOC Code</div>
-                    <div style={{ fontSize: '1.4rem', fontWeight: 'bold', color: 'var(--primary-color)' }}>
-                      {data.noc_analysis.detected_code}
-                    </div>
-                    <div style={{ fontSize: '0.95rem', color: 'var(--text-main)', marginTop: '4px' }}>
-                      {data.noc_analysis.detected_title}
-                    </div>
-                  </div>
-                  <div style={{ marginBottom: '12px' }}>
-                    <strong>Match Score: </strong> 
-                    <span className={`badge ${data.noc_analysis.match_score >= 80 ? 'badge-success' : data.noc_analysis.match_score >= 65 ? 'badge-warning' : 'badge-danger'}`}>
-                      {data.noc_analysis.match_score}% Match
-                    </span>
-                  </div>
-                </div>
-                
-                <div className="card" style={{ background: 'var(--bg-color)', border: '2px solid var(--primary-color)' }}>
-                  <h3 className="card-title">🟢 Final Verdict</h3>
-                  <p style={{ fontSize: '1.1rem', fontWeight: 600, marginBottom: '10px' }}>
-                    {data.final_verdict === 'ready' ? 'Ready to Submit' : 
-                     data.final_verdict === 'revise_minor' ? 'Minor Revisions Recommended' : 
-                     'Major Issues Must Be Resolved Before Submission'}
-                  </p>
-                  {renderBadge(data.final_verdict)}
-                  <p style={{ marginTop: '20px', fontSize: '11px', color: 'var(--text-muted)', textAlign: 'center' }}>
-                    * This review is for informational purposes only and does not constitute legal advice.
-                  </p>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '12px', marginBottom: '20px' }}>
+              <div style={{ padding: '16px', background: 'white', borderRadius: '10px', border: '1px solid var(--border-color)' }}>
+                <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '4px' }}>Duties Match Score</div>
+                <div style={{ fontSize: '1.3rem', fontWeight: 700, color: data.noc_analysis.match_score >= 80 ? '#10B981' : data.noc_analysis.match_score >= 65 ? '#F59E0B' : '#EF4444' }}>
+                  {data.noc_analysis.match_score}%
                 </div>
               </div>
-            </div> {/* End Free Dashboard Grid */}
+              <div style={{ padding: '16px', background: 'white', borderRadius: '10px', border: '1px solid var(--border-color)' }}>
+                <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '4px' }}>TEER Category</div>
+                <div style={{ fontSize: '1.3rem', fontWeight: 700, color: '#374151' }}>
+                  {data.noc_analysis.detected_code ? data.noc_analysis.detected_code.charAt(1) : 'Unknown'}
+                </div>
+              </div>
+              <div style={{ padding: '16px', background: 'white', borderRadius: '10px', border: '1px solid var(--border-color)' }}>
+                <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '4px' }}>Format Compliance</div>
+                <div style={{ fontSize: '1.3rem', fontWeight: 700, color: data.compliance_status === 'compliant' ? '#10B981' : data.compliance_status === 'risk' ? '#F59E0B' : '#EF4444' }}>
+                  {data.compliance_status === 'compliant' ? 'Pass' : data.compliance_status === 'risk' ? 'Warning' : 'Fail'}
+                </div>
+              </div>
+            </div>
+
+            <div style={{ 
+              padding: '16px 20px', 
+              background: 'white', 
+              border: '1px solid var(--border-color)', 
+              borderRadius: '10px', 
+              fontSize: '0.95rem',
+              color: 'var(--text-main)',
+              lineHeight: 1.6
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px', fontWeight: 700, color: '#111827' }}>
+                <span style={{ fontSize: '1.1rem' }}>📝</span>
+                Actionable Summary
+              </div>
+              {data.summary}
+            </div>
 
             {/* --- PREMIUM LOCKED SECTION --- */}
             <div style={{ position: 'relative', marginTop: '20px' }}>
