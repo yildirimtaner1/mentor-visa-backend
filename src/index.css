@@ -1,3 +1,7 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
 :root {
   /* Corporate Blue Theme */
   --primary-color: #1E3A8A; /* Navy blue */

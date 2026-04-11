@@ -1,5 +1,7 @@
 import { useState } from 'react';
 import type { AnalysisResponse } from './types';
+import { GridPattern } from './components/ui/grid-pattern';
+import { cn } from './lib/utils';
 import { LandingPage } from './components/LandingPage';
 import { AuditorPage } from './components/AuditorPage';
 import { Dashboard } from './components/Dashboard';
@@ -24,26 +26,41 @@ import './App.css';
 // A wrapper for pages that share the unified navbar and footer (e.g. NOC Finder, CRS Calc)
 const SharedLayout = ({ children }: { children: React.ReactNode }) => {
   return (
-    <div className="landing">
-      <Navbar />
-      {children}
-      <footer className="landing-footer">
-        <div className="landing-footer-inner">
-          <div className="landing-footer-brand">
-            <img src="/logo.png" alt="Mentor Visa" style={{ height: '28px', width: '28px', objectFit: 'contain' }} />
-            <span>Mentor Visa</span>
-          </div>
-          <p className="landing-footer-disclaimer" style={{ marginBottom: '12px' }}>
-            © 2026 Mentor Visa Services. All rights reserved.<br />
-            This tool is for informational purposes only and does not constitute legal or immigration advice.
-          </p>
-          <div style={{ display: 'flex', gap: '16px', justifyContent: 'center', fontSize: '12px', flexWrap: 'wrap' }}>
-            <a href="/privacy-policy" style={{ color: 'var(--text-muted)', textDecoration: 'none' }}>Privacy Policy</a>
-            <a href="/terms-of-service" style={{ color: 'var(--text-muted)', textDecoration: 'none' }}>Terms of Service</a>
-            <a href="/refund-policy" style={{ color: 'var(--text-muted)', textDecoration: 'none' }}>Refund Policy</a>
-          </div>
+    <div className="landing relative min-h-screen">
+      <GridPattern
+        width={30}
+        height={30}
+        x={-1}
+        y={-1}
+        strokeDasharray="4 2"
+        className={cn(
+          "[mask-image:radial-gradient(1500px_circle_at_center,white,transparent)]",
+          "fixed inset-0 z-0 opacity-40 mix-blend-multiply"
+        )}
+      />
+      <div className="relative z-10 flex flex-col min-h-screen">
+        <Navbar />
+        <div className="flex-grow">
+          {children}
         </div>
-      </footer>
+        <footer className="landing-footer">
+          <div className="landing-footer-inner">
+            <div className="landing-footer-brand">
+              <img src="/logo.png" alt="Mentor Visa" style={{ height: '28px', width: '28px', objectFit: 'contain' }} />
+              <span>Mentor Visa</span>
+            </div>
+            <p className="landing-footer-disclaimer" style={{ marginBottom: '12px' }}>
+              © 2026 Mentor Visa Services. All rights reserved.<br />
+              This tool is for informational purposes only and does not constitute legal or immigration advice.
+            </p>
+            <div style={{ display: 'flex', gap: '16px', justifyContent: 'center', fontSize: '12px', flexWrap: 'wrap' }}>
+              <a href="/privacy-policy" style={{ color: 'var(--text-muted)', textDecoration: 'none' }}>Privacy Policy</a>
+              <a href="/terms-of-service" style={{ color: 'var(--text-muted)', textDecoration: 'none' }}>Terms of Service</a>
+              <a href="/refund-policy" style={{ color: 'var(--text-muted)', textDecoration: 'none' }}>Refund Policy</a>
+            </div>
+          </div>
+        </footer>
+      </div>
     </div>
   );
 };
@@ -54,7 +71,19 @@ const AppLayout = ({ children }: { children: React.ReactNode }) => {
   const navigate = useNavigate();
 
   return (
-    <div className="app-container">
+    <div className="app-container relative min-h-screen">
+      <GridPattern
+        width={30}
+        height={30}
+        x={-1}
+        y={-1}
+        strokeDasharray={"4 2"}
+        className={cn(
+          "[mask-image:radial-gradient(1500px_circle_at_center,white,transparent)]",
+          "fixed inset-0 z-0 opacity-40 mix-blend-multiply"
+        )}
+      />
+      <div className="relative z-10 flex flex-col min-h-screen">
       <header className="header">
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
@@ -95,6 +124,7 @@ const AppLayout = ({ children }: { children: React.ReactNode }) => {
           <a href="/refund-policy" style={{ color: 'var(--text-muted)', textDecoration: 'none' }}>Refund Policy</a>
         </div>
       </footer>
+      </div>
     </div>
   );
 };

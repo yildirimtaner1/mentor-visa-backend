@@ -1,6 +1,7 @@
 import type { FC } from 'react';
 import { Navbar } from './common/Navbar';
 import { SEO } from './common/SEO';
+import { Testimonials } from './ui/testimonials-columns-1';
 
 interface LandingPageProps {
   onGetStarted: () => void;
@@ -68,8 +69,8 @@ export const LandingPage: FC<LandingPageProps> = ({ onNavigate }) => {
       <Navbar />
 
       {/* Hero Section */}
-      <section className="hero">
-        <div className="hero-content">
+      <section className="hero relative overflow-hidden">
+        <div className="hero-content relative z-10">
           <div className="hero-badge">🎯 AI-Powered NOC 2021 Matching</div>
           <h1 className="hero-title">
             Wrong NOC Code?<br />
@@ -237,6 +238,8 @@ export const LandingPage: FC<LandingPageProps> = ({ onNavigate }) => {
           </div>
         </div>
       </section>
+      {/* Testimonials */}
+      <Testimonials />
 
       {/* Also Available */}
       <section className="section">
