@@ -229,7 +229,14 @@ function App() {
         try { payload = JSON.parse(payload); } catch(e) {}
       }
       payload = { ...payload, is_premium_unlocked: ev.is_premium_unlocked };
-      handleAnalysisResult(payload, false);
+      // Store in sessionStorage so AuditorPage picks it up with full hero/upload context
+      sessionStorage.setItem('mentorVisaAnalysisResult', JSON.stringify(payload));
+      setAnalysisResult(payload);
+      navigate('/audit-employment-letter');
+      // Slight delay to allow navigation, then scroll to results
+      setTimeout(() => {
+        document.getElementById('primary-match-section')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }, 300);
     }
   };
 
