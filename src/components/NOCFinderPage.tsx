@@ -609,9 +609,9 @@ export const NOCFinderPage: FC<NOCFinderPageProps> = ({ onNavigate }) => {
                     <div style={{ fontSize: '1.1rem', fontWeight: 700 }}>{result.teer_category}</div>
                   </div>
                   <div style={{ padding: '14px', background: '#F8FAFC', borderRadius: '10px', border: '1px solid var(--border-color)' }}>
-                    <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '4px' }}>Match Score</div>
-                    <div style={{ fontSize: '1.1rem', fontWeight: 700, color: getScoreColor(result.match_score), ...(result.is_premium_unlocked ? {} : { filter: 'blur(8px)', userSelect: 'none' as const }) }}>
-                      {result.match_score}%
+                    <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '4px' }}>Match Strength</div>
+                    <div style={{ fontSize: '1.1rem', fontWeight: 700, color: result.match_score >= 80 ? '#059669' : result.match_score >= 70 ? '#D97706' : '#EF4444' }}>
+                      {result.match_score >= 80 ? 'Strong Match' : result.match_score >= 70 ? 'Good Match' : 'Moderate Match'}
                     </div>
                   </div>
                 </div>
