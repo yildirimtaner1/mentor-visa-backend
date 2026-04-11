@@ -1,6 +1,6 @@
 import { type FC, useState, useRef, useEffect } from 'react';
 import { useUser, SignInButton, useAuth } from '@clerk/clerk-react';
-import { findNOCCode, fetchUserCredits, createCheckoutSession, consumeCreditToUnlock } from '../services/api';
+import { findNOCCode, fetchUserCredits, createCheckoutSession, consumeCreditToUnlock, reevaluateDocument } from '../services/api';
 import { SEO } from './common/SEO';
 import { DynamicLoader } from './common/DynamicLoader';
 
@@ -200,6 +200,11 @@ export const NOCFinderPage: FC<NOCFinderPageProps> = ({ onNavigate }) => {
 
 
   const processInput = async (inputFile: File | null, inputTitle: string = '', inputDuties: string = '', targetNoc: string = '') => {
+    // If we have a stored file from a previous analysis and no local file/text, use the reevaluate endpoint
+    if (!inputFile && (!inputTitle.trim() || !inputDuties.trim()) && targetNoc && result?.stored_file_id) {
+      return reEvaluateWithStoredFile(result.stored_file_id, targetNoc);
+    }
+    
     if (!inputFile && (!inputTitle.trim() || !inputDuties.trim())) {
       setError('Please either upload a document OR fill in your job title and duties.');
       return;
@@ -214,6 +219,7 @@ export const NOCFinderPage: FC<NOCFinderPageProps> = ({ onNavigate }) => {
     setLoading(true);
     if (targetNoc) {
       setTargetNocOverride(targetNoc);
+      window.scrollTo({ top: 0, behavior: 'smooth' });
     } else {
       setTargetNocOverride(null);
       setResult(null);
@@ -274,6 +280,54 @@ export const NOCFinderPage: FC<NOCFinderPageProps> = ({ onNavigate }) => {
       }
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Something went wrong. Please try again.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const reEvaluateWithStoredFile = async (fileId: string, targetNoc: string) => {
+    setError('');
+    setLoading(true);
+    setTargetNocOverride(targetNoc);
+    // Scroll up so the user sees the loading indicator
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+    try {
+      const token = await getToken() || '';
+      const rawData = await reevaluateDocument(fileId, targetNoc, token, 'noc_finder');
+      
+      if (rawData.noc_analysis) {
+        const ana = rawData.noc_analysis;
+        const teer = ana.detected_code.charAt(1);
+        const cec = ['0', '1', '2', '3'].includes(teer);
+        
+        const dutiesList: DutyMatch[] = ana.duties_match 
+          ? ana.duties_match.map((d: any) => ({
+              applicant_duty: d.applicant_duty || '',
+              official_noc_duty: d.official_noc_duty || '',
+              overlap_description: d.overlap_description || ''
+            }))
+          : [];
+
+        setResult({
+          document_valid: true,
+          rejection_reason: '',
+          noc_code: ana.detected_code,
+          noc_title: ana.detected_title,
+          teer_category: teer,
+          match_score: ana.match_score,
+          alternative_nocs: ana.alternative_nocs || [],
+          explanation: ana.notes || '',
+          matched_duties: dutiesList,
+          cec_eligible: cec,
+          location_of_experience: ana.location_of_experience,
+          stored_file_id: rawData.stored_file_id || fileId,
+          is_premium_unlocked: !!rawData.is_premium_unlocked || !!result?.is_premium_unlocked
+        });
+      } else {
+        setError('Re-evaluation returned no NOC analysis. Please try again.');
+      }
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Re-evaluation failed. Please try again.');
     } finally {
       setLoading(false);
     }
@@ -440,15 +494,7 @@ export const NOCFinderPage: FC<NOCFinderPageProps> = ({ onNavigate }) => {
 
               {loading ? (
                 <div style={{ marginTop: '32px' }}>
-                  {targetNocOverride ? (
-                    <div style={{ padding: '40px', textAlign: 'center', background: '#F8FAFC', borderRadius: '12px', border: '1px solid var(--border-color)' }}>
-                      <div style={{ display: 'inline-block', width: '40px', height: '40px', border: '3px solid var(--primary-light)', borderTopColor: 'var(--primary-color)', borderRadius: '50%', animation: 'spin 1s linear infinite', marginBottom: '16px' }} />
-                      <h3 style={{ fontSize: '1.2rem', fontWeight: 700, marginBottom: '8px' }}>Re-evaluating against NOC {targetNocOverride}...</h3>
-                      <p style={{ color: 'var(--text-muted)' }}>Mapping your duties strictly against this target code.</p>
-                    </div>
-                  ) : (
-                    <DynamicLoader tool="noc" />
-                  )}
+                  <DynamicLoader tool={targetNocOverride ? 'noc_retarget' : 'noc'} targetNoc={targetNocOverride || undefined} />
                 </div>
               ) : !file && (
                 <div>
@@ -562,9 +608,9 @@ export const NOCFinderPage: FC<NOCFinderPageProps> = ({ onNavigate }) => {
                     <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '4px' }}>TEER Category</div>
                     <div style={{ fontSize: '1.1rem', fontWeight: 700 }}>{result.teer_category}</div>
                   </div>
-                  <div style={{ padding: '14px', background: 'white', borderRadius: '10px', border: '1px solid var(--border-color)' }}>
+                  <div style={{ padding: '14px', background: '#F8FAFC', borderRadius: '10px', border: '1px solid var(--border-color)' }}>
                     <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '4px' }}>Match Score</div>
-                    <div style={{ fontSize: '1.1rem', fontWeight: 700, color: getScoreColor(result.match_score) }}>
+                    <div style={{ fontSize: '1.1rem', fontWeight: 700, color: getScoreColor(result.match_score), ...(result.is_premium_unlocked ? {} : { filter: 'blur(8px)', userSelect: 'none' as const }) }}>
                       {result.match_score}%
                     </div>
                   </div>
@@ -690,7 +736,11 @@ export const NOCFinderPage: FC<NOCFinderPageProps> = ({ onNavigate }) => {
                         <h4 style={{ fontSize: '0.95rem', fontWeight: 700, marginBottom: '12px' }}>Other Potential Matches:</h4>
                         <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginBottom: '16px' }}>Not sure about the primary match? Click any code below to re-evaluate your duties strictly against that target NOC.</p>
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                          {result.alternative_nocs.map((alt, i) => (
+                          {result.alternative_nocs.map((alt, i) => {
+                            const label = alt.match_score >= 80 ? 'Strong Match' : alt.match_score >= 70 ? 'Good Match' : 'Moderate Match';
+                            const labelColor = alt.match_score >= 80 ? '#059669' : alt.match_score >= 70 ? '#D97706' : '#9CA3AF';
+                            const labelBg = alt.match_score >= 80 ? '#ECFDF5' : alt.match_score >= 70 ? '#FFFBEB' : '#F9FAFB';
+                            return (
                             <div 
                               key={i} 
                               onClick={() => processInput(file, jobTitle, duties, alt.noc_code)}
@@ -700,13 +750,14 @@ export const NOCFinderPage: FC<NOCFinderPageProps> = ({ onNavigate }) => {
                               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
                                 <div style={{ fontWeight: 600, fontSize: '0.95rem' }}>NOC {alt.noc_code} — {alt.noc_title}</div>
                                 <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                                  <div style={{ fontWeight: 700, color: getScoreColor(alt.match_score), fontSize: '0.9rem' }}>{alt.match_score}% Match</div>
+                                  <span style={{ fontWeight: 600, color: labelColor, fontSize: '0.8rem', background: labelBg, padding: '4px 10px', borderRadius: '6px' }}>{label}</span>
                                   <span style={{ fontSize: '0.8rem', color: 'var(--primary-color)', fontWeight: 600 }} className="target-btn">Re-evaluate →</span>
                                 </div>
                               </div>
                               <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', lineHeight: 1.5, margin: 0 }}>{alt.explanation}</p>
                             </div>
-                          ))}
+                            );
+                          })}
                         </div>
                       </div>
                     )}

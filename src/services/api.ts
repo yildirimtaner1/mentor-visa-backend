@@ -26,14 +26,14 @@ export async function uploadDocument(file: File, targetNoc?: string): Promise<An
   }
 }
 
-export async function reevaluateDocument(fileId: string, targetNoc: string, token: string): Promise<AnalysisResponse> {
+export async function reevaluateDocument(fileId: string, targetNoc: string, token: string, mode: string = 'audit'): Promise<AnalysisResponse> {
   const response = await fetch(`${API_BASE_URL}/api/v1/reevaluate`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
       'Authorization': `Bearer ${token}`
     },
-    body: JSON.stringify({ file_id: fileId, target_noc: targetNoc })
+    body: JSON.stringify({ file_id: fileId, target_noc: targetNoc, mode })
   });
   
   if (!response.ok) {

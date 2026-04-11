@@ -230,12 +230,13 @@
 
 /* Result Card */
 .result-card {
-  background: linear-gradient(135deg, #EFF6FF, #F8FAFC);
-  border: 2px solid var(--primary-light);
+  background: white;
+  border: 2px solid #2563EB;
   border-radius: 16px;
   padding: 32px;
   margin-top: 32px;
   animation: fadeInUp 0.5s ease-out;
+  box-shadow: 0 4px 24px rgba(37, 99, 235, 0.1);
 }
 
 .result-card-header {

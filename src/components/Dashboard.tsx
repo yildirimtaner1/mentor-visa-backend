@@ -406,9 +406,9 @@ export const Dashboard: FC<DashboardProps> = ({ data, onReset, onUpdate }) => {
             </div>
 
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '12px', marginBottom: '20px' }}>
-              <div style={{ padding: '16px', background: 'white', borderRadius: '10px', border: '1px solid var(--border-color)' }}>
+              <div style={{ padding: '16px', background: '#F8FAFC', borderRadius: '10px', border: '1px solid var(--border-color)' }}>
                 <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '4px' }}>Duties Match Score</div>
-                <div style={{ fontSize: '1.3rem', fontWeight: 700, color: data.noc_analysis.match_score >= 80 ? '#10B981' : data.noc_analysis.match_score >= 65 ? '#F59E0B' : '#EF4444' }}>
+                <div style={{ fontSize: '1.3rem', fontWeight: 700, color: data.noc_analysis.match_score >= 80 ? '#10B981' : data.noc_analysis.match_score >= 65 ? '#F59E0B' : '#EF4444', ...(isPremiumUnlocked ? {} : { filter: 'blur(8px)', userSelect: 'none' as const }) }}>
                   {data.noc_analysis.match_score}%
                 </div>
               </div>
@@ -512,7 +512,11 @@ export const Dashboard: FC<DashboardProps> = ({ data, onReset, onUpdate }) => {
                           <h4 style={{ fontSize: '0.85rem', fontWeight: 'bold', marginBottom: '8px', color: 'var(--text-muted)' }}>ALTERNATIVE NOC CODES:</h4>
                           <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginBottom: '12px' }}>Want to apply under one of these instead? Click a NOC below to run the audit against it.</p>
                           <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                            {data.noc_analysis.alternative_nocs.map((alt, i) => (
+                            {data.noc_analysis.alternative_nocs.map((alt, i) => {
+                              const label = alt.match_score >= 80 ? 'Strong Match' : alt.match_score >= 70 ? 'Good Match' : 'Moderate Match';
+                              const labelColor = alt.match_score >= 80 ? '#059669' : alt.match_score >= 70 ? '#D97706' : '#9CA3AF';
+                              const labelBg = alt.match_score >= 80 ? '#ECFDF5' : alt.match_score >= 70 ? '#FFFBEB' : '#F9FAFB';
+                              return (
                               <div 
                                 key={i} 
                                 onClick={() => handleReevaluate(alt.noc_code)}
@@ -522,7 +526,7 @@ export const Dashboard: FC<DashboardProps> = ({ data, onReset, onUpdate }) => {
                                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: alt.explanation ? '8px' : '0' }}>
                                   <div style={{ fontWeight: 600, fontSize: '0.95rem' }}>NOC {alt.noc_code} — {alt.noc_title}</div>
                                   <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                                    <div style={{ fontWeight: 700, color: alt.match_score >= 80 ? '#059669' : '#D97706', fontSize: '0.9rem' }}>{alt.match_score}% Match</div>
+                                    <span style={{ fontWeight: 600, color: labelColor, fontSize: '0.8rem', background: labelBg, padding: '4px 10px', borderRadius: '6px' }}>{label}</span>
                                     {onUpdate && (
                                       <span style={{ fontSize: '0.8rem', color: 'var(--primary-color)', fontWeight: 600 }} className="target-btn">Re-evaluate →</span>
                                     )}
@@ -532,7 +536,8 @@ export const Dashboard: FC<DashboardProps> = ({ data, onReset, onUpdate }) => {
                                   <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', lineHeight: 1.5, margin: 0 }}>{alt.explanation}</p>
                                 )}
                               </div>
-                            ))}
+                              );
+                            })}
                           </div>
                         </div>
                       )}
