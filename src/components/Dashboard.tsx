@@ -160,76 +160,60 @@ export const Dashboard: FC<DashboardProps> = ({ data, onReset, onUpdate }) => {
   }, [isSignedIn, data, getToken]);
 
   const handleDownloadFull = async () => {
-    const originalWidth = fullTargetRef.current?.style.width || '';
-    const originalMaxWidth = fullTargetRef.current?.style.maxWidth || '';
-    const originalAnimation = fullTargetRef.current?.style.animation || '';
-    const originalOpacity = fullTargetRef.current?.style.opacity || '';
-    const originalTransform = fullTargetRef.current?.style.transform || '';
+    if (!fullTargetRef.current) return;
+    const el = fullTargetRef.current;
+    const origWidth = el.style.width;
+    const origMaxWidth = el.style.maxWidth;
 
-    if (fullTargetRef.current) {
-       fullTargetRef.current.style.width = '1024px';
-       fullTargetRef.current.style.maxWidth = '1024px';
-       fullTargetRef.current.style.animation = 'none';
-       fullTargetRef.current.style.opacity = '1';
-       fullTargetRef.current.style.transform = 'translateY(0)';
-    }
+    // Apply pdf-capture-mode to force full opacity, no animations/blur
+    el.classList.add('pdf-capture-mode');
+    el.style.width = '1024px';
+    el.style.maxWidth = '1024px';
 
     // Force layout recalculation before measurement
     await new Promise(resolve => setTimeout(resolve, 50));
 
-    if (fullTargetRef.current && breakSpacerRef.current) {
-      const fullBounds = fullTargetRef.current.getBoundingClientRect();
+    if (breakSpacerRef.current) {
+      const fullBounds = el.getBoundingClientRect();
       const spacerBounds = breakSpacerRef.current.getBoundingClientRect();
       const offset = spacerBounds.top - fullBounds.top;
-      
-      const width = fullTargetRef.current.clientWidth;
-      const pageHeight = width * (267 / 180); 
-      
+      const width = el.clientWidth;
+      const pageHeight = width * (267 / 180);
       const remainder = offset % pageHeight;
-      const paddingNeeded = pageHeight - remainder + 2; 
-      
+      const paddingNeeded = pageHeight - remainder + 2;
       breakSpacerRef.current.style.height = `${paddingNeeded}px`;
     }
-    
+
     await new Promise(resolve => setTimeout(resolve, 100));
     toFullPDF();
-    
+
     setTimeout(() => {
       if (breakSpacerRef.current) breakSpacerRef.current.style.height = '0px';
-      if (fullTargetRef.current) {
-        fullTargetRef.current.style.width = originalWidth;
-        fullTargetRef.current.style.maxWidth = originalMaxWidth;
-        fullTargetRef.current.style.animation = originalAnimation;
-        fullTargetRef.current.style.opacity = originalOpacity;
-        fullTargetRef.current.style.transform = originalTransform;
-      }
+      el.classList.remove('pdf-capture-mode');
+      el.style.width = origWidth;
+      el.style.maxWidth = origMaxWidth;
     }, 500);
   };
 
   const handleDownloadNoc = async () => {
     if (!nocTargetRef.current) return;
-    const originalWidth = nocTargetRef.current.style.width;
-    const originalMaxWidth = nocTargetRef.current.style.maxWidth;
-    const originalAnimation = nocTargetRef.current.style.animation;
-    const originalOpacity = nocTargetRef.current.style.opacity;
-    const originalTransform = nocTargetRef.current.style.transform;
-    
-    nocTargetRef.current.style.width = '800px';
-    nocTargetRef.current.style.maxWidth = '800px';
-    nocTargetRef.current.style.animation = 'none';
-    nocTargetRef.current.style.opacity = '1';
-    nocTargetRef.current.style.transform = 'translateY(0)';
-    
+    const el = nocTargetRef.current;
+    const origWidth = el.style.width;
+    const origMaxWidth = el.style.maxWidth;
+
+    // Apply pdf-capture-mode to force full opacity, no animations/blur
+    el.classList.add('pdf-capture-mode');
+    el.style.width = '800px';
+    el.style.maxWidth = '800px';
+
     await new Promise(resolve => setTimeout(resolve, 100));
     toNocPDF();
-    
+
     setTimeout(() => {
       if (nocTargetRef.current) {
-        nocTargetRef.current.style.width = originalWidth;
-        nocTargetRef.current.style.maxWidth = originalMaxWidth;
-        nocTargetRef.current.style.animation = originalAnimation;
-        nocTargetRef.current.style.opacity = originalOpacity;
-        nocTargetRef.current.style.transform = originalTransform;
+        el.classList.remove('pdf-capture-mode');
+        el.style.width = origWidth;
+        el.style.maxWidth = origMaxWidth;
       }
     }, 500);
   };
@@ -457,6 +441,36 @@ export const Dashboard: FC<DashboardProps> = ({ data, onReset, onUpdate }) => {
                 </div>
               </div>
             </div>
+
+            {/* Location of Experience — CEC eligibility note */}
+            {data.noc_analysis.location_of_experience && (
+              <div style={{ 
+                marginBottom: '20px', 
+                padding: '14px 18px', 
+                borderRadius: '10px', 
+                border: '1px solid',
+                borderColor: data.noc_analysis.location_of_experience === 'canada' ? '#86EFAC' : '#FDE68A',
+                background: data.noc_analysis.location_of_experience === 'canada' ? '#F0FDF4' : '#FFFBEB',
+                display: 'flex',
+                alignItems: 'flex-start',
+                gap: '10px',
+                fontSize: '0.9rem',
+                lineHeight: 1.5
+              }}>
+                <span style={{ fontSize: '1.1rem', flexShrink: 0 }}>
+                  {data.noc_analysis.location_of_experience === 'canada' ? '🇨🇦' : data.noc_analysis.location_of_experience === 'outside_canada' ? '🌍' : 'ℹ️'}
+                </span>
+                <div>
+                  {data.noc_analysis.location_of_experience === 'canada' ? (
+                    <><strong style={{ color: '#166534' }}>Canadian Experience Detected.</strong> This work experience appears to have been gained in Canada and may qualify under the <strong>Canadian Experience Class (CEC)</strong> stream of Express Entry.</>
+                  ) : data.noc_analysis.location_of_experience === 'outside_canada' ? (
+                    <><strong style={{ color: '#92400E' }}>Foreign Experience Detected.</strong> This work experience appears to have been gained outside Canada. While it does <strong>not</strong> qualify under Canadian Experience Class (CEC), it may still be used for <strong>Federal Skilled Worker (FSW)</strong> or <strong>Provincial Nominee Programs (PNP)</strong>.</>
+                  ) : (
+                    <><strong>Location Unclear.</strong> We could not determine whether this experience was gained in Canada or abroad. If this is Canadian experience, ensure the employer's Canadian address is clearly stated on the letter.</>
+                  )}
+                </div>
+              </div>
+            )}
 
             {/* Highest priority risk — always visible as teaser */}
             {!isPremiumUnlocked && data.risk_assessment.key_risks.length > 0 && (
