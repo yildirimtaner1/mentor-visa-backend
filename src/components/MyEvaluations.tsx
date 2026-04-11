@@ -58,7 +58,7 @@ export const MyEvaluations: FC<MyEvaluationsProps> = ({ onSelectEvaluation }) =>
               onMouseLeave={(e) => e.currentTarget.style.borderColor = 'var(--border-color)'}
             >
               <div>
-                <div style={{ fontWeight: 'bold', fontSize: '1.1rem', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <div style={{ fontWeight: 'bold', fontSize: '1.1rem', display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
                     {ev.is_premium_unlocked ? <span title="Premium Unlocked">🔓</span> : <span title="Premium Locked">🔒</span>}
                     
                     {ev.document_type === "NOC Finder Query" ? (
@@ -67,10 +67,20 @@ export const MyEvaluations: FC<MyEvaluationsProps> = ({ onSelectEvaluation }) =>
                       <span style={{ fontSize: '0.8rem', background: '#f3e8ff', color: '#6b21a8', padding: '2px 8px', borderRadius: '12px', fontWeight: 600 }}>📄 Letter Audit</span>
                     )}
 
+                    {/* Show reevaluation badge if this was a targeted reevaluation */}
+                    {ev.payload?.reevaluated_against_noc && (
+                      <span style={{ fontSize: '0.75rem', background: '#FEF3C7', color: '#92400E', padding: '2px 8px', borderRadius: '12px', fontWeight: 600 }}>🔄 vs NOC {ev.payload.reevaluated_against_noc}</span>
+                    )}
+
                     {`${ev.role_name && ev.role_name !== 'Unknown Role' ? ev.role_name : 'Unknown Role'} - ${ev.company_name && ev.company_name !== 'N/A' ? ev.company_name : 'Unknown Company'}`}
                 </div>
-                <div style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginTop: '4px' }}>
-                  Analyzed on: {new Date(ev.timestamp).toLocaleDateString()} at {new Date(ev.timestamp).toLocaleTimeString()}
+                <div style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginTop: '4px', display: 'flex', gap: '12px', alignItems: 'center' }}>
+                  <span>Analyzed on: {new Date(ev.timestamp).toLocaleDateString()} at {new Date(ev.timestamp).toLocaleTimeString()}</span>
+                  {ev.payload?.noc_analysis?.detected_code && (
+                    <span style={{ fontSize: '0.75rem', color: '#4B5563', background: '#F3F4F6', padding: '2px 6px', borderRadius: '4px' }}>
+                      NOC {ev.payload.noc_analysis.detected_code}
+                    </span>
+                  )}
                 </div>
               </div>
               <div>

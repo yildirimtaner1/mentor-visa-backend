@@ -97,12 +97,16 @@ export const Dashboard: FC<DashboardProps> = ({ data, onReset, onUpdate }) => {
 
   const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
 
+  // The actual uploaded file's ID. For reevaluations, stored_file_id is unique per run,
+  // but original_file_id references the real uploaded document.
+  const originalFileId = (data as any).original_file_id || data.stored_file_id;
+
   const handleDownloadOriginal = async () => {
-    if (!data.stored_file_id) return;
+    if (!originalFileId) return;
     try {
       const token = await getToken();
       if (!token) return;
-      const response = await fetch(`${API_BASE_URL}/api/v1/documents/${data.stored_file_id}`, {
+      const response = await fetch(`${API_BASE_URL}/api/v1/documents/${originalFileId}`, {
         headers: { 'Authorization': `Bearer ${token}` }
       });
       if (!response.ok) throw new Error('Download failed');
@@ -121,14 +125,14 @@ export const Dashboard: FC<DashboardProps> = ({ data, onReset, onUpdate }) => {
   };
 
   const handleReevaluate = async (targetNoc: string) => {
-    if (!data.stored_file_id || !onUpdate) {
+    if (!originalFileId || !onUpdate) {
         alert("Cannot re-evaluate right now. Please re-upload your document.");
         return;
     }
     const tk = await getToken();
     try {
         setIsReevaluating(targetNoc);
-        const newResult = await reevaluateDocument(data.stored_file_id, targetNoc, tk || '');
+        const newResult = await reevaluateDocument(originalFileId, targetNoc, tk || '');
         onUpdate(newResult);
         window.scrollTo({ top: 0, behavior: 'smooth' });
     } catch (e: any) {
