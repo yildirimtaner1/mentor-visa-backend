@@ -408,7 +408,7 @@ export const Dashboard: FC<DashboardProps> = ({ data, onReset, onUpdate }) => {
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '12px', marginBottom: '20px' }}>
               <div style={{ padding: '16px', background: '#F8FAFC', borderRadius: '10px', border: '1px solid var(--border-color)' }}>
                 <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '4px' }}>Duties Match Strength</div>
-                <div style={{ fontSize: '1.3rem', fontWeight: 700, color: data.noc_analysis.match_score >= 80 ? '#059669' : data.noc_analysis.match_score >= 70 ? '#D97706' : '#EF4444' }}>
+                <div style={{ fontSize: '1.3rem', fontWeight: 700, color: data.noc_analysis.match_score >= 80 ? '#059669' : data.noc_analysis.match_score >= 70 ? '#D97706' : '#EF4444', ...(isPremiumUnlocked ? {} : { filter: 'blur(6px)', userSelect: 'none' as const }) }}>
                   {data.noc_analysis.match_score >= 80 ? 'Strong Match' : data.noc_analysis.match_score >= 70 ? 'Good Match' : 'Moderate Match'}
                 </div>
               </div>

@@ -67,10 +67,7 @@ export const MyEvaluations: FC<MyEvaluationsProps> = ({ onSelectEvaluation }) =>
                       <span style={{ fontSize: '0.8rem', background: '#f3e8ff', color: '#6b21a8', padding: '2px 8px', borderRadius: '12px', fontWeight: 600 }}>📄 Letter Audit</span>
                     )}
 
-                    {ev.role_name !== 'Unknown Role' && ev.company_name !== 'Unknown Company' && ev.company_name !== 'N/A' 
-                      ? `${ev.role_name} - ${ev.company_name}` 
-                      : ev.role_name && ev.company_name === 'N/A' ? ev.role_name 
-                      : ev.document_type}
+                    {`${ev.role_name && ev.role_name !== 'Unknown Role' ? ev.role_name : 'Unknown Role'} - ${ev.company_name && ev.company_name !== 'N/A' ? ev.company_name : 'Unknown Company'}`}
                 </div>
                 <div style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginTop: '4px' }}>
                   Analyzed on: {new Date(ev.timestamp).toLocaleDateString()} at {new Date(ev.timestamp).toLocaleTimeString()}

@@ -142,8 +142,18 @@ function App() {
         
         if (typeof rawData.noc_code === 'string') {
           // Payload is already flattened NOCResult from frontend autosave
+          // Normalize matched_duties — old records may have strings instead of objects
+          let normalizedDuties = rawData.matched_duties || [];
+          if (normalizedDuties.length > 0 && typeof normalizedDuties[0] === 'string') {
+            normalizedDuties = normalizedDuties.map((s: string) => ({
+              applicant_duty: s,
+              official_noc_duty: '',
+              overlap_description: ''
+            }));
+          }
           nocResult = {
             ...rawData,
+            matched_duties: normalizedDuties,
             stored_file_id: rawData.stored_file_id || ev.stored_file_id,
             is_premium_unlocked: rawData.is_premium_unlocked || ev.is_premium_unlocked
           };
@@ -152,8 +162,12 @@ function App() {
           const ana = rawData.noc_analysis || {};
           const teer = ana.detected_code ? ana.detected_code.charAt(1) : '';
           const cec = ['0', '1', '2', '3'].includes(teer);
-          const dutiesStrList = ana.duties_match 
-            ? ana.duties_match.map((d: any) => `• ${d.applicant_duty} → NOC: ${d.official_noc_duty} (${d.overlap_description})`)
+          const dutiesList = ana.duties_match 
+            ? ana.duties_match.map((d: any) => ({
+                applicant_duty: d.applicant_duty || '',
+                official_noc_duty: d.official_noc_duty || '',
+                overlap_description: d.overlap_description || ''
+              }))
             : [];
             
           nocResult = {
@@ -165,7 +179,7 @@ function App() {
             match_score: ana.match_score || 0,
             alternative_nocs: ana.alternative_nocs || [],
             explanation: ana.notes || '',
-            matched_duties: dutiesStrList,
+            matched_duties: dutiesList,
             cec_eligible: cec,
             location_of_experience: ana.location_of_experience || 'unknown',
             stored_file_id: rawData.stored_file_id || ev.stored_file_id,
