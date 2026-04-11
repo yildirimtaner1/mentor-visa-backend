@@ -1,7 +1,7 @@
 import { type FC, useEffect, useState, useRef } from 'react';
 import { useUser, SignInButton, useAuth } from '@clerk/clerk-react';
 import { usePDF } from 'react-to-pdf';
-import type { AnalysisResponse, Risk } from '../types';
+import type { AnalysisResponse, KeyRisk } from '../types';
 import { reevaluateDocument, fetchUserCredits, createCheckoutSession, consumeCreditToUnlock } from '../services/api';
 
 interface DashboardProps {
@@ -162,10 +162,16 @@ export const Dashboard: FC<DashboardProps> = ({ data, onReset, onUpdate }) => {
   const handleDownloadFull = async () => {
     const originalWidth = fullTargetRef.current?.style.width || '';
     const originalMaxWidth = fullTargetRef.current?.style.maxWidth || '';
+    const originalAnimation = fullTargetRef.current?.style.animation || '';
+    const originalOpacity = fullTargetRef.current?.style.opacity || '';
+    const originalTransform = fullTargetRef.current?.style.transform || '';
 
     if (fullTargetRef.current) {
        fullTargetRef.current.style.width = '1024px';
        fullTargetRef.current.style.maxWidth = '1024px';
+       fullTargetRef.current.style.animation = 'none';
+       fullTargetRef.current.style.opacity = '1';
+       fullTargetRef.current.style.transform = 'translateY(0)';
     }
 
     // Force layout recalculation before measurement
@@ -177,26 +183,25 @@ export const Dashboard: FC<DashboardProps> = ({ data, onReset, onUpdate }) => {
       const offset = spacerBounds.top - fullBounds.top;
       
       const width = fullTargetRef.current.clientWidth;
-      // react-to-pdf uses A4 (210x297mm). With 15mm margin, printable is 180x267mm.
       const pageHeight = width * (267 / 180); 
       
       const remainder = offset % pageHeight;
-      // Add a small 2px overflow to guarantee it breaks exactly onto the next page
       const paddingNeeded = pageHeight - remainder + 2; 
       
       breakSpacerRef.current.style.height = `${paddingNeeded}px`;
     }
     
-    // Yield to browser to paint new layout
     await new Promise(resolve => setTimeout(resolve, 100));
     toFullPDF();
     
-    // Clean up
     setTimeout(() => {
       if (breakSpacerRef.current) breakSpacerRef.current.style.height = '0px';
       if (fullTargetRef.current) {
         fullTargetRef.current.style.width = originalWidth;
         fullTargetRef.current.style.maxWidth = originalMaxWidth;
+        fullTargetRef.current.style.animation = originalAnimation;
+        fullTargetRef.current.style.opacity = originalOpacity;
+        fullTargetRef.current.style.transform = originalTransform;
       }
     }, 500);
   };
@@ -205,9 +210,15 @@ export const Dashboard: FC<DashboardProps> = ({ data, onReset, onUpdate }) => {
     if (!nocTargetRef.current) return;
     const originalWidth = nocTargetRef.current.style.width;
     const originalMaxWidth = nocTargetRef.current.style.maxWidth;
+    const originalAnimation = nocTargetRef.current.style.animation;
+    const originalOpacity = nocTargetRef.current.style.opacity;
+    const originalTransform = nocTargetRef.current.style.transform;
     
-    nocTargetRef.current.style.width = '1024px';
-    nocTargetRef.current.style.maxWidth = '1024px';
+    nocTargetRef.current.style.width = '800px';
+    nocTargetRef.current.style.maxWidth = '800px';
+    nocTargetRef.current.style.animation = 'none';
+    nocTargetRef.current.style.opacity = '1';
+    nocTargetRef.current.style.transform = 'translateY(0)';
     
     await new Promise(resolve => setTimeout(resolve, 100));
     toNocPDF();
@@ -216,6 +227,9 @@ export const Dashboard: FC<DashboardProps> = ({ data, onReset, onUpdate }) => {
       if (nocTargetRef.current) {
         nocTargetRef.current.style.width = originalWidth;
         nocTargetRef.current.style.maxWidth = originalMaxWidth;
+        nocTargetRef.current.style.animation = originalAnimation;
+        nocTargetRef.current.style.opacity = originalOpacity;
+        nocTargetRef.current.style.transform = originalTransform;
       }
     }, 500);
   };
@@ -225,9 +239,6 @@ export const Dashboard: FC<DashboardProps> = ({ data, onReset, onUpdate }) => {
       const pending = sessionStorage.getItem('pendingPdfDownload');
       if (pending) {
         sessionStorage.removeItem('pendingPdfDownload');
-        
-        // The main auth hook already handled saving the evaluation.
-
         if (pending === 'noc') {
           setTimeout(() => handleDownloadNoc(), 1000);
         } else {
@@ -251,6 +262,28 @@ export const Dashboard: FC<DashboardProps> = ({ data, onReset, onUpdate }) => {
     return () => window.removeEventListener('scroll', handleScroll);
   }, [toastDismissed]);
 
+  // ── Helper: Decision styling ──
+  const decisionConfig = {
+    ACCEPT: { icon: '✅', label: 'Likely Accepted', color: '#059669', bg: '#ECFDF5', border: '#10B981' },
+    PFL_RISK: { icon: '⚠️', label: 'PFL Risk', color: '#D97706', bg: '#FFFBEB', border: '#F59E0B' },
+    REFUSE: { icon: '❌', label: 'Likely Refused', color: '#DC2626', bg: '#FEF2F2', border: '#EF4444' },
+  };
+  const dc = decisionConfig[data.decision] || decisionConfig.REFUSE;
+
+  // ── Helper: Match strength colors ──
+  const strengthColor = (s: string) => {
+    if (s === 'strong') return '#059669';
+    if (s === 'partial') return '#D97706';
+    if (s === 'weak') return '#EA580C';
+    return '#DC2626'; // missing
+  };
+  const strengthBg = (s: string) => {
+    if (s === 'strong') return '#ECFDF5';
+    if (s === 'partial') return '#FFFBEB';
+    if (s === 'weak') return '#FFF7ED';
+    return '#FEF2F2';
+  };
+
   if (isReevaluating) {
     return (
       <div style={{ maxWidth: '900px', margin: '40px auto', padding: '40px', background: 'white', borderRadius: '12px', boxShadow: '0 4px 24px rgba(0,0,0,0.06)', textAlign: 'center' }}>
@@ -267,7 +300,15 @@ export const Dashboard: FC<DashboardProps> = ({ data, onReset, onUpdate }) => {
     return (
       <div style={{ maxWidth: '600px', margin: '40px auto', padding: '40px', background: '#FEF2F2', borderRadius: '12px', textAlign: 'center', border: '1px solid #FCA5A5' }}>
         <h2 style={{ fontSize: '1.5rem', fontWeight: 700, color: '#991b1b', marginBottom: '12px' }}>Document Validation Failed</h2>
-        <p style={{ color: '#7f1d1d' }}>{data?.summary || 'We could not process this document.'}</p>
+        <p style={{ color: '#7f1d1d' }}>{data?.officer_narrative || 'We could not process this document.'}</p>
+        {data?.refusal_reasons && data.refusal_reasons.length > 0 && (
+          <div style={{ textAlign: 'left', marginTop: '16px', padding: '16px', background: 'white', borderRadius: '8px', border: '1px solid #FCA5A5' }}>
+            <p style={{ fontWeight: 700, color: '#991b1b', marginBottom: '8px', fontSize: '0.9rem' }}>Reasons:</p>
+            <ul style={{ paddingLeft: '20px', color: '#7f1d1d', fontSize: '0.9rem' }}>
+              {data.refusal_reasons.map((r, i) => <li key={i} style={{ marginBottom: '6px' }}>{r}</li>)}
+            </ul>
+          </div>
+        )}
         <button className="btn" style={{ marginTop: '20px', background: '#dc2626', borderColor: '#dc2626' }} onClick={onReset}>Try Another Document</button>
       </div>
     );
@@ -356,27 +397,14 @@ export const Dashboard: FC<DashboardProps> = ({ data, onReset, onUpdate }) => {
             padding: '24px',
             borderRadius: '12px'
           }}>
-            <p style={{ marginTop: 0 }}><strong>Why this happened:</strong></p>
-            <p>{data.summary}</p>
-            
-            {data.risks.length > 0 && (
-              <div style={{ marginTop: '20px' }}>
-                <p style={{ fontWeight: 'bold', marginBottom: '8px' }}>Action Required:</p>
-                <div className="risk-item high" style={{ background: 'white', border: '1px solid #ef4444' }}>
-                  <div className="risk-title">{data.risks[0].issue}</div>
-                  <div className="risk-impact">{data.risks[0].recommendation}</div>
-                </div>
-              </div>
-            )}
+            <p style={{ marginTop: 0 }}><strong>Officer's Assessment:</strong></p>
+            <p>{data.officer_narrative}</p>
           </div>
           
           <div style={{ marginTop: '32px' }}>
             <button className="btn btn-primary btn-lg" onClick={onReset} style={{ padding: '12px 32px' }}>
               Upload Correct Document
             </button>
-            <p style={{ fontSize: '0.85rem', color: '#92400E', marginTop: '16px' }}>
-              Only official employment/reference letters with job duties can be audited.
-            </p>
           </div>
         </div>
       ) : (
@@ -386,60 +414,66 @@ export const Dashboard: FC<DashboardProps> = ({ data, onReset, onUpdate }) => {
               Employment Letter Audit Complete
             </h3>
               
+            {/* Decision Badge */}
             <div className="result-card-header" style={{ marginBottom: '24px' }}>
               <div className="result-card-icon" style={{ 
-                background: data.final_verdict === 'ready' ? '#10B981' : data.final_verdict === 'revise_minor' ? '#F59E0B' : '#EF4444',
-                boxShadow: data.final_verdict === 'ready' ? '0 4px 12px rgba(16, 185, 129, 0.3)' : '0 4px 12px rgba(245, 158, 11, 0.3)'
+                background: dc.color,
+                boxShadow: `0 4px 12px ${dc.color}40`
               }}>
-                {data.final_verdict === 'ready' ? '✅' : data.final_verdict === 'revise_minor' ? '⚠️' : '❌'}
+                {dc.icon}
               </div>
               <div>
-                <div className="result-card-title">
-                  {data.final_verdict === 'ready' ? 'Ready to Submit' : 
-                   data.final_verdict === 'revise_minor' ? 'Minor Revisions Recommended' : 
-                   'Major Issues Found'}
-                </div>
+                <div className="result-card-title">{dc.label}</div>
                 <div className="result-card-subtitle" style={{ color: '#4B5563', fontSize: '1.05rem', marginTop: '4px' }}>
                   Target: NOC {data.noc_analysis.detected_code} — {data.noc_analysis.detected_title}
                 </div>
               </div>
             </div>
 
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '12px', marginBottom: '20px' }}>
+            {/* Stat Grid — 4 cards, always visible */}
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: '12px', marginBottom: '20px' }}>
               <div style={{ padding: '16px', background: '#F8FAFC', borderRadius: '10px', border: '1px solid var(--border-color)' }}>
-                <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '4px' }}>Duties Match Strength</div>
-                <div style={{ fontSize: '1.3rem', fontWeight: 700, color: data.noc_analysis.match_score >= 80 ? '#059669' : data.noc_analysis.match_score >= 70 ? '#D97706' : '#EF4444', ...(isPremiumUnlocked ? {} : { filter: 'blur(6px)', userSelect: 'none' as const }) }}>
-                  {data.noc_analysis.match_score >= 80 ? 'Strong Match' : data.noc_analysis.match_score >= 70 ? 'Good Match' : 'Moderate Match'}
+                <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '4px' }}>Duty Coverage</div>
+                <div style={{ fontSize: '1.5rem', fontWeight: 700, color: data.noc_analysis.duty_coverage_percentage >= 75 ? '#059669' : data.noc_analysis.duty_coverage_percentage >= 50 ? '#D97706' : '#EF4444' }}>
+                  {data.noc_analysis.duty_coverage_percentage}%
                 </div>
               </div>
-              <div style={{ padding: '16px', background: 'white', borderRadius: '10px', border: '1px solid var(--border-color)' }}>
-                <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '4px' }}>TEER Category</div>
-                <div style={{ fontSize: '1.3rem', fontWeight: 700, color: '#374151' }}>
-                  {data.noc_analysis.detected_code ? data.noc_analysis.detected_code.charAt(1) : 'Unknown'}
+              <div style={{ padding: '16px', background: '#F8FAFC', borderRadius: '10px', border: '1px solid var(--border-color)' }}>
+                <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '4px' }}>Compliance Score</div>
+                <div style={{ fontSize: '1.5rem', fontWeight: 700, color: data.compliance.score >= 88 ? '#059669' : data.compliance.score >= 63 ? '#D97706' : '#EF4444' }}>
+                  {data.compliance.score}%
                 </div>
               </div>
-              <div style={{ padding: '16px', background: 'white', borderRadius: '10px', border: '1px solid var(--border-color)' }}>
-                <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '4px' }}>Format Compliance</div>
-                <div style={{ fontSize: '1.3rem', fontWeight: 700, color: data.compliance_status === 'compliant' ? '#10B981' : data.compliance_status === 'risk' ? '#F59E0B' : '#EF4444' }}>
-                  {data.compliance_status === 'compliant' ? 'Pass' : data.compliance_status === 'risk' ? 'Warning' : 'Fail'}
+              <div style={{ padding: '16px', background: '#F8FAFC', borderRadius: '10px', border: '1px solid var(--border-color)' }}>
+                <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '4px' }}>NOC Confidence</div>
+                <div style={{ fontSize: '1.5rem', fontWeight: 700, color: '#374151' }}>
+                  {data.noc_analysis.confidence}%
+                </div>
+              </div>
+              <div style={{ padding: '16px', background: '#F8FAFC', borderRadius: '10px', border: '1px solid var(--border-color)' }}>
+                <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '4px' }}>PFL Likelihood</div>
+                <div style={{ fontSize: '1.5rem', fontWeight: 700, color: data.risk_assessment.pfl_likelihood === 'low' ? '#059669' : data.risk_assessment.pfl_likelihood === 'medium' ? '#D97706' : '#EF4444' }}>
+                  {data.risk_assessment.pfl_likelihood.charAt(0).toUpperCase() + data.risk_assessment.pfl_likelihood.slice(1)}
                 </div>
               </div>
             </div>
 
-            {!isPremiumUnlocked && data.risks.length > 0 && (
+            {/* Highest priority risk — always visible as teaser */}
+            {!isPremiumUnlocked && data.risk_assessment.key_risks.length > 0 && (
               <div style={{ marginBottom: '20px', padding: '16px', background: '#FEF2F2', border: '1px solid #FCA5A5', borderRadius: '10px' }}>
                 <div style={{ fontSize: '0.75rem', color: '#B91C1C', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '6px', fontWeight: 700 }}>
                   ⚠️ Priority Risk Identified
                 </div>
                 <div style={{ fontSize: '1.05rem', fontWeight: 700, color: '#991B1B', marginBottom: '8px' }}>
-                  {data.risks[0].issue}
+                  {data.risk_assessment.key_risks[0].issue}
                 </div>
                 <div style={{ fontSize: '0.9rem', color: '#7F1D1D' }}>
-                  <strong style={{ opacity: 0.8 }}>Impact:</strong> {data.risks[0].impact}
+                  <strong style={{ opacity: 0.8 }}>Impact:</strong> {data.risk_assessment.key_risks[0].impact}
                 </div>
               </div>
             )}
 
+            {/* Officer Narrative — always visible */}
             <div style={{ 
               padding: '16px 20px', 
               background: 'white', 
@@ -450,12 +484,12 @@ export const Dashboard: FC<DashboardProps> = ({ data, onReset, onUpdate }) => {
               lineHeight: 1.6
             }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '12px', fontWeight: 700, color: '#111827' }}>
-                <span style={{ fontSize: '1.1rem' }}>📝</span>
-                Actionable Summary
-                {!isPremiumUnlocked && <span style={{ fontSize: '0.75rem', fontWeight: 600, color: '#6B7280', background: '#F3F4F6', padding: '4px 8px', borderRadius: '6px', marginLeft: 'auto' }}>🔒 Locked</span>}
+                <span style={{ fontSize: '1.1rem' }}>🏛️</span>
+                Officer's Assessment
+                {!isPremiumUnlocked && <span style={{ fontSize: '0.75rem', fontWeight: 600, color: '#6B7280', background: '#F3F4F6', padding: '4px 8px', borderRadius: '6px', marginLeft: 'auto' }}>Preview</span>}
               </div>
-              <div style={!isPremiumUnlocked ? { filter: 'blur(5px)', userSelect: 'none', pointerEvents: 'none', opacity: 0.8 } : {}}>
-                {data.summary}
+              <div style={!isPremiumUnlocked ? { filter: 'blur(4px)', userSelect: 'none', pointerEvents: 'none' } : {}}>
+                {data.officer_narrative}
               </div>
             </div>
 
@@ -464,19 +498,21 @@ export const Dashboard: FC<DashboardProps> = ({ data, onReset, onUpdate }) => {
               <div style={!isPremiumUnlocked ? { filter: 'blur(8px)', pointerEvents: 'none', userSelect: 'none', opacity: 0.6 } : {}}>
                 <div className="dashboard">
                   <div>
-                    {data.strengths.length > 0 && (
-                      <div className="card">
-                        <h3 className="card-title">✅ Strengths</h3>
+                    {/* Refusal Reasons / PFL Grounds */}
+                    {data.refusal_reasons && data.refusal_reasons.length > 0 && (
+                      <div className="card" style={{ borderLeft: `4px solid ${dc.color}` }}>
+                        <h3 className="card-title">{data.decision === 'REFUSE' ? '❌ Refusal Grounds' : '⚠️ PFL Trigger Points'}</h3>
                         <ul style={{ paddingLeft: '20px', fontSize: '14px' }}>
-                          {data.strengths.map((s, idx) => <li key={idx}>{s}</li>)}
+                          {data.refusal_reasons.map((r, idx) => <li key={idx} style={{ marginBottom: '6px', color: '#991B1B' }}>{r}</li>)}
                         </ul>
                       </div>
                     )}
 
+                    {/* Key Risks */}
                     <div className="card">
-                      <h3 className="card-title">⚠️ Identified Risks ({data.risks.length})</h3>
-                      {data.risks.length === 0 ? <p>No significant risks found in the document.</p> : null}
-                      {data.risks.map((risk: Risk, idx: number) => (
+                      <h3 className="card-title">⚠️ Risk Assessment ({data.risk_assessment.key_risks.length})</h3>
+                      {data.risk_assessment.key_risks.length === 0 ? <p>No significant risks identified.</p> : null}
+                      {data.risk_assessment.key_risks.map((risk: KeyRisk, idx: number) => (
                         <div key={idx} className={`risk-item ${risk.severity === 'high' ? 'high' : ''}`}>
                           <div className="risk-title">{risk.issue}</div>
                           <div className="risk-impact">Impact: {risk.impact}</div>
@@ -485,27 +521,57 @@ export const Dashboard: FC<DashboardProps> = ({ data, onReset, onUpdate }) => {
                       ))}
                     </div>
 
+                    {/* Compliance Details */}
                     <div className="card">
-                      <h3 className="card-title">❌ Missing Elements</h3>
-                      {data.missing_elements.length > 0 ? (
-                        <ul className="missing-elements">
-                          {data.missing_elements.map((item, idx) => (
-                            <li key={idx}>{item}</li>
+                      <h3 className="card-title">📋 Compliance Details</h3>
+                      {data.compliance.missing_elements.length > 0 && (
+                        <div style={{ marginBottom: '12px' }}>
+                          <h4 style={{ fontSize: '0.85rem', fontWeight: 700, color: '#DC2626', marginBottom: '8px' }}>Missing Elements:</h4>
+                          <ul className="missing-elements">
+                            {data.compliance.missing_elements.map((item, idx) => <li key={idx}>{item}</li>)}
+                          </ul>
+                        </div>
+                      )}
+                      {data.compliance.warnings.length > 0 && (
+                        <div>
+                          <h4 style={{ fontSize: '0.85rem', fontWeight: 700, color: '#D97706', marginBottom: '8px' }}>Warnings:</h4>
+                          <ul style={{ paddingLeft: '20px', fontSize: '14px' }}>
+                            {data.compliance.warnings.map((w, idx) => <li key={idx} style={{ marginBottom: '4px' }}>{w}</li>)}
+                          </ul>
+                        </div>
+                      )}
+                      {data.compliance.missing_elements.length === 0 && data.compliance.warnings.length === 0 && (
+                        <p>All compliance elements are present and properly formatted.</p>
+                      )}
+                    </div>
+
+                    {/* Missing Critical Duties */}
+                    {data.noc_analysis.missing_critical_duties && data.noc_analysis.missing_critical_duties.length > 0 && (
+                      <div className="card" style={{ borderLeft: '4px solid #EF4444' }}>
+                        <h3 className="card-title">🚫 Missing Critical NOC Duties</h3>
+                        <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginBottom: '12px' }}>
+                          The following main duties from NOC {data.noc_analysis.detected_code} are NOT demonstrated in the letter:
+                        </p>
+                        <ul style={{ paddingLeft: '20px', fontSize: '14px' }}>
+                          {data.noc_analysis.missing_critical_duties.map((d, idx) => (
+                            <li key={idx} style={{ marginBottom: '6px', color: '#B91C1C' }}>{d}</li>
                           ))}
                         </ul>
-                      ) : <p>All essential elements are present in the document.</p>}
-                    </div>
-                    
+                      </div>
+                    )}
+
+                    {/* Action Plan */}
                     <div className="card">
-                      <h3 className="card-title">🔧 Recommended Fixes</h3>
-                      <ul style={{ paddingLeft: '20px' }}>
-                        {data.recommended_fixes.map((fix, idx) => (
-                          <li key={idx} style={{ marginBottom: '8px' }}>{fix}</li>
+                      <h3 className="card-title">🔧 Action Plan (Priority Order)</h3>
+                      <ol style={{ paddingLeft: '20px' }}>
+                        {data.action_plan.map((fix, idx) => (
+                          <li key={idx} style={{ marginBottom: '10px', fontSize: '0.95rem', lineHeight: 1.5 }}>{fix}</li>
                         ))}
-                      </ul>
+                      </ol>
                     </div>
                   </div>
                   <div>
+                    {/* Alternative NOCs */}
                     <div className="card">
                       {data.noc_analysis.alternative_nocs && data.noc_analysis.alternative_nocs.length > 0 && (
                         <div style={{ background: 'white', borderRadius: '6px', border: '1px dashed var(--border-color)' }}>
@@ -513,9 +579,9 @@ export const Dashboard: FC<DashboardProps> = ({ data, onReset, onUpdate }) => {
                           <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginBottom: '12px' }}>Want to apply under one of these instead? Click a NOC below to run the audit against it.</p>
                           <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
                             {data.noc_analysis.alternative_nocs.map((alt, i) => {
-                              const label = alt.match_score >= 80 ? 'Strong Match' : alt.match_score >= 70 ? 'Good Match' : 'Moderate Match';
-                              const labelColor = alt.match_score >= 80 ? '#059669' : alt.match_score >= 70 ? '#D97706' : '#9CA3AF';
-                              const labelBg = alt.match_score >= 80 ? '#ECFDF5' : alt.match_score >= 70 ? '#FFFBEB' : '#F9FAFB';
+                              const label = alt.match_score >= 75 ? 'Strong Match' : alt.match_score >= 50 ? 'Moderate' : 'Weak';
+                              const labelColor = alt.match_score >= 75 ? '#059669' : alt.match_score >= 50 ? '#D97706' : '#9CA3AF';
+                              const labelBg = alt.match_score >= 75 ? '#ECFDF5' : alt.match_score >= 50 ? '#FFFBEB' : '#F9FAFB';
                               return (
                               <div 
                                 key={i} 
@@ -526,7 +592,7 @@ export const Dashboard: FC<DashboardProps> = ({ data, onReset, onUpdate }) => {
                                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: alt.explanation ? '8px' : '0' }}>
                                   <div style={{ fontWeight: 600, fontSize: '0.95rem' }}>NOC {alt.noc_code} — {alt.noc_title}</div>
                                   <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                                    <span style={{ fontWeight: 600, color: labelColor, fontSize: '0.8rem', background: labelBg, padding: '4px 10px', borderRadius: '6px' }}>{label}</span>
+                                    <span style={{ fontWeight: 600, color: labelColor, fontSize: '0.8rem', background: labelBg, padding: '4px 10px', borderRadius: '6px' }}>{label} ({alt.match_score}%)</span>
                                     {onUpdate && (
                                       <span style={{ fontSize: '0.8rem', color: 'var(--primary-color)', fontWeight: 600 }} className="target-btn">Re-evaluate →</span>
                                     )}
@@ -544,14 +610,18 @@ export const Dashboard: FC<DashboardProps> = ({ data, onReset, onUpdate }) => {
                       <p style={{ fontSize: '0.9rem', color: 'var(--text-muted)', marginTop: '12px' }}>{data.noc_analysis.notes}</p>
                     </div>
 
-                    <div className="card">
-                      <h3 className="card-title">✍️ Suggested Wording</h3>
-                      {data.suggested_wording.map((text, idx) => (
-                        <div key={idx} className="recommendation-box" style={{ fontStyle: 'italic', color: 'var(--primary-dark)' }}>
-                          "{text}"
-                        </div>
-                      ))}
-                    </div>
+                    {/* Suggested Wording */}
+                    {data.suggested_wording && data.suggested_wording.length > 0 && (
+                      <div className="card">
+                        <h3 className="card-title">✍️ Suggested Wording</h3>
+                        <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginBottom: '12px' }}>Give these sample sentences to your employer to strengthen your letter:</p>
+                        {data.suggested_wording.map((text, idx) => (
+                          <div key={idx} className="recommendation-box" style={{ fontStyle: 'italic', color: 'var(--primary-dark)' }}>
+                            "{text}"
+                          </div>
+                        ))}
+                      </div>
+                    )}
                   </div>
                 </div>
               </div> {/* End Blurred Section */}
@@ -564,7 +634,7 @@ export const Dashboard: FC<DashboardProps> = ({ data, onReset, onUpdate }) => {
                     <div style={{ fontSize: '2.5rem', marginBottom: '10px' }}>🔒</div>
                     <h3 style={{ fontSize: '1.4rem', fontWeight: 800, marginBottom: '12px' }}>Premium Audit Locked</h3>
                     <p style={{ color: 'var(--text-muted)', marginBottom: '24px', lineHeight: 1.5 }}>
-                      Unlock detailed risk analysis, missing elements, recommended fixes, alternative NOC mappings, suggested wordings, and the official alignment sheet.
+                      Unlock the full officer assessment, risk analysis, missing duties, compliance details, NOC alignment sheet, and actionable fix plan.
                     </p>
                     
                     {!isSignedIn ? (
@@ -588,6 +658,7 @@ export const Dashboard: FC<DashboardProps> = ({ data, onReset, onUpdate }) => {
               )}
             </div>
 
+            {/* NOC Alignment Sheet (for PDF download — same structure as before) */}
             {data.noc_analysis?.duties_match && data.noc_analysis.duties_match.length > 0 && (
                <div style={!isPremiumUnlocked ? { filter: 'blur(8px)', pointerEvents: 'none', userSelect: 'none', opacity: 0.6 } : {}}>
                  <div ref={breakSpacerRef} style={{ transition: 'height 0.1s ease-in-out' }}></div>
@@ -622,16 +693,31 @@ export const Dashboard: FC<DashboardProps> = ({ data, onReset, onUpdate }) => {
                       <table style={{ width: '100%', borderCollapse: 'collapse', border: '1px solid var(--border-color)' }}>
                         <thead>
                           <tr style={{ backgroundColor: 'var(--bg-color)' }}>
-                            <th style={{ padding: '12px', border: '1px solid var(--border-color)', textAlign: 'left', width: '33%' }}>Official NOC Documented Duty</th>
-                            <th style={{ padding: '12px', border: '1px solid var(--border-color)', textAlign: 'left', width: '33%' }}>Applicant's Duty (from letter)</th>
-                            <th style={{ padding: '12px', border: '1px solid var(--border-color)', textAlign: 'left', width: '33%' }}>Overlap Description</th>
+                            <th style={{ padding: '12px', border: '1px solid var(--border-color)', textAlign: 'left', width: '25%' }}>Official NOC Duty</th>
+                            <th style={{ padding: '12px', border: '1px solid var(--border-color)', textAlign: 'left', width: '25%' }}>Evidence in Letter</th>
+                            <th style={{ padding: '12px', border: '1px solid var(--border-color)', textAlign: 'left', width: '15%' }}>Match</th>
+                            <th style={{ padding: '12px', border: '1px solid var(--border-color)', textAlign: 'left', width: '35%' }}>Analysis</th>
                           </tr>
                         </thead>
                         <tbody>
                           {data.noc_analysis.duties_match.map((duty, idx) => (
                             <tr key={idx}>
-                              <td style={{ padding: '12px', border: '1px solid var(--border-color)', verticalAlign: 'top', color: 'var(--text-muted)', fontSize: '0.95rem' }}>{duty.official_noc_duty}</td>
-                              <td style={{ padding: '12px', border: '1px solid var(--border-color)', verticalAlign: 'top', fontWeight: 500, fontSize: '0.95rem' }}>"{duty.applicant_duty}"</td>
+                              <td style={{ padding: '12px', border: '1px solid var(--border-color)', verticalAlign: 'top', color: 'var(--text-muted)', fontSize: '0.95rem' }}>{duty.noc_duty}</td>
+                              <td style={{ padding: '12px', border: '1px solid var(--border-color)', verticalAlign: 'top', fontWeight: 500, fontSize: '0.95rem' }}>"{duty.letter_evidence}"</td>
+                              <td style={{ padding: '12px', border: '1px solid var(--border-color)', verticalAlign: 'top' }}>
+                                <span style={{ 
+                                  display: 'inline-block', 
+                                  padding: '4px 10px', 
+                                  borderRadius: '6px', 
+                                  fontSize: '0.8rem', 
+                                  fontWeight: 600, 
+                                  color: strengthColor(duty.match_strength), 
+                                  background: strengthBg(duty.match_strength),
+                                  textTransform: 'uppercase'
+                                }}>
+                                  {duty.match_strength}
+                                </span>
+                              </td>
                               <td style={{ padding: '12px', border: '1px solid var(--border-color)', verticalAlign: 'top', color: 'var(--primary-dark)', fontSize: '0.95rem' }}>{duty.overlap_description}</td>
                             </tr>
                           ))}

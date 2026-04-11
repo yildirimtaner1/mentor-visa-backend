@@ -80,8 +80,12 @@ export const MyEvaluations: FC<MyEvaluationsProps> = ({ onSelectEvaluation }) =>
                   <span className="badge" style={{ background: '#EFF6FF', color: '#1D4ED8', border: '1px solid #BFDBFE' }}>NOC Match</span>
                 ) : (
                   <>
+                    {ev.compliance_status === 'ACCEPT' && <span className="badge badge-success">Accepted</span>}
+                    {ev.compliance_status === 'PFL_RISK' && <span className="badge badge-warning">PFL Risk</span>}
+                    {ev.compliance_status === 'REFUSE' && <span className="badge badge-danger">Refused</span>}
+                    {/* Legacy fallback */}
                     {ev.compliance_status === 'compliant' && <span className="badge badge-success">Compliant</span>}
-                    {ev.compliance_status === 'risk' && <span className="badge badge-warning">Risk Match</span>}
+                    {ev.compliance_status === 'risk' && <span className="badge badge-warning">Risk</span>}
                     {ev.compliance_status === 'non_compliant' && <span className="badge badge-danger">Non-Compliant</span>}
                   </>
                 )}

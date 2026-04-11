@@ -1,18 +1,16 @@
-export type ComplianceStatus = 'compliant' | 'risk' | 'non_compliant';
+// ── Decision & Enum Types ──
+export type Decision = 'ACCEPT' | 'PFL_RISK' | 'REFUSE';
+export type MatchStrength = 'strong' | 'partial' | 'weak' | 'missing';
 export type Severity = 'low' | 'medium' | 'high';
-export type MatchLevel = 'high' | 'medium' | 'low';
-export type FinalVerdict = 'ready' | 'revise_minor' | 'revise_major';
+export type RiskLevel = 'low' | 'moderate' | 'high';
+export type PFLLikelihood = 'low' | 'medium' | 'high';
 
-export interface Risk {
-  issue: string;
-  severity: Severity;
-  impact: string;
-  recommendation: string;
-}
+// ── NOC Analysis ──
 
-export interface NocDutyMatch {
-  official_noc_duty: string;
-  applicant_duty: string;
+export interface EvidenceMapping {
+  noc_duty: string;
+  letter_evidence: string;
+  match_strength: MatchStrength;
   overlap_description: string;
 }
 
@@ -28,14 +26,19 @@ export interface NOCAnalysis {
   detected_code: string;
   detected_title: string;
   match_score: number;
+  confidence: number;
   alternative_nocs: AlternativeNOC[];
   notes: string;
   lead_statement_official: string;
   lead_statement_applicant: string;
   lead_statement_overlap: string;
-  duties_match: NocDutyMatch[];
+  duties_match: EvidenceMapping[];
+  missing_critical_duties: string[];
+  duty_coverage_percentage: number;
   location_of_experience: 'canada' | 'outside_canada' | 'unknown';
 }
+
+// ── Compliance ──
 
 export interface MandatoryRequirements {
   company_letterhead: boolean;
@@ -48,21 +51,59 @@ export interface MandatoryRequirements {
   signatory: boolean;
 }
 
+export interface Compliance {
+  score: number;
+  missing_elements: string[];
+  warnings: string[];
+}
+
+// ── Risk Assessment ──
+
+export interface KeyRisk {
+  issue: string;
+  severity: Severity;
+  impact: string;
+  recommendation: string;
+}
+
+export interface RiskAssessment {
+  overall_risk: RiskLevel;
+  pfl_likelihood: PFLLikelihood;
+  key_risks: KeyRisk[];
+}
+
+// ── Main Response ──
+
 export interface AnalysisResponse {
+  // Identity
   document_type: string;
   role_name?: string;
   company_name?: string;
   stored_file_id?: string;
   original_filename?: string;
-  compliance_status: ComplianceStatus;
-  summary: string;
-  strengths: string[];
-  risks: Risk[];
-  missing_elements: string[];
-  recommended_fixes: string[];
-  suggested_wording: string[];
+
+  // Core Decision
+  decision: Decision;
+  confidence_score: number;
+
+  // Officer Assessment
+  officer_narrative: string;
+
+  // NOC Analysis
   noc_analysis: NOCAnalysis;
+
+  // Compliance
+  compliance: Compliance;
   mandatory_requirements: MandatoryRequirements;
-  final_verdict: FinalVerdict;
+
+  // Risk
+  risk_assessment: RiskAssessment;
+
+  // Actionable Outputs
+  refusal_reasons: string[];
+  action_plan: string[];
+  suggested_wording: string[];
+
+  // Premium unlock state (added by backend/frontend)
   is_premium_unlocked?: boolean | number;
 }
