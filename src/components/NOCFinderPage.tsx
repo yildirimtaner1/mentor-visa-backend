@@ -374,11 +374,6 @@ export const NOCFinderPage: FC<NOCFinderPageProps> = ({ onNavigate }) => {
     processInput(file, jobTitle, duties);
   };
 
-  const getScoreColor = (score: number) => {
-    if (score >= 80) return '#059669'; // Green
-    if (score >= 65) return '#D97706'; // Orange
-    return '#DC2626'; // Red
-  };
 
   return (
     <div>
