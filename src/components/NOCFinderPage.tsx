@@ -181,11 +181,12 @@ export const NOCFinderPage: FC<NOCFinderPageProps> = ({ onNavigate }) => {
     }
 
     try {
+      const token = isSignedIn ? (await getToken() || '') : '';
       let rawData;
       if (inputFile) {
-        rawData = await findNOCCode(undefined, undefined, inputFile, targetNoc);
+        rawData = await findNOCCode(undefined, undefined, inputFile, targetNoc, token);
       } else {
-        rawData = await findNOCCode(inputTitle.trim(), inputDuties.trim(), undefined, targetNoc);
+        rawData = await findNOCCode(inputTitle.trim(), inputDuties.trim(), undefined, targetNoc, token);
       }
       
       if (rawData.document_valid && rawData.recommended_noc) {

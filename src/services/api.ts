@@ -69,7 +69,7 @@ export async function getEvaluations(token: string) {
   return response.json();
 }
 
-export async function findNOCCode(jobTitle?: string, dutiesDescription?: string, document?: File, targetNoc?: string) {
+export async function findNOCCode(jobTitle?: string, dutiesDescription?: string, document?: File, targetNoc?: string, token?: string) {
   const formData = new FormData();
   if (document) {
     formData.append('document', document);
@@ -82,8 +82,12 @@ export async function findNOCCode(jobTitle?: string, dutiesDescription?: string,
 
   if (targetNoc) formData.append('target_noc', targetNoc);
 
+  const headers: Record<string, string> = {};
+  if (token) headers['Authorization'] = `Bearer ${token}`;
+
   const response = await fetch(`${API_BASE_URL}/api/v1/noc-finder`, {
     method: 'POST',
+    headers,
     body: formData,
   });
   if (!response.ok) {
