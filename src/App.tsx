@@ -255,11 +255,7 @@ function App() {
           };
         }
         sessionStorage.setItem('nocFinderResult', JSON.stringify(nocResult));
-        navigate('/find-my-noc');
-        
-        // Slight delay to allow navigation to complete before triggering a refresh 
-        // to ensure NOCFinderPage mounts with the newly set sessionStorage
-        setTimeout(() => window.location.reload(), 50);
+        navigate('/find-my-noc', { state: { fromHistory: Date.now() } });
       }
     } else {
       let payload = ev.payload;
@@ -303,7 +299,7 @@ function App() {
       <Route path="/dashboard" element={<AppLayout><MyEvaluations onSelectEvaluation={handleHistorySelection} /></AppLayout>} />
       <Route path="/results" element={
         <AppLayout>
-          {analysisResult ? <Dashboard data={analysisResult} onReset={handleReset} onUpdate={(res) => handleAnalysisResult(res, true)} /> : <div style={{textAlign: 'center', padding: '40px'}}>No result found. <button onClick={() => navigate('/audit-employment-letter')} className="btn btn-primary" style={{marginLeft: '10px'}}>Audit a new letter</button></div>}
+          {analysisResult ? <Dashboard data={analysisResult} onReset={handleReset} onUpdate={(res) => handleAnalysisResult(res, false)} /> : <div style={{textAlign: 'center', padding: '40px'}}>No result found. <button onClick={() => navigate('/audit-employment-letter')} className="btn btn-primary" style={{marginLeft: '10px'}}>Audit a new letter</button></div>}
         </AppLayout>
       } />
     </Routes>

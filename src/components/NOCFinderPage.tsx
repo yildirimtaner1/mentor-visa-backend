@@ -1,5 +1,6 @@
 import { type FC, useState, useRef, useEffect } from 'react';
 import { useUser, SignInButton, useAuth } from '@clerk/clerk-react';
+import { useLocation } from 'react-router-dom';
 import { findNOCCode, reevaluateDocument } from '../services/api';
 import { SEO } from './common/SEO';
 import { DynamicLoader } from './common/DynamicLoader';
@@ -53,6 +54,7 @@ const nocSchema = JSON.stringify({
 export const NOCFinderPage: FC<NOCFinderPageProps> = ({ onNavigate }) => {
   const { isSignedIn } = useUser();
   const { getToken } = useAuth();
+  const location = useLocation();
   const [jobTitle, setJobTitle] = useState('');
   const [duties, setDuties] = useState('');
   const [file, setFile] = useState<File | null>(null);
@@ -63,6 +65,19 @@ export const NOCFinderPage: FC<NOCFinderPageProps> = ({ onNavigate }) => {
     const saved = sessionStorage.getItem('nocFinderResult');
     return saved ? JSON.parse(saved) : null;
   });
+
+  // Re-read from sessionStorage when navigating here from My Evaluations
+  // (replaces the old window.location.reload() hack)
+  useEffect(() => {
+    if ((location.state as any)?.fromHistory) {
+      const saved = sessionStorage.getItem('nocFinderResult');
+      if (saved) {
+        setResult(JSON.parse(saved));
+      }
+      // Clear the state to prevent re-triggering on subsequent renders
+      window.history.replaceState({}, '', window.location.pathname);
+    }
+  }, [(location.state as any)?.fromHistory]);
   const [error, setError] = useState('');
   const [isDragActive, setIsDragActive] = useState(false);
   const [targetNocOverride, setTargetNocOverride] = useState<string | null>(null);
@@ -193,19 +208,7 @@ export const NOCFinderPage: FC<NOCFinderPageProps> = ({ onNavigate }) => {
         const mapped = mapApiResponse(rawData);
         setResult(mapped);
         sessionStorage.setItem('nocFinderResult', JSON.stringify(mapped));
-        // Save to user's account if signed in
-        if (isSignedIn) {
-          getToken().then((token) => {
-            if (token) {
-              const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
-              fetch(`${API_BASE_URL}/api/v1/evaluations`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-                body: JSON.stringify({ ...mapped, evaluation_type: 'noc_finder', document_type: 'NOC Finder Query' })
-              }).catch(console.error);
-            }
-          });
-        }
+        // Backend /api/v1/noc-finder already persists evaluation for signed-in users — no need to double-save
       } else {
         setResult({
           document_valid: false,

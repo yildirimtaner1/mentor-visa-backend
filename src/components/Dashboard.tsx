@@ -27,6 +27,12 @@ export const Dashboard: FC<DashboardProps> = ({ data, onReset, onUpdate }) => {
     !!(data.is_premium_unlocked)
   );
 
+  // Keep isPremiumUnlocked in sync when the parent passes a new result
+  // (e.g. after reevaluation — the backend response includes is_premium_unlocked)
+  useEffect(() => {
+    setIsPremiumUnlocked(!!data.is_premium_unlocked);
+  }, [data.is_premium_unlocked]);
+
   const breakSpacerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
