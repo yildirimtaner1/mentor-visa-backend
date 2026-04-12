@@ -82,27 +82,38 @@ export const NOCFinderPage: FC<NOCFinderPageProps> = ({ onNavigate }) => {
   // Auto-unblur, auto-scroll, and auto-save when the user successfully signs in
   const prevSignedIn = useRef(isSignedIn);
   useEffect(() => {
-    if (!prevSignedIn.current && isSignedIn && result) {
-      // 1. Unblur results immediately
-      const unblurred = { ...result, is_signed_in: true };
-      setResult(unblurred);
-
-      // 2. Auto-scroll to the result card
-      setTimeout(() => {
-        document.getElementById('primary-match-section')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-      }, 300);
-
-      // 3. Save to their account
-      getToken().then((token) => {
-        if (token) {
-          const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
-          fetch(`${API_BASE_URL}/api/v1/evaluations`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-            body: JSON.stringify({ ...unblurred, evaluation_type: 'noc_finder', document_type: 'NOC Finder Query' })
-          }).catch(console.error);
+    if (!prevSignedIn.current && isSignedIn) {
+      // Restore result from sessionStorage if it was lost during sign-in redirect
+      let currentResult = result;
+      if (!currentResult) {
+        const saved = sessionStorage.getItem('nocFinderResult');
+        if (saved) {
+          currentResult = JSON.parse(saved);
         }
-      });
+      }
+      if (currentResult) {
+        // 1. Unblur results immediately
+        const unblurred = { ...currentResult, is_signed_in: true };
+        setResult(unblurred);
+        sessionStorage.setItem('nocFinderResult', JSON.stringify(unblurred));
+
+        // 2. Auto-scroll to the result card
+        setTimeout(() => {
+          document.getElementById('primary-match-section')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }, 300);
+
+        // 3. Save to their account (UPSERT claims anonymous record)
+        getToken().then((token) => {
+          if (token) {
+            const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
+            fetch(`${API_BASE_URL}/api/v1/evaluations`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+              body: JSON.stringify({ ...unblurred, evaluation_type: 'noc_finder', document_type: 'NOC Finder Query' })
+            }).catch(console.error);
+          }
+        });
+      }
     }
     prevSignedIn.current = isSignedIn;
   }, [isSignedIn, result, getToken]);
@@ -180,6 +191,7 @@ export const NOCFinderPage: FC<NOCFinderPageProps> = ({ onNavigate }) => {
       if (rawData.document_valid && rawData.recommended_noc) {
         const mapped = mapApiResponse(rawData);
         setResult(mapped);
+        sessionStorage.setItem('nocFinderResult', JSON.stringify(mapped));
         // Save to user's account if signed in
         if (isSignedIn) {
           getToken().then((token) => {
