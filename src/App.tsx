@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import type { AnalysisResponse } from './types';
 import { GridPattern } from './components/ui/grid-pattern';
 import { cn } from './lib/utils';
@@ -16,7 +16,7 @@ import { PrivacyPolicyPage } from './components/PrivacyPolicyPage';
 import { TermsOfServicePage } from './components/TermsOfServicePage';
 import { RefundPolicyPage } from './components/RefundPolicyPage';
 import { useAuth, UserButton } from '@clerk/clerk-react';
-import { saveEvaluation } from './services/api';
+import { saveEvaluation, cancelPaymentEvent } from './services/api';
 import { Navbar } from './components/common/Navbar';
 import { Routes, Route, useNavigate } from 'react-router-dom';
 import './components/LandingPage.css';
@@ -132,6 +132,21 @@ const AppLayout = ({ children }: { children: React.ReactNode }) => {
 function App() {
   const { isSignedIn, getToken } = useAuth();
   const navigate = useNavigate();
+  
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('payment_canceled') === 'true') {
+      const sessionId = params.get('session_id');
+      if (sessionId) {
+        cancelPaymentEvent(sessionId);
+      }
+      // Clean up the URL quietly without reloading
+      const url = new URL(window.location.href);
+      url.searchParams.delete('payment_canceled');
+      url.searchParams.delete('session_id');
+      window.history.replaceState({}, '', url);
+    }
+  }, []);
   
   const [analysisResult, setAnalysisResult] = useState<AnalysisResponse | null>(() => {
     const saved = sessionStorage.getItem('mentorVisaAnalysisResult');

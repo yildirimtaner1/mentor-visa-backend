@@ -62,25 +62,18 @@ export const AuditorPage: FC = () => {
         setLoading(true);
         setError(null);
         try {
-          // get token if signed in (though reevaluate handles missing token if user is guest)
           const token = await getToken() || '';
           
+          // Always use 'auto' for a fresh, unbiased audit
           const res = await reevaluateDocument(
             location.state.fileId, 
-            location.state.targetNoc || 'auto', 
+            'auto', 
             token
           );
           
           setResult(res);
           sessionStorage.setItem('mentorVisaAnalysisResult', JSON.stringify(res));
-
-          if (token && isSignedIn) {
-            try {
-              await saveEvaluation(res, token);
-            } catch (e) {
-              console.error("Failed to auto-save evaluation:", e);
-            }
-          }
+          // Backend reevaluate endpoint already saves the record — no need to double-save
         } catch (err) {
           const message = err instanceof Error ? err.message : 'An error occurred during auto-analysis.';
           setError(message);

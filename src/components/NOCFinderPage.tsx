@@ -79,22 +79,27 @@ export const NOCFinderPage: FC<NOCFinderPageProps> = ({ onNavigate }) => {
     }
   }, []);
 
-  // Auto-scroll and auto-save when the user successfully signs in
+  // Auto-unblur, auto-scroll, and auto-save when the user successfully signs in
   const prevSignedIn = useRef(isSignedIn);
   useEffect(() => {
     if (!prevSignedIn.current && isSignedIn && result) {
+      // 1. Unblur results immediately
+      const unblurred = { ...result, is_signed_in: true };
+      setResult(unblurred);
+
+      // 2. Auto-scroll to the result card
       setTimeout(() => {
         document.getElementById('primary-match-section')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
       }, 300);
 
-      // Silently save to their account
+      // 3. Save to their account
       getToken().then((token) => {
         if (token) {
           const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
           fetch(`${API_BASE_URL}/api/v1/evaluations`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-            body: JSON.stringify({ ...result, evaluation_type: 'noc_finder', document_type: 'NOC Finder Query' })
+            body: JSON.stringify({ ...unblurred, evaluation_type: 'noc_finder', document_type: 'NOC Finder Query' })
           }).catch(console.error);
         }
       });
@@ -155,11 +160,13 @@ export const NOCFinderPage: FC<NOCFinderPageProps> = ({ onNavigate }) => {
     setLoading(true);
     if (targetNoc) {
       setTargetNocOverride(targetNoc);
-      window.scrollTo({ top: 0, behavior: 'smooth' });
+      // Scroll to the loading/results area so the user sees progress
+      setTimeout(() => {
+        document.getElementById('noc-results-area')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }, 100);
     } else {
       setTargetNocOverride(null);
       setResult(null);
-      sessionStorage.removeItem('nocFinderResult');
     }
 
     try {
@@ -171,7 +178,21 @@ export const NOCFinderPage: FC<NOCFinderPageProps> = ({ onNavigate }) => {
       }
       
       if (rawData.document_valid && rawData.recommended_noc) {
-        setResult(mapApiResponse(rawData));
+        const mapped = mapApiResponse(rawData);
+        setResult(mapped);
+        // Save to user's account if signed in
+        if (isSignedIn) {
+          getToken().then((token) => {
+            if (token) {
+              const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
+              fetch(`${API_BASE_URL}/api/v1/evaluations`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+                body: JSON.stringify({ ...mapped, evaluation_type: 'noc_finder', document_type: 'NOC Finder Query' })
+              }).catch(console.error);
+            }
+          });
+        }
       } else {
         setResult({
           document_valid: false,
@@ -204,7 +225,10 @@ export const NOCFinderPage: FC<NOCFinderPageProps> = ({ onNavigate }) => {
     setError('');
     setLoading(true);
     setTargetNocOverride(targetNoc);
-    window.scrollTo({ top: 0, behavior: 'smooth' });
+    // Scroll to the loading/results area so the user sees progress
+    setTimeout(() => {
+      document.getElementById('noc-results-area')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }, 100);
     try {
       const token = await getToken() || '';
       const rawData = await reevaluateDocument(fileId, targetNoc, token, 'noc_finder');
@@ -214,6 +238,7 @@ export const NOCFinderPage: FC<NOCFinderPageProps> = ({ onNavigate }) => {
         mapped.stored_file_id = rawData.stored_file_id || fileId;
         mapped.is_signed_in = !!rawData.is_signed_in || !!result?.is_signed_in;
         setResult(mapped);
+        // Re-evaluations are already saved by backend, no need to double-save
       } else {
         setError('Re-evaluation returned no NOC analysis. Please try again.');
       }
@@ -395,7 +420,7 @@ export const NOCFinderPage: FC<NOCFinderPageProps> = ({ onNavigate }) => {
               )}
 
               {loading ? (
-                <div style={{ marginTop: '32px' }}>
+                <div id="noc-results-area" style={{ marginTop: '32px' }}>
                   <DynamicLoader tool={targetNocOverride ? 'noc_retarget' : 'noc'} targetNoc={targetNocOverride || undefined} />
                 </div>
               ) : !file && (
@@ -708,7 +733,7 @@ export const NOCFinderPage: FC<NOCFinderPageProps> = ({ onNavigate }) => {
                   <p style={{ fontSize: '0.9rem', color: '#78350F', marginBottom: '16px', lineHeight: 1.5 }}>
                     {result.next_step || 'Run a full Employment Letter Audit to confirm eligibility and reduce refusal risk.'}
                   </p>
-                  <button className="btn btn-primary btn-lg" onClick={() => onNavigate('audit-employment-letter', { fileId: result.stored_file_id, targetNoc: result.noc_code })} style={{ background: '#D97706', borderColor: '#D97706' }}>
+                  <button className="btn btn-primary btn-lg" onClick={() => onNavigate('audit-employment-letter', { fileId: result.stored_file_id, targetNoc: 'auto' })} style={{ background: '#D97706', borderColor: '#D97706' }}>
                     📄 Audit My Letter — $24.90 CAD
                   </button>
                   <p style={{ fontSize: '0.75rem', color: '#92400E', marginTop: '10px', marginBottom: 0 }}>One-time purchase. Instant results.</p>

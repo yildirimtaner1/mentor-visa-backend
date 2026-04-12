@@ -143,3 +143,19 @@ export async function devGrantCredits(token: string) {
   if (!response.ok) throw new Error('Failed to grant credits');
   return response.json();
 }
+
+/** Informs backend that a user canceled checkout */
+export async function cancelPaymentEvent(sessionId: string) {
+  try {
+    await fetch(`${API_BASE_URL}/api/v1/payment-events/cancel`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({ session_id: sessionId })
+    });
+  } catch (e) {
+    console.error("Failed to cancel payment event", e);
+  }
+}
+
