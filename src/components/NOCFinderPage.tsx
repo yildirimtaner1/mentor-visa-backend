@@ -29,7 +29,7 @@ interface NOCResult {
   important_note: string;
   next_step: string;
   stored_file_id?: string;
-  is_premium_unlocked?: boolean;
+  is_signed_in?: boolean;
 }
 
 interface NOCFinderPageProps {
@@ -131,7 +131,7 @@ export const NOCFinderPage: FC<NOCFinderPageProps> = ({ onNavigate }) => {
       important_note: rawData.important_note || '',
       next_step: rawData.next_step || '',
       stored_file_id: rawData.stored_file_id,
-      is_premium_unlocked: !!rawData.is_premium_unlocked,
+      is_signed_in: !!rawData.is_signed_in,
     };
   };
 
@@ -212,7 +212,7 @@ export const NOCFinderPage: FC<NOCFinderPageProps> = ({ onNavigate }) => {
       if (rawData.recommended_noc || rawData.noc_analysis) {
         const mapped = mapApiResponse(rawData);
         mapped.stored_file_id = rawData.stored_file_id || fileId;
-        mapped.is_premium_unlocked = !!rawData.is_premium_unlocked || !!result?.is_premium_unlocked;
+        mapped.is_signed_in = !!rawData.is_signed_in || !!result?.is_signed_in;
         setResult(mapped);
       } else {
         setError('Re-evaluation returned no NOC analysis. Please try again.');
@@ -578,7 +578,7 @@ export const NOCFinderPage: FC<NOCFinderPageProps> = ({ onNavigate }) => {
 
                 {/* Key Gaps — behind paywall */}
                 <div style={{ position: 'relative' }}>
-                  <div style={!(result.is_premium_unlocked) ? { filter: 'blur(6px)', pointerEvents: 'none', userSelect: 'none', opacity: 0.6 } : {}}>
+                  <div style={!(result.is_signed_in) ? { filter: 'blur(6px)', pointerEvents: 'none', userSelect: 'none', opacity: 0.6 } : {}}>
                     {result.key_gaps && result.key_gaps.length > 0 && (
                       <div style={{ marginBottom: '20px' }}>
                         <h4 style={{ fontSize: '0.9rem', fontWeight: 700, marginBottom: '10px', display: 'flex', alignItems: 'center', gap: '6px' }}>
@@ -627,7 +627,7 @@ export const NOCFinderPage: FC<NOCFinderPageProps> = ({ onNavigate }) => {
                   </div>
 
                   {/* Sign-in Gate — NOC Finder is free for signed-in users */}
-                  {!(result.is_premium_unlocked) && !isSignedIn && (
+                  {!(result.is_signed_in) && !isSignedIn && (
                     <div style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, zIndex: 10, pointerEvents: 'none' }}>
                       <div style={{ position: 'sticky', top: '25vh', display: 'flex', justifyContent: 'center', pointerEvents: 'auto', padding: '0 20px' }}>
                         <div className="card" style={{ width: '100%', maxWidth: '500px', background: 'white', border: '2px solid var(--primary-color)', textAlign: 'center', boxShadow: '0 20px 40px rgba(0,0,0,0.2)' }}>
