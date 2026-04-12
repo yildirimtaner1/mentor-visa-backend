@@ -73,6 +73,10 @@ export const NOCFinderPage: FC<NOCFinderPageProps> = ({ onNavigate }) => {
       const saved = sessionStorage.getItem('nocFinderResult');
       if (saved) {
         setResult(JSON.parse(saved));
+        // Auto-scroll to results after React renders the card
+        setTimeout(() => {
+          document.getElementById('primary-match-section')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }, 300);
       }
       // Clear the state to prevent re-triggering on subsequent renders
       window.history.replaceState({}, '', window.location.pathname);
