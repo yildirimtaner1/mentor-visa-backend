@@ -411,8 +411,19 @@ export const Dashboard: FC<DashboardProps> = ({ data, onReset, onUpdate }) => {
                 {dc.icon}
               </div>
               <div>
-                <div className="result-card-title">{dc.label}</div>
-                <div className="result-card-subtitle" style={{ color: '#4B5563', fontSize: '1.05rem', marginTop: '4px' }}>
+                <div className="result-card-title">
+                  {isPremiumUnlocked 
+                    ? dc.label 
+                    : dc.label === 'Likely Accepted' 
+                      ? 'Preliminary Assessment: Likely Acceptable \u2014 Verification Recommended' 
+                      : `Preliminary Assessment: ${dc.label} \u2014 Verification Recommended`}
+                </div>
+                {!isPremiumUnlocked && (
+                  <div style={{ fontSize: '0.95rem', color: '#6B7280', marginTop: '6px', lineHeight: 1.5, fontWeight: 500 }}>
+                    Your profile shows strong alignment, but final approval depends on how clearly your duties are demonstrated.
+                  </div>
+                )}
+                <div className="result-card-subtitle" style={{ color: '#4B5563', fontSize: '1.05rem', marginTop: '6px' }}>
                   Target: NOC {data.noc_analysis.detected_code} — {data.noc_analysis.detected_title}
                 </div>
               </div>
@@ -422,12 +433,14 @@ export const Dashboard: FC<DashboardProps> = ({ data, onReset, onUpdate }) => {
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: '12px', marginBottom: '20px' }}>
               <div style={{ padding: '16px', background: '#F8FAFC', borderRadius: '10px', border: '1px solid var(--border-color)' }}>
                 <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '4px' }}>Duty Coverage</div>
+                {!isPremiumUnlocked && <div style={{ fontSize: '0.7rem', color: '#6B7280', marginBottom: '4px', lineHeight: 1.2 }}>Strong alignment detected with core responsibilities.</div>}
                 <div style={{ fontSize: '1.5rem', fontWeight: 700, color: data.noc_analysis.duty_coverage_percentage >= 75 ? '#059669' : data.noc_analysis.duty_coverage_percentage >= 50 ? '#D97706' : '#EF4444' }}>
                   {data.noc_analysis.duty_coverage_percentage}%
                 </div>
               </div>
               <div style={{ padding: '16px', background: '#F8FAFC', borderRadius: '10px', border: '1px solid var(--border-color)' }}>
                 <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '4px' }}>Compliance Score</div>
+                {!isPremiumUnlocked && <div style={{ fontSize: '0.7rem', color: '#6B7280', marginBottom: '4px', lineHeight: 1.2 }}>All key elements appear present, but wording clarity may still impact evaluation.</div>}
                 <div style={{ fontSize: '1.5rem', fontWeight: 700, color: data.compliance.score >= 88 ? '#059669' : data.compliance.score >= 63 ? '#D97706' : '#EF4444' }}>
                   {data.compliance.score}%
                 </div>
@@ -446,6 +459,7 @@ export const Dashboard: FC<DashboardProps> = ({ data, onReset, onUpdate }) => {
                     </span>
                   </span>
                 </div>
+                {!isPremiumUnlocked && <div style={{ fontSize: '0.7rem', color: '#6B7280', marginBottom: '4px', lineHeight: 1.2 }}>High alignment with selected NOC based on provided duties.</div>}
                 <div style={{ fontSize: '1.5rem', fontWeight: 700, color: '#374151' }}>
                   {data.noc_analysis.confidence}%
                 </div>
@@ -454,6 +468,13 @@ export const Dashboard: FC<DashboardProps> = ({ data, onReset, onUpdate }) => {
                 <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '4px' }}>PFL Likelihood</div>
                 <div style={{ fontSize: '1.5rem', fontWeight: 700, color: data.risk_assessment.pfl_likelihood === 'low' ? '#059669' : data.risk_assessment.pfl_likelihood === 'medium' ? '#D97706' : '#EF4444' }}>
                   {data.risk_assessment.pfl_likelihood.charAt(0).toUpperCase() + data.risk_assessment.pfl_likelihood.slice(1)}
+                  {!isPremiumUnlocked && (
+                    <span style={{ display: 'block', fontSize: '0.7rem', color: '#6B7280', fontWeight: 500, marginTop: '2px', lineHeight: 1.2 }}>
+                      {data.risk_assessment.pfl_likelihood === 'low' 
+                        ? '(based on preliminary signals \u2014 full review required for confirmation)' 
+                        : 'Elevated Risk Detected \u2014 Full audit highly recommended to identify exact refusal triggers'}
+                    </span>
+                  )}
                 </div>
               </div>
             </div>
@@ -488,17 +509,12 @@ export const Dashboard: FC<DashboardProps> = ({ data, onReset, onUpdate }) => {
               </div>
             )}
 
-            {/* Highest priority risk — always visible as teaser */}
-            {!isPremiumUnlocked && data.risk_assessment.key_risks.length > 0 && (
-              <div style={{ marginBottom: '20px', padding: '16px', background: '#FEF2F2', border: '1px solid #FCA5A5', borderRadius: '10px' }}>
-                <div style={{ fontSize: '0.75rem', color: '#B91C1C', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '6px', fontWeight: 700 }}>
-                  ⚠️ Priority Risk Identified
-                </div>
-                <div style={{ fontSize: '1.05rem', fontWeight: 700, color: '#991B1B', marginBottom: '8px' }}>
-                  {data.risk_assessment.key_risks[0].issue}
-                </div>
-                <div style={{ fontSize: '0.9rem', color: '#7F1D1D' }}>
-                  <strong style={{ opacity: 0.8 }}>Impact:</strong> {data.risk_assessment.key_risks[0].impact}
+            {/* Controlled Uncertainty Block (Replaces priority risk teaser) */}
+            {!isPremiumUnlocked && (
+              <div style={{ marginBottom: '20px', padding: '14px 18px', background: '#F9FAFB', border: '1px solid #E5E7EB', borderRadius: '10px', display: 'flex', gap: '10px', alignItems: 'flex-start' }}>
+                <span style={{ fontSize: '1.1rem' }}>⚠️</span>
+                <div style={{ fontSize: '0.95rem', color: '#4B5563', lineHeight: 1.5 }}>
+                  Even strong profiles may face additional document requests or delays if duties are not clearly articulated.
                 </div>
               </div>
             )}
@@ -660,12 +676,22 @@ export const Dashboard: FC<DashboardProps> = ({ data, onReset, onUpdate }) => {
               {!isPremiumUnlocked && (
                 <div style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, zIndex: 10, pointerEvents: 'none' }}>
                   <div style={{ position: 'sticky', top: '25vh', display: 'flex', justifyContent: 'center', pointerEvents: 'auto', padding: '0 20px' }}>
-                    <div id="paywall-overlay" className="card" style={{ maxWidth: '500px', background: 'white', border: '2px solid var(--primary-color)', textAlign: 'center', boxShadow: '0 20px 40px rgba(0,0,0,0.2)' }}>
-                    <div style={{ fontSize: '2.5rem', marginBottom: '10px' }}>🔒</div>
-                    <h3 style={{ fontSize: '1.4rem', fontWeight: 800, marginBottom: '12px' }}>Premium Audit Locked</h3>
-                    <p style={{ color: 'var(--text-muted)', marginBottom: '24px', lineHeight: 1.5 }}>
-                      Unlock the full officer assessment, risk analysis, missing duties, compliance details, NOC alignment sheet, and actionable fix plan.
+                    <div id="paywall-overlay" className="card" style={{ maxWidth: '450px', background: 'white', border: '2px solid var(--primary-color)', textAlign: 'center', boxShadow: '0 20px 40px rgba(0,0,0,0.2)' }}>
+                    <div style={{ fontSize: '2.5rem', marginBottom: '5px' }}>🔒</div>
+                    <h3 style={{ fontSize: '1.4rem', fontWeight: 800, marginBottom: '10px', color: '#111827' }}>Detailed IRCC Assessment (Locked)</h3>
+                    <p style={{ color: '#4B5563', marginBottom: '16px', lineHeight: 1.5, fontSize: '0.95rem' }}>
+                      Includes line-by-line officer evaluation, potential weak points, and exact wording suggestions to eliminate refusal risks.
                     </p>
+                    
+                    <div style={{ background: '#F9FAFB', border: '1px solid #E5E7EB', borderRadius: '8px', padding: '16px', textAlign: 'left', marginBottom: '24px' }}>
+                      <div style={{ fontWeight: 700, fontSize: '0.9rem', marginBottom: '10px', color: '#374151', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Unlock the full audit to get:</div>
+                      <ul style={{ paddingLeft: '20px', margin: 0, color: '#4B5563', fontSize: '0.95rem', lineHeight: 1.5 }}>
+                        <li style={{ marginBottom: '6px' }}>Specific wording improvements to strengthen your letter</li>
+                        <li style={{ marginBottom: '6px' }}>Identification of unclear or weak duties</li>
+                        <li style={{ marginBottom: '6px' }}>Detailed officer-style reasoning</li>
+                        <li>Risk indicators for refusal or document requests</li>
+                      </ul>
+                    </div>
                     
                     {!isSignedIn ? (
                       <SignInButton mode="modal" forceRedirectUrl={window.location.href} signUpForceRedirectUrl={window.location.href}>
@@ -675,13 +701,19 @@ export const Dashboard: FC<DashboardProps> = ({ data, onReset, onUpdate }) => {
                       </SignInButton>
                     ) : credits > 0 ? (
                       <button className="btn btn-primary" onClick={handleUnlock} disabled={isUnlocking} style={{ width: '100%', padding: '12px', fontSize: '1.1rem' }}>
-                        {isUnlocking ? 'Unlocking...' : `Unlock Full Audit (1 Credit — ${credits} remaining)`}
+                        {isUnlocking ? 'Unlocking...' : `Unlock Full Audit (1 Credit \u2014 ${credits} remaining)`}
                       </button>
                     ) : (
-                      <button className="btn btn-primary" onClick={handleCheckout} disabled={isBuying} style={{ width: '100%', padding: '12px', fontSize: '1.1rem', background: '#10b981', borderColor: '#10b981' }}>
-                        {isBuying ? 'Redirecting to Stripe...' : 'Unlock Full Audit \u2014 $24.90 CAD'}
-                      </button>
+                      <>
+                        <button className="btn btn-primary" onClick={handleCheckout} disabled={isBuying} style={{ width: '100%', padding: '12px', fontSize: '1.1rem', background: '#10b981', borderColor: '#10b981', marginBottom: '8px' }}>
+                          {isBuying ? 'Redirecting to Stripe...' : 'Unlock Full Audit \u2014 $24.90 CAD'}
+                        </button>
+                        <div style={{ fontSize: '0.85rem', color: '#6B7280', fontWeight: 500 }}>A quick final check before submitting your application</div>
+                      </>
                     )}
+                    <div style={{ marginTop: '20px', fontSize: '0.8rem', color: '#9CA3AF', lineHeight: 1.4 }}>
+                      This step helps ensure your employment letter clearly supports your application under IRCC requirements.
+                    </div>
                   </div>
                   </div>
                 </div>
