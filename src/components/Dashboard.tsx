@@ -429,51 +429,59 @@ export const Dashboard: FC<DashboardProps> = ({ data, onReset, onUpdate }) => {
               </div>
             </div>
 
-            {/* Stat Grid — 4 cards, always visible */}
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: '12px', marginBottom: '20px' }}>
-              <div style={{ padding: '16px', background: '#F8FAFC', borderRadius: '10px', border: '1px solid var(--border-color)' }}>
-                <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '4px' }}>Duty Coverage</div>
-                {!isPremiumUnlocked && <div style={{ fontSize: '0.7rem', color: '#6B7280', marginBottom: '4px', lineHeight: 1.2 }}>Strong alignment detected with core responsibilities.</div>}
-                <div style={{ fontSize: '1.5rem', fontWeight: 700, color: data.noc_analysis.duty_coverage_percentage >= 75 ? '#059669' : data.noc_analysis.duty_coverage_percentage >= 50 ? '#D97706' : '#EF4444' }}>
+            {/* Stat Grid \u2014 4 cards, always visible */}
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '16px', marginBottom: '24px' }}>
+              {/* Card 1: Duty Coverage */}
+              <div style={{ padding: '20px', background: '#FFFFFF', borderRadius: '12px', border: '1px solid #E2E8F0', display: 'flex', flexDirection: 'column', justifyContent: 'space-between', boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.02)' }}>
+                <div>
+                  <div style={{ fontSize: '0.75rem', color: '#64748B', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '8px', fontWeight: 600 }}>Duty Coverage</div>
+                  {!isPremiumUnlocked && <div style={{ fontSize: '0.8rem', color: '#94A3B8', marginBottom: '16px', lineHeight: 1.4 }}>Strong alignment detected with core responsibilities.</div>}
+                </div>
+                <div style={{ fontSize: '1.75rem', fontWeight: 800, color: data.noc_analysis.duty_coverage_percentage >= 75 ? '#059669' : data.noc_analysis.duty_coverage_percentage >= 50 ? '#D97706' : '#EF4444', marginTop: isPremiumUnlocked ? '8px' : '0' }}>
                   {data.noc_analysis.duty_coverage_percentage}%
                 </div>
               </div>
-              <div style={{ padding: '16px', background: '#F8FAFC', borderRadius: '10px', border: '1px solid var(--border-color)' }}>
-                <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '4px' }}>Compliance Score</div>
-                {!isPremiumUnlocked && <div style={{ fontSize: '0.7rem', color: '#6B7280', marginBottom: '4px', lineHeight: 1.2 }}>All key elements appear present, but wording clarity may still impact evaluation.</div>}
-                <div style={{ fontSize: '1.5rem', fontWeight: 700, color: data.compliance.score >= 88 ? '#059669' : data.compliance.score >= 63 ? '#D97706' : '#EF4444' }}>
+              {/* Card 2: Compliance Score */}
+              <div style={{ padding: '20px', background: '#FFFFFF', borderRadius: '12px', border: '1px solid #E2E8F0', display: 'flex', flexDirection: 'column', justifyContent: 'space-between', boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.02)' }}>
+                <div>
+                  <div style={{ fontSize: '0.75rem', color: '#64748B', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '8px', fontWeight: 600 }}>Compliance Score</div>
+                  {!isPremiumUnlocked && <div style={{ fontSize: '0.8rem', color: '#94A3B8', marginBottom: '16px', lineHeight: 1.4 }}>All key elements appear present, but wording clarity may still impact evaluation.</div>}
+                </div>
+                <div style={{ fontSize: '1.75rem', fontWeight: 800, color: data.compliance.score >= 88 ? '#059669' : data.compliance.score >= 63 ? '#D97706' : '#EF4444', marginTop: isPremiumUnlocked ? '8px' : '0' }}>
                   {data.compliance.score}%
                 </div>
               </div>
-              <div style={{ padding: '16px', background: '#F8FAFC', borderRadius: '10px', border: '1px solid var(--border-color)', position: 'relative' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '5px', marginBottom: '4px' }}>
-                  <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>NOC Confidence</div>
-                  <span style={{ position: 'relative', display: 'inline-flex' }}>
-                    <span 
-                      className="noc-confidence-bulb"
-                      style={{ fontSize: '0.85rem', cursor: 'help', lineHeight: 1 }}
-                      tabIndex={0}
-                    >💡</span>
-                    <span className="noc-confidence-tooltip">
-                      How closely your duties match this NOC's official IRCC requirements.
+              {/* Card 3: NOC Confidence */}
+              <div style={{ padding: '20px', background: '#FFFFFF', borderRadius: '12px', border: '1px solid #E2E8F0', display: 'flex', flexDirection: 'column', justifyContent: 'space-between', boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.02)', position: 'relative' }}>
+                <div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '5px', marginBottom: '8px' }}>
+                    <div style={{ fontSize: '0.75rem', color: '#64748B', textTransform: 'uppercase', letterSpacing: '0.05em', fontWeight: 600 }}>NOC Confidence</div>
+                    <span style={{ position: 'relative', display: 'inline-flex' }}>
+                      <span className="noc-confidence-bulb" style={{ fontSize: '0.85rem', cursor: 'help', lineHeight: 1 }} tabIndex={0}>💡</span>
+                      <span className="noc-confidence-tooltip">How closely your duties match this NOC's official IRCC requirements.</span>
                     </span>
-                  </span>
+                  </div>
+                  {!isPremiumUnlocked && <div style={{ fontSize: '0.8rem', color: '#94A3B8', marginBottom: '16px', lineHeight: 1.4 }}>High alignment with selected NOC based on provided duties.</div>}
                 </div>
-                {!isPremiumUnlocked && <div style={{ fontSize: '0.7rem', color: '#6B7280', marginBottom: '4px', lineHeight: 1.2 }}>High alignment with selected NOC based on provided duties.</div>}
-                <div style={{ fontSize: '1.5rem', fontWeight: 700, color: '#374151' }}>
+                <div style={{ fontSize: '1.75rem', fontWeight: 800, color: '#334155', marginTop: isPremiumUnlocked ? '8px' : '0' }}>
                   {data.noc_analysis.confidence}%
                 </div>
               </div>
-              <div style={{ padding: '16px', background: '#F8FAFC', borderRadius: '10px', border: '1px solid var(--border-color)' }}>
-                <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '4px' }}>PFL Likelihood</div>
-                <div style={{ fontSize: '1.5rem', fontWeight: 700, color: data.risk_assessment.pfl_likelihood === 'low' ? '#059669' : data.risk_assessment.pfl_likelihood === 'medium' ? '#D97706' : '#EF4444' }}>
-                  {data.risk_assessment.pfl_likelihood.charAt(0).toUpperCase() + data.risk_assessment.pfl_likelihood.slice(1)}
+              {/* Card 4: PFL Likelihood */}
+              <div style={{ padding: '20px', background: '#FFFFFF', borderRadius: '12px', border: '1px solid #E2E8F0', display: 'flex', flexDirection: 'column', justifyContent: 'space-between', boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.02)' }}>
+                <div>
+                  <div style={{ fontSize: '0.75rem', color: '#64748B', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '8px', fontWeight: 600 }}>PFL Likelihood</div>
+                </div>
+                <div>
+                  <div style={{ fontSize: '1.75rem', fontWeight: 800, color: data.risk_assessment.pfl_likelihood === 'low' ? '#059669' : data.risk_assessment.pfl_likelihood === 'medium' ? '#D97706' : '#EF4444', marginTop: isPremiumUnlocked ? '8px' : '0' }}>
+                    {data.risk_assessment.pfl_likelihood.charAt(0).toUpperCase() + data.risk_assessment.pfl_likelihood.slice(1)}
+                  </div>
                   {!isPremiumUnlocked && (
-                    <span style={{ display: 'block', fontSize: '0.7rem', color: '#6B7280', fontWeight: 500, marginTop: '2px', lineHeight: 1.2 }}>
+                    <div style={{ fontSize: '0.75rem', color: '#94A3B8', fontWeight: 400, marginTop: '6px', lineHeight: 1.3 }}>
                       {data.risk_assessment.pfl_likelihood === 'low' 
                         ? '(based on preliminary signals \u2014 full review required for confirmation)' 
                         : 'Elevated Risk Detected \u2014 Full audit highly recommended to identify exact refusal triggers'}
-                    </span>
+                    </div>
                   )}
                 </div>
               </div>
