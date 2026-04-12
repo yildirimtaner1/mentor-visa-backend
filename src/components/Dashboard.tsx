@@ -675,46 +675,81 @@ export const Dashboard: FC<DashboardProps> = ({ data, onReset, onUpdate }) => {
               {/* Paywall Overlay */}
               {!isPremiumUnlocked && (
                 <div style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, zIndex: 10, pointerEvents: 'none' }}>
-                  <div style={{ position: 'sticky', top: '25vh', display: 'flex', justifyContent: 'center', pointerEvents: 'auto', padding: '0 20px' }}>
-                    <div id="paywall-overlay" className="card" style={{ maxWidth: '450px', background: 'white', border: '2px solid var(--primary-color)', textAlign: 'center', boxShadow: '0 20px 40px rgba(0,0,0,0.2)' }}>
-                    <div style={{ fontSize: '2.5rem', marginBottom: '5px' }}>🔒</div>
-                    <h3 style={{ fontSize: '1.4rem', fontWeight: 800, marginBottom: '10px', color: '#111827' }}>Detailed IRCC Assessment (Locked)</h3>
-                    <p style={{ color: '#4B5563', marginBottom: '16px', lineHeight: 1.5, fontSize: '0.95rem' }}>
-                      Includes line-by-line officer evaluation, potential weak points, and exact wording suggestions to eliminate refusal risks.
-                    </p>
-                    
-                    <div style={{ background: '#F9FAFB', border: '1px solid #E5E7EB', borderRadius: '8px', padding: '16px', textAlign: 'left', marginBottom: '24px' }}>
-                      <div style={{ fontWeight: 700, fontSize: '0.9rem', marginBottom: '10px', color: '#374151', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Unlock the full audit to get:</div>
-                      <ul style={{ paddingLeft: '20px', margin: 0, color: '#4B5563', fontSize: '0.95rem', lineHeight: 1.5 }}>
-                        <li style={{ marginBottom: '6px' }}>Specific wording improvements to strengthen your letter</li>
-                        <li style={{ marginBottom: '6px' }}>Identification of unclear or weak duties</li>
-                        <li style={{ marginBottom: '6px' }}>Detailed officer-style reasoning</li>
-                        <li>Risk indicators for refusal or document requests</li>
-                      </ul>
-                    </div>
-                    
-                    {!isSignedIn ? (
-                      <SignInButton mode="modal" forceRedirectUrl={window.location.href} signUpForceRedirectUrl={window.location.href}>
-                        <button className="btn btn-primary" style={{ width: '100%', padding: '12px', fontSize: '1.1rem' }}>
-                          Sign In to Unlock Insights
+                  <div style={{ position: 'sticky', top: '20vh', display: 'flex', justifyContent: 'center', pointerEvents: 'auto', padding: '0 20px' }}>
+                    <div id="paywall-overlay" style={{ 
+                      maxWidth: '480px', 
+                      width: '100%',
+                      background: 'rgba(255, 255, 255, 0.98)', 
+                      border: '1px solid rgba(255, 255, 255, 0.5)',
+                      borderRadius: '24px',
+                      padding: '40px 32px',
+                      textAlign: 'center', 
+                      boxShadow: '0 30px 60px rgba(0,0,0,0.12), 0 0 0 1px rgba(0,0,0,0.05)',
+                      backdropFilter: 'blur(10px)'
+                    }}>
+                      <div style={{ 
+                        width: '64px', 
+                        height: '64px', 
+                        background: 'linear-gradient(135deg, #FBBF24 0%, #D97706 100%)', 
+                        borderRadius: '50%', 
+                        display: 'flex', 
+                        alignItems: 'center', 
+                        justifyContent: 'center',
+                        margin: '0 auto 20px auto',
+                        boxShadow: '0 10px 20px rgba(217, 119, 6, 0.2)'
+                      }}>
+                        <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                          <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
+                          <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
+                        </svg>
+                      </div>
+                      
+                      <h3 style={{ fontSize: '1.6rem', fontWeight: 800, marginBottom: '12px', color: '#0F172A', letterSpacing: '-0.02em' }}>Detailed IRCC Assessment</h3>
+                      <p style={{ color: '#475569', marginBottom: '28px', lineHeight: 1.6, fontSize: '1.05rem' }}>
+                        Includes line-by-line officer evaluation, potential weak points, and exact wording suggestions to eliminate refusal risks.
+                      </p>
+                      
+                      <div style={{ background: '#F8FAFC', border: '1px solid #E2E8F0', borderRadius: '16px', padding: '24px', textAlign: 'left', marginBottom: '32px' }}>
+                        <div style={{ fontWeight: 800, fontSize: '0.85rem', marginBottom: '16px', color: '#0F172A', textTransform: 'uppercase', letterSpacing: '0.08em' }}>Unlock the full audit to get:</div>
+                        <ul style={{ listStyle: 'none', padding: 0, margin: 0, display: 'flex', flexDirection: 'column', gap: '14px' }}>
+                          {[
+                            "Specific wording improvements to strengthen your letter",
+                            "Identification of unclear or weak duties",
+                            "Detailed officer-style reasoning",
+                            "Risk indicators for refusal or document requests"
+                          ].map((item, i) => (
+                            <li key={i} style={{ display: 'flex', alignItems: 'flex-start', gap: '12px', color: '#334155', fontSize: '0.95rem', lineHeight: 1.5, fontWeight: 500 }}>
+                              <svg style={{ flexShrink: 0, marginTop: '2px' }} width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#10B981" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+                                <polyline points="20 6 9 17 4 12"></polyline>
+                              </svg>
+                              {item}
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                      
+                      {!isSignedIn ? (
+                        <SignInButton mode="modal" forceRedirectUrl={window.location.href} signUpForceRedirectUrl={window.location.href}>
+                          <button className="btn" style={{ width: '100%', padding: '16px', fontSize: '1.15rem', fontWeight: 700, borderRadius: '12px', background: '#2563EB', color: 'white', border: 'none', boxShadow: '0 8px 16px rgba(37, 99, 235, 0.25)', cursor: 'pointer' }}>
+                            Sign In to Unlock Insights
+                          </button>
+                        </SignInButton>
+                      ) : credits > 0 ? (
+                        <button className="btn" onClick={handleUnlock} disabled={isUnlocking} style={{ width: '100%', padding: '16px', fontSize: '1.15rem', fontWeight: 700, borderRadius: '12px', background: '#2563EB', color: 'white', border: 'none', boxShadow: '0 8px 16px rgba(37, 99, 235, 0.25)', cursor: 'pointer' }}>
+                          {isUnlocking ? 'Unlocking...' : `Unlock Full Audit (1 Credit \u2014 ${credits} remaining)`}
                         </button>
-                      </SignInButton>
-                    ) : credits > 0 ? (
-                      <button className="btn btn-primary" onClick={handleUnlock} disabled={isUnlocking} style={{ width: '100%', padding: '12px', fontSize: '1.1rem' }}>
-                        {isUnlocking ? 'Unlocking...' : `Unlock Full Audit (1 Credit \u2014 ${credits} remaining)`}
-                      </button>
-                    ) : (
-                      <>
-                        <button className="btn btn-primary" onClick={handleCheckout} disabled={isBuying} style={{ width: '100%', padding: '12px', fontSize: '1.1rem', background: '#10b981', borderColor: '#10b981', marginBottom: '8px' }}>
-                          {isBuying ? 'Redirecting to Stripe...' : 'Unlock Full Audit \u2014 $24.90 CAD'}
-                        </button>
-                        <div style={{ fontSize: '0.85rem', color: '#6B7280', fontWeight: 500 }}>A quick final check before submitting your application</div>
-                      </>
-                    )}
-                    <div style={{ marginTop: '20px', fontSize: '0.8rem', color: '#9CA3AF', lineHeight: 1.4 }}>
-                      This step helps ensure your employment letter clearly supports your application under IRCC requirements.
+                      ) : (
+                        <>
+                          <button className="btn" onClick={handleCheckout} disabled={isBuying} style={{ width: '100%', padding: '16px', fontSize: '1.15rem', fontWeight: 700, background: '#10B981', color: 'white', border: 'none', borderRadius: '12px', boxShadow: '0 8px 16px rgba(16, 185, 129, 0.25)', marginBottom: '12px', cursor: 'pointer' }}>
+                            {isBuying ? 'Redirecting to Stripe...' : 'Unlock Full Audit \u2014 $24.90 CAD'}
+                          </button>
+                          <div style={{ fontSize: '0.9rem', color: '#64748B', fontWeight: 500 }}>A quick final check before submitting your application</div>
+                        </>
+                      )}
+                      <div style={{ marginTop: '24px', fontSize: '0.8rem', color: '#94A3B8', lineHeight: 1.5, padding: '0 10px' }}>
+                        This step helps ensure your employment letter clearly supports your application under IRCC requirements.
+                      </div>
                     </div>
-                  </div>
                   </div>
                 </div>
               )}
