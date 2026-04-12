@@ -218,7 +218,7 @@ export const LandingPage: FC<LandingPageProps> = ({ onNavigate }) => {
             padding: '40px 32px'
           }}>
             <div style={{ fontSize: '2.5rem', fontWeight: 800, color: 'var(--text-color)', marginBottom: '8px' }}>
-              $4.90 <span style={{ fontSize: '1rem', color: 'var(--text-muted)', fontWeight: 400 }}>CAD</span>
+              $24.90 <span style={{ fontSize: '1rem', color: 'var(--text-muted)', fontWeight: 400 }}>CAD</span>
             </div>
             <p style={{ color: 'var(--text-muted)', marginBottom: '24px', fontSize: '1rem' }}>
               One-time purchase. One full NOC analysis.

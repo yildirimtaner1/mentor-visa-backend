@@ -29,7 +29,7 @@ const uploaderSchema = JSON.stringify({
   "applicationCategory": "WebApplication",
   "offers": {
     "@type": "Offer",
-    "price": "4.90",
+    "price": "24.90",
     "priceCurrency": "CAD"
   },
   "description": "Upload your Express Entry employment letter and check for missing IRCC requirements and NOC code alignment mistakes instantly."

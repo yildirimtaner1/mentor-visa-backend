@@ -766,3 +766,68 @@
     padding: 24px;
   }
 }
+
+/* ===========================
+   NOC Confidence 💡 Tooltip
+   Shared between NOC Finder + Auditor Dashboard
+   =========================== */
+
+.noc-confidence-tooltip {
+  position: absolute;
+  top: calc(100% + 10px);
+  left: 50%;
+  transform: translateX(-50%) translateY(4px);
+  width: max-content;
+  max-width: 260px;
+  background: #1E293B;
+  color: #F1F5F9;
+  border-radius: 8px;
+  padding: 8px 14px;
+  font-size: 0.78rem;
+  line-height: 1.5;
+  text-align: center;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.18);
+  z-index: 50;
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity 0.2s ease, visibility 0.2s ease, transform 0.2s ease;
+  pointer-events: none;
+}
+
+/* Arrow */
+.noc-confidence-tooltip::before {
+  content: '';
+  position: absolute;
+  top: -5px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 10px;
+  height: 10px;
+  background: #1E293B;
+  border-radius: 2px;
+  transform: translateX(-50%) rotate(45deg);
+}
+
+.noc-confidence-bulb:hover + .noc-confidence-tooltip,
+.noc-confidence-bulb:focus + .noc-confidence-tooltip {
+  opacity: 1;
+  visibility: visible;
+  transform: translateX(-50%) translateY(0);
+}
+
+.noc-confidence-bulb {
+  transition: transform 0.15s ease;
+  display: inline-block;
+}
+
+.noc-confidence-bulb:hover {
+  transform: scale(1.2);
+}
+
+@media (max-width: 480px) {
+  .noc-confidence-tooltip {
+    left: -40px;
+    right: -40px;
+    min-width: unset;
+  }
+}

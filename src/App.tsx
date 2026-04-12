@@ -172,46 +172,69 @@ function App() {
         
         if (typeof rawData.noc_code === 'string') {
           // Payload is already flattened NOCResult from frontend autosave
-          // Normalize matched_duties — old records may have strings instead of objects
-          let normalizedDuties = rawData.matched_duties || [];
-          if (normalizedDuties.length > 0 && typeof normalizedDuties[0] === 'string') {
-            normalizedDuties = normalizedDuties.map((s: string) => ({
-              applicant_duty: s,
-              official_noc_duty: '',
-              overlap_description: ''
-            }));
-          }
           nocResult = {
             ...rawData,
-            matched_duties: normalizedDuties,
             stored_file_id: rawData.stored_file_id || ev.stored_file_id,
             is_premium_unlocked: rawData.is_premium_unlocked || ev.is_premium_unlocked
           };
-        } else {
-          // Payload is raw Gemini NOCFinderResponseSchema from backend direct save
-          const ana = rawData.noc_analysis || {};
-          const teer = ana.detected_code ? ana.detected_code.charAt(1) : '';
+        } else if (rawData.recommended_noc) {
+          // New v2 NOCFinderResponseSchema from backend
+          const noc_code = rawData.recommended_noc?.code || '';
+          const teer = noc_code.length >= 2 ? noc_code.charAt(1) : '';
           const cec = ['0', '1', '2', '3'].includes(teer);
-          const dutiesList = ana.duties_match 
-            ? ana.duties_match.map((d: any) => ({
-                applicant_duty: d.applicant_duty || '',
-                official_noc_duty: d.official_noc_duty || '',
-                overlap_description: d.overlap_description || ''
-              }))
-            : [];
-            
           nocResult = {
             document_valid: rawData.document_valid !== false,
             rejection_reason: rawData.rejection_reason || '',
-            noc_code: ana.detected_code || '',
-            noc_title: ana.detected_title || '',
+            result_type: rawData.result_type || 'NO_MATCH',
+            noc_code,
+            noc_title: rawData.recommended_noc?.title || '',
+            confidence: rawData.recommended_noc?.confidence || 0,
             teer_category: teer,
-            match_score: ana.match_score || 0,
-            alternative_nocs: ana.alternative_nocs || [],
-            explanation: ana.notes || '',
-            matched_duties: dutiesList,
             cec_eligible: cec,
+            confidence_level: rawData.confidence_level || 'low',
+            why_this_noc: rawData.why_this_noc || '',
+            key_matches: rawData.key_matches || [],
+            key_gaps: rawData.key_gaps || [],
+            alternatives: (rawData.alternatives || []).map((a: any) => ({
+              code: a.code || '',
+              title: a.title || '',
+              confidence: a.confidence || 0,
+            })),
+            input_reliability: rawData.input_reliability || 'medium',
+            location_of_experience: rawData.location_of_experience || 'unknown',
+            important_note: rawData.important_note || '',
+            next_step: rawData.next_step || '',
+            stored_file_id: rawData.stored_file_id || ev.stored_file_id,
+            is_premium_unlocked: rawData.is_premium_unlocked || ev.is_premium_unlocked
+          };
+        } else if (rawData.noc_analysis) {
+          // Legacy old schema from backend — convert to v2 format
+          const ana = rawData.noc_analysis;
+          const noc_code = ana.detected_code || '';
+          const teer = noc_code.length >= 2 ? noc_code.charAt(1) : '';
+          const cec = ['0', '1', '2', '3'].includes(teer);
+          nocResult = {
+            document_valid: rawData.document_valid !== false,
+            rejection_reason: rawData.rejection_reason || '',
+            result_type: (ana.match_score || 0) >= 75 ? 'STRONG_MATCH' : (ana.match_score || 0) >= 60 ? 'MODERATE_MATCH' : 'NO_MATCH',
+            noc_code,
+            noc_title: ana.detected_title || '',
+            confidence: ana.match_score || 0,
+            teer_category: teer,
+            cec_eligible: cec,
+            confidence_level: (ana.match_score || 0) >= 75 ? 'high' : (ana.match_score || 0) >= 60 ? 'medium' : 'low',
+            why_this_noc: ana.notes || '',
+            key_matches: (ana.duties_match || []).map((d: any) => d.applicant_duty || '').filter(Boolean),
+            key_gaps: [],
+            alternatives: (ana.alternative_nocs || []).map((a: any) => ({
+              code: a.noc_code || a.code || '',
+              title: a.noc_title || a.title || '',
+              confidence: a.match_score || a.confidence || 0,
+            })),
+            input_reliability: 'medium' as const,
             location_of_experience: ana.location_of_experience || 'unknown',
+            important_note: '',
+            next_step: '',
             stored_file_id: rawData.stored_file_id || ev.stored_file_id,
             is_premium_unlocked: rawData.is_premium_unlocked || ev.is_premium_unlocked
           };

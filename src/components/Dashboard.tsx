@@ -432,8 +432,20 @@ export const Dashboard: FC<DashboardProps> = ({ data, onReset, onUpdate }) => {
                   {data.compliance.score}%
                 </div>
               </div>
-              <div style={{ padding: '16px', background: '#F8FAFC', borderRadius: '10px', border: '1px solid var(--border-color)' }}>
-                <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '4px' }}>NOC Confidence</div>
+              <div style={{ padding: '16px', background: '#F8FAFC', borderRadius: '10px', border: '1px solid var(--border-color)', position: 'relative' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '5px', marginBottom: '4px' }}>
+                  <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>NOC Confidence</div>
+                  <span style={{ position: 'relative', display: 'inline-flex' }}>
+                    <span 
+                      className="noc-confidence-bulb"
+                      style={{ fontSize: '0.85rem', cursor: 'help', lineHeight: 1 }}
+                      tabIndex={0}
+                    >💡</span>
+                    <span className="noc-confidence-tooltip">
+                      How closely your duties match this NOC's official IRCC requirements.
+                    </span>
+                  </span>
+                </div>
                 <div style={{ fontSize: '1.5rem', fontWeight: 700, color: '#374151' }}>
                   {data.noc_analysis.confidence}%
                 </div>
@@ -667,7 +679,7 @@ export const Dashboard: FC<DashboardProps> = ({ data, onReset, onUpdate }) => {
                       </button>
                     ) : (
                       <button className="btn btn-primary" onClick={handleCheckout} disabled={isBuying} style={{ width: '100%', padding: '12px', fontSize: '1.1rem', background: '#10b981', borderColor: '#10b981' }}>
-                        {isBuying ? 'Redirecting to Stripe...' : 'Unlock Full Audit \u2014 $4.90 CAD'}
+                        {isBuying ? 'Redirecting to Stripe...' : 'Unlock Full Audit \u2014 $24.90 CAD'}
                       </button>
                     )}
                   </div>

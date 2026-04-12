@@ -100,7 +100,7 @@ const testimonials = [
     role: "Graphic Designer",
   },
   {
-    text: "For $4.90, this is the cheapest insurance policy for your Express Entry application. The peace of mind knowing my documents are IRCC compliant is priceless.",
+    text: "For $24.90, this is the cheapest insurance policy for your Express Entry application. The peace of mind knowing my documents are IRCC compliant is priceless.",
     image: "https://images.unsplash.com/photo-1438761681033-6461ffad8d80?q=80&w=200&auto=format&fit=crop",
     name: "Sarah Jenkins",
     role: "Retail Supervisor",

@@ -1,34 +1,33 @@
 import { type FC, useState, useRef, useEffect } from 'react';
 import { useUser, SignInButton, useAuth } from '@clerk/clerk-react';
-import { findNOCCode, fetchUserCredits, createCheckoutSession, consumeCreditToUnlock, reevaluateDocument } from '../services/api';
+import { findNOCCode, reevaluateDocument } from '../services/api';
 import { SEO } from './common/SEO';
 import { DynamicLoader } from './common/DynamicLoader';
 
 interface AlternativeNOC {
-  noc_code: string;
-  noc_title: string;
-  match_score: number;
-  explanation: string;
-}
-
-interface DutyMatch {
-  applicant_duty: string;
-  official_noc_duty: string;
-  overlap_description: string;
+  code: string;
+  title: string;
+  confidence: number;
 }
 
 interface NOCResult {
   document_valid: boolean;
   rejection_reason: string;
+  result_type: 'STRONG_MATCH' | 'MODERATE_MATCH' | 'NO_MATCH';
   noc_code: string;
   noc_title: string;
+  confidence: number;
   teer_category: string;
-  match_score: number;
-  alternative_nocs: AlternativeNOC[];
-  explanation: string;
-  matched_duties: DutyMatch[];
   cec_eligible: boolean;
+  confidence_level: 'high' | 'medium' | 'low';
+  why_this_noc: string;
+  key_matches: string[];
+  key_gaps: string[];
+  alternatives: AlternativeNOC[];
+  input_reliability: 'high' | 'medium' | 'low';
   location_of_experience?: 'canada' | 'outside_canada' | 'unknown';
+  important_note: string;
+  next_step: string;
   stored_file_id?: string;
   is_premium_unlocked?: boolean;
 }
@@ -45,7 +44,7 @@ const nocSchema = JSON.stringify({
   "applicationCategory": "WebApplication",
   "offers": {
     "@type": "Offer",
-    "price": "4.90",
+    "price": "0",
     "priceCurrency": "CAD"
   },
   "description": "AI-powered tool that matches your job duties to the correct Canadian NOC 2021 code for Express Entry. Analyzes all 516 unit groups in seconds."
@@ -70,72 +69,14 @@ export const NOCFinderPage: FC<NOCFinderPageProps> = ({ onNavigate }) => {
   
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Monetization State
-  const [credits, setCredits] = useState<number>(0);
-  const [isBuying, setIsBuying] = useState(false);
-  const [isUnlocking, setIsUnlocking] = useState(false);
-
-  useEffect(() => {
-    const loadCredits = async () => {
-       if (isSignedIn) {
-           const tk = await getToken();
-           if (tk) {
-               const c = await fetchUserCredits(tk);
-               setCredits(c.find_noc_credits || 0);
-           }
-       }
-    };
-    loadCredits();
-  }, [isSignedIn, getToken]);
-
-  // Persist result to sessionStorage whenever it changes
-  useEffect(() => {
-    if (result) {
-      sessionStorage.setItem('nocFinderResult', JSON.stringify(result));
-    }
-  }, [result]);
-
-  // Auto-unlock when returning from Stripe with ?payment_success=true
+  // Clean up any stale payment_success params in URL
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     if (params.get('payment_success') === 'true') {
-      // Clean URL immediately
       const cleanUrl = new URL(window.location.href);
       cleanUrl.searchParams.delete('payment_success');
       window.history.replaceState({}, '', cleanUrl.toString());
-
-      const pollAndUnlock = async () => {
-        const savedRaw = sessionStorage.getItem('nocFinderResult');
-        if (!savedRaw) return;
-        const saved: NOCResult = JSON.parse(savedRaw);
-        if (saved.is_premium_unlocked || !saved.stored_file_id) return;
-
-        const tk = await getToken();
-        if (!tk) return;
-
-        for (let i = 0; i < 10; i++) {
-          await new Promise(res => setTimeout(res, 1500));
-          try {
-            const creditData = await fetchUserCredits(tk);
-            const hasCredits = (creditData.find_noc_credits || 0) > 0;
-            if (hasCredits) {
-              const res = await consumeCreditToUnlock(saved.stored_file_id, 'finder', tk);
-              setCredits(res.remaining_finder);
-              const unlocked = { ...saved, is_premium_unlocked: true };
-              setResult(unlocked);
-              sessionStorage.setItem('nocFinderResult', JSON.stringify(unlocked));
-              return;
-            }
-          } catch (e: any) {
-            console.warn('Poll attempt failed:', e.message);
-          }
-        }
-        console.error('Payment processed but credits never appeared. Check Stripe webhook.');
-      };
-
-      pollAndUnlock();
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Auto-scroll and auto-save when the user successfully signs in
@@ -153,7 +94,7 @@ export const NOCFinderPage: FC<NOCFinderPageProps> = ({ onNavigate }) => {
           fetch(`${API_BASE_URL}/api/v1/evaluations`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-            body: JSON.stringify({ ...result, evaluation_type: 'noc_finder' })
+            body: JSON.stringify({ ...result, evaluation_type: 'noc_finder', document_type: 'NOC Finder Query' })
           }).catch(console.error);
         }
       });
@@ -161,43 +102,38 @@ export const NOCFinderPage: FC<NOCFinderPageProps> = ({ onNavigate }) => {
     prevSignedIn.current = isSignedIn;
   }, [isSignedIn, result, getToken]);
 
-  const handleCheckout = async () => {
-    setIsBuying(true);
-    try {
-        const tk = await getToken();
-        if (!tk) return;
-        if (result) {
-          sessionStorage.setItem('nocFinderResult', JSON.stringify(result));
-        }
-        const url = await createCheckoutSession('finder', tk, '/find-my-noc');
-        window.location.href = url;
-    } catch (e: any) {
-        alert("Failed to initiate checkout: " + (e.message || "Unknown error"));
-        setIsBuying(false);
-    }
-  };
+  /** Map raw backend v2 response to our local NOCResult interface */
+  const mapApiResponse = (rawData: any): NOCResult => {
+    const noc_code = rawData.recommended_noc?.code || '';
+    const teer = noc_code.length >= 2 ? noc_code.charAt(1) : '';
+    const cec = ['0', '1', '2', '3'].includes(teer);
 
-  const handleUnlock = async () => {
-    if (!result?.stored_file_id) return;
-    setIsUnlocking(true);
-    try {
-        const tk = await getToken();
-        if (!tk) return;
-        const res = await consumeCreditToUnlock(result.stored_file_id, 'finder', tk);
-        setCredits(res.remaining_finder);
-        const unlocked = {...result, is_premium_unlocked: true};
-        setResult(unlocked);
-        sessionStorage.setItem('nocFinderResult', JSON.stringify(unlocked));
-        const url = new URL(window.location.href);
-        url.searchParams.delete('payment_success');
-        window.history.replaceState({}, '', url.toString());
-    } catch (e: any) {
-        alert(e.message || "Failed to unlock insights.");
-    } finally {
-        setIsUnlocking(false);
-    }
+    return {
+      document_valid: rawData.document_valid,
+      rejection_reason: rawData.rejection_reason || '',
+      result_type: rawData.result_type || 'NO_MATCH',
+      noc_code,
+      noc_title: rawData.recommended_noc?.title || '',
+      confidence: rawData.recommended_noc?.confidence || 0,
+      teer_category: teer,
+      cec_eligible: cec,
+      confidence_level: rawData.confidence_level || 'low',
+      why_this_noc: rawData.why_this_noc || '',
+      key_matches: rawData.key_matches || [],
+      key_gaps: rawData.key_gaps || [],
+      alternatives: (rawData.alternatives || []).map((a: any) => ({
+        code: a.code || a.noc_code || '',
+        title: a.title || a.noc_title || '',
+        confidence: a.confidence || a.match_score || 0,
+      })),
+      input_reliability: rawData.input_reliability || 'medium',
+      location_of_experience: rawData.location_of_experience || 'unknown',
+      important_note: rawData.important_note || '',
+      next_step: rawData.next_step || '',
+      stored_file_id: rawData.stored_file_id,
+      is_premium_unlocked: !!rawData.is_premium_unlocked,
+    };
   };
-
 
   const processInput = async (inputFile: File | null, inputTitle: string = '', inputDuties: string = '', targetNoc: string = '') => {
     // If we have a stored file from a previous analysis and no local file/text, use the reevaluate endpoint
@@ -223,7 +159,7 @@ export const NOCFinderPage: FC<NOCFinderPageProps> = ({ onNavigate }) => {
     } else {
       setTargetNocOverride(null);
       setResult(null);
-      sessionStorage.removeItem('nocFinderResult'); // clear stale cache on new search
+      sessionStorage.removeItem('nocFinderResult');
     }
 
     try {
@@ -234,48 +170,27 @@ export const NOCFinderPage: FC<NOCFinderPageProps> = ({ onNavigate }) => {
         rawData = await findNOCCode(inputTitle.trim(), inputDuties.trim(), undefined, targetNoc);
       }
       
-      if (rawData.document_valid && rawData.noc_analysis) {
-        const ana = rawData.noc_analysis;
-        // TEER = second digit of the 5-digit NOC code (e.g. NOC 42101 → TEER 2)
-        const teer = ana.detected_code.charAt(1);
-        const cec = ['0', '1', '2', '3'].includes(teer);
-        
-        const dutiesList: DutyMatch[] = ana.duties_match 
-          ? ana.duties_match.map((d: any) => ({
-              applicant_duty: d.applicant_duty || '',
-              official_noc_duty: d.official_noc_duty || '',
-              overlap_description: d.overlap_description || ''
-            }))
-          : [];
-
-        setResult({
-          document_valid: true,
-          rejection_reason: '',
-          noc_code: ana.detected_code,
-          noc_title: ana.detected_title,
-          teer_category: teer,
-          match_score: ana.match_score,
-          alternative_nocs: ana.alternative_nocs || [],
-          explanation: ana.notes || '',
-          matched_duties: dutiesList,
-          cec_eligible: cec,
-          location_of_experience: ana.location_of_experience,
-          stored_file_id: rawData.stored_file_id,
-          is_premium_unlocked: !!rawData.is_premium_unlocked
-        });
+      if (rawData.document_valid && rawData.recommended_noc) {
+        setResult(mapApiResponse(rawData));
       } else {
         setResult({
           document_valid: false,
           rejection_reason: rawData.rejection_reason || 'Could not validate input.',
+          result_type: 'NO_MATCH',
           noc_code: '',
           noc_title: '',
+          confidence: 0,
           teer_category: '',
-          match_score: 0,
-          alternative_nocs: [],
-          explanation: '',
-          matched_duties: [],
           cec_eligible: false,
-          location_of_experience: 'unknown'
+          confidence_level: 'low',
+          why_this_noc: '',
+          key_matches: [],
+          key_gaps: [],
+          alternatives: [],
+          input_reliability: 'low',
+          location_of_experience: 'unknown',
+          important_note: '',
+          next_step: '',
         });
       }
     } catch (e) {
@@ -289,40 +204,16 @@ export const NOCFinderPage: FC<NOCFinderPageProps> = ({ onNavigate }) => {
     setError('');
     setLoading(true);
     setTargetNocOverride(targetNoc);
-    // Scroll up so the user sees the loading indicator
     window.scrollTo({ top: 0, behavior: 'smooth' });
     try {
       const token = await getToken() || '';
       const rawData = await reevaluateDocument(fileId, targetNoc, token, 'noc_finder');
       
-      if (rawData.noc_analysis) {
-        const ana = rawData.noc_analysis;
-        const teer = ana.detected_code.charAt(1);
-        const cec = ['0', '1', '2', '3'].includes(teer);
-        
-        const dutiesList: DutyMatch[] = ana.duties_match 
-          ? ana.duties_match.map((d: any) => ({
-              applicant_duty: d.applicant_duty || '',
-              official_noc_duty: d.official_noc_duty || '',
-              overlap_description: d.overlap_description || ''
-            }))
-          : [];
-
-        setResult({
-          document_valid: true,
-          rejection_reason: '',
-          noc_code: ana.detected_code,
-          noc_title: ana.detected_title,
-          teer_category: teer,
-          match_score: ana.match_score,
-          alternative_nocs: ana.alternative_nocs || [],
-          explanation: ana.notes || '',
-          matched_duties: dutiesList,
-          cec_eligible: cec,
-          location_of_experience: ana.location_of_experience,
-          stored_file_id: rawData.stored_file_id || fileId,
-          is_premium_unlocked: !!rawData.is_premium_unlocked || !!result?.is_premium_unlocked
-        });
+      if (rawData.recommended_noc || rawData.noc_analysis) {
+        const mapped = mapApiResponse(rawData);
+        mapped.stored_file_id = rawData.stored_file_id || fileId;
+        mapped.is_premium_unlocked = !!rawData.is_premium_unlocked || !!result?.is_premium_unlocked;
+        setResult(mapped);
       } else {
         setError('Re-evaluation returned no NOC analysis. Please try again.');
       }
@@ -374,6 +265,22 @@ export const NOCFinderPage: FC<NOCFinderPageProps> = ({ onNavigate }) => {
     processInput(file, jobTitle, duties);
   };
 
+  // Helpers for match styling
+  const getMatchBadge = (type: string) => {
+    switch (type) {
+      case 'STRONG_MATCH': return { label: 'Strong Match', bg: '#ECFDF5', color: '#059669', border: '#A7F3D0', icon: '✅' };
+      case 'MODERATE_MATCH': return { label: 'Moderate Match', bg: '#FFFBEB', color: '#D97706', border: '#FDE68A', icon: '⚠️' };
+      default: return { label: 'Weak Match', bg: '#FEF2F2', color: '#DC2626', border: '#FECACA', icon: '❌' };
+    }
+  };
+
+  const getConfidenceColor = (level: string) => {
+    switch (level) {
+      case 'high': return '#059669';
+      case 'medium': return '#D97706';
+      default: return '#DC2626';
+    }
+  };
 
   return (
     <div>
@@ -515,7 +422,7 @@ export const NOCFinderPage: FC<NOCFinderPageProps> = ({ onNavigate }) => {
                       <div>
                         <div style={{ fontSize: '0.85rem', fontWeight: 700, color: '#065F46', marginBottom: '4px' }}>100% Official IRCC Data. Zero Hallucinations.</div>
                         <div style={{ fontSize: '0.8rem', color: '#047857', lineHeight: 1.5 }}>
-                          Our model strictly cross-references your duties against the official NOC 2021 Version 1.0 Matrix. It was developed using thousands of real, successful PR employment letters to guarantee Express Entry compliance.
+                          Our model strictly cross-references your duties against the official NOC 2021 Version 1.0 Matrix.
                         </div>
                       </div>
                     </div>
@@ -539,22 +446,22 @@ export const NOCFinderPage: FC<NOCFinderPageProps> = ({ onNavigate }) => {
                   <div style={{ display: 'flex', alignItems: 'flex-start', gap: '10px' }}>
                     <span style={{ fontSize: '1.2rem' }}>📊</span>
                     <div>
-                      <div style={{ fontWeight: 600, fontSize: '0.9rem', marginBottom: '2px' }}>Match Score (How Strong Your Case Is)</div>
+                      <div style={{ fontWeight: 600, fontSize: '0.9rem', marginBottom: '2px' }}>Match Strength + Confidence</div>
                       <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>See how closely your duties align with the NOC</div>
                     </div>
                   </div>
                   <div style={{ display: 'flex', alignItems: 'flex-start', gap: '10px' }}>
                     <span style={{ fontSize: '1.2rem' }}>💡</span>
                     <div>
-                      <div style={{ fontWeight: 600, fontSize: '0.9rem', marginBottom: '2px' }}>Why This NOC Fits Your Duties</div>
-                      <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>Clear explanation of why this NOC was chosen</div>
+                      <div style={{ fontWeight: 600, fontSize: '0.9rem', marginBottom: '2px' }}>Key Matches & Gaps</div>
+                      <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>Know exactly what aligns and what's weak</div>
                     </div>
                   </div>
                   <div style={{ display: 'flex', alignItems: 'flex-start', gap: '10px' }}>
                     <span style={{ fontSize: '1.2rem' }}>🔄</span>
                     <div>
-                      <div style={{ fontWeight: 600, fontSize: '0.9rem', marginBottom: '2px' }}>Backup NOC Options (If Needed)</div>
-                      <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>Other NOC codes that could also apply</div>
+                      <div style={{ fontWeight: 600, fontSize: '0.9rem', marginBottom: '2px' }}>Alternative NOC Options</div>
+                      <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>Backup codes you can re-evaluate against</div>
                     </div>
                   </div>
                 </div>
@@ -583,13 +490,34 @@ export const NOCFinderPage: FC<NOCFinderPageProps> = ({ onNavigate }) => {
               </div>
             )}
 
-            {/* Result */}
-            {result && result.document_valid && (
+            {/* === RESULT CARD === */}
+            {result && result.document_valid && (() => {
+              const badge = getMatchBadge(result.result_type);
+              return (
               <div id="primary-match-section" className="result-card" style={{ marginTop: '32px' }}>
-                <h3 style={{ fontSize: '1.2rem', fontWeight: 700, marginBottom: '20px', color: 'var(--text-color)', borderBottom: '1px solid var(--border-color)', paddingBottom: '12px' }}>
-                  Top NOC Match Identified
-                </h3>
-                  
+                
+                {/* Header */}
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '20px', borderBottom: '1px solid var(--border-color)', paddingBottom: '16px' }}>
+                  <div>
+                    <h3 style={{ fontSize: '1.2rem', fontWeight: 700, margin: 0, color: 'var(--text-color)' }}>
+                      NOC Match Result
+                    </h3>
+                    {result.input_reliability !== 'high' && (
+                      <span style={{ fontSize: '0.75rem', color: '#D97706', marginTop: '4px', display: 'block' }}>
+                        ⚠️ Input reliability: {result.input_reliability} — results based on a resume/manual input may be less precise
+                      </span>
+                    )}
+                  </div>
+                  <span style={{ 
+                    padding: '6px 14px', borderRadius: '20px', fontSize: '0.8rem', fontWeight: 700,
+                    background: badge.bg, color: badge.color, border: `1px solid ${badge.border}`,
+                    whiteSpace: 'nowrap'
+                  }}>
+                    {badge.icon} {badge.label}
+                  </span>
+                </div>
+
+                {/* NOC Code + Title */}
                 <div className="result-card-header" style={{ marginBottom: '20px' }}>
                   <div className="result-card-icon">🎯</div>
                   <div>
@@ -598,278 +526,196 @@ export const NOCFinderPage: FC<NOCFinderPageProps> = ({ onNavigate }) => {
                   </div>
                 </div>
 
+                {/* Stats Grid */}
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '20px' }}>
                   <div style={{ padding: '14px', background: 'white', borderRadius: '10px', border: '1px solid var(--border-color)' }}>
-                    <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '4px' }}>TEER Category</div>
-                    <div style={{ fontSize: '1.1rem', fontWeight: 700 }}>{result.teer_category}</div>
+                    <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '4px' }}>TEER Category</div>
+                    <div style={{ fontSize: '1.4rem', fontWeight: 700 }}>{result.teer_category}</div>
                   </div>
-                  <div style={{ padding: '14px', background: '#F8FAFC', borderRadius: '10px', border: '1px solid var(--border-color)' }}>
-                    <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '4px' }}>Match Strength</div>
-                    <div style={{ fontSize: '1.1rem', fontWeight: 700, color: result.match_score >= 80 ? '#059669' : result.match_score >= 70 ? '#D97706' : '#EF4444', ...(result.is_premium_unlocked ? {} : { filter: 'blur(6px)', userSelect: 'none' as const }) }}>
-                      {result.match_score >= 80 ? 'Strong Match' : result.match_score >= 70 ? 'Good Match' : 'Moderate Match'}
-                    </div>
-                  </div>
-                </div>
-
-                {/* Strategic uncertainty + move explanation behind paywall */}
-                <div style={{ 
-                  padding: '14px 16px', 
-                  background: '#FFFBEB', 
-                  border: '1px solid #FDE68A', 
-                  borderRadius: '10px', 
-                  marginBottom: '20px',
-                  fontSize: '0.88rem',
-                  color: '#92400E',
-                  lineHeight: 1.6
-                }}>
-                  ⚠️ This is your strongest match based on your duties — but IRCC approval depends on detailed duty-to-NOC alignment. Unlock the full analysis below to confirm this is the right code for your application.
-                </div>
-
-                {/* --- TEASER/UNLOCKED SECTION --- */}
-                {result.matched_duties && result.matched_duties.length > 0 && (
-                  <div style={{ marginBottom: '24px' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
-                      <h4 style={{ fontSize: '1rem', fontWeight: 700, margin: 0 }}>Duty-by-Duty Alignment</h4>
-                      <span style={{ fontSize: '0.7rem', color: '#059669', background: '#D1FAE5', padding: '4px 8px', borderRadius: '4px', fontWeight: 700 }}>
-                        ✓ VERIFIED DRAFT
+                  <div style={{ padding: '14px', background: '#F8FAFC', borderRadius: '10px', border: '1px solid var(--border-color)', position: 'relative' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '5px', marginBottom: '4px' }}>
+                      <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>NOC Confidence</div>
+                      <span style={{ position: 'relative', display: 'inline-flex' }}>
+                        <span 
+                          className="noc-confidence-bulb"
+                          style={{ fontSize: '0.85rem', cursor: 'help', lineHeight: 1 }}
+                          tabIndex={0}
+                        >💡</span>
+                        <span className="noc-confidence-tooltip">
+                          How closely your duties match this NOC's official IRCC requirements.
+                        </span>
                       </span>
                     </div>
-                    <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginBottom: '16px' }}>
-                      We cross-reference your exact wording exclusively against the official IRCC NOC 2021 Version 1.0 database. No hallucinations, no generic AI guessing.
-                    </p>
-                    
-                    {/* Render the FIRST duty (index 0) completely unblurred as a teaser */}
-                    <div style={{
-                      background: '#F8FAFC',
-                      border: '1px solid var(--border-color)',
-                      borderRadius: '12px',
-                      padding: '16px 18px',
-                      fontSize: '0.88rem',
-                      lineHeight: 1.6
-                    }}>
-                      <div style={{ display: 'flex', alignItems: 'flex-start', gap: '8px', marginBottom: '10px' }}>
-                        <span style={{ 
-                          background: 'var(--primary-color)', color: 'white', 
-                          borderRadius: '50%', width: '22px', height: '22px', minWidth: '22px',
-                          display: 'flex', alignItems: 'center', justifyContent: 'center',
-                          fontSize: '0.7rem', fontWeight: 700, marginTop: '1px'
-                        }}>1</span>
-                        <div>
-                          <div style={{ fontSize: '0.7rem', textTransform: 'uppercase', letterSpacing: '0.5px', color: 'var(--text-muted)', fontWeight: 600, marginBottom: '3px' }}>Your Duty</div>
-                          <div style={{ color: 'var(--text-color)', fontWeight: 500 }}>{result.matched_duties[0].applicant_duty}</div>
+                    <div style={{ fontSize: '1.4rem', fontWeight: 700, color: getConfidenceColor(result.confidence_level) }}>
+                      {result.confidence}%
+                    </div>
+                  </div>
+                </div>
+
+                {/* Why This NOC */}
+                {result.why_this_noc && (
+                  <div style={{ padding: '16px', background: '#F8FAFC', borderRadius: '10px', border: '1px solid var(--border-color)', marginBottom: '20px' }}>
+                    <div style={{ fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.5px', color: 'var(--text-muted)', fontWeight: 600, marginBottom: '6px' }}>Why This NOC</div>
+                    <p style={{ margin: 0, fontSize: '0.9rem', lineHeight: 1.6, color: 'var(--text-color)' }}>{result.why_this_noc}</p>
+                  </div>
+                )}
+
+                {/* Key Matches */}
+                {result.key_matches && result.key_matches.length > 0 && (
+                  <div style={{ marginBottom: '20px' }}>
+                    <h4 style={{ fontSize: '0.9rem', fontWeight: 700, marginBottom: '10px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                      <span style={{ color: '#059669' }}>✅</span> Aligned Responsibilities
+                    </h4>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                      {result.key_matches.map((match, i) => (
+                        <div key={i} style={{ padding: '10px 14px', background: '#F0FDF4', borderRadius: '8px', border: '1px solid #BBF7D0', fontSize: '0.88rem', lineHeight: 1.5 }}>
+                          {match}
                         </div>
-                      </div>
-                      <div style={{ borderLeft: '2px solid #C7D2FE', paddingLeft: '14px', marginLeft: '10px' }}>
-                        <div style={{ fontSize: '0.7rem', textTransform: 'uppercase', letterSpacing: '0.5px', color: '#4338CA', fontWeight: 600, marginBottom: '3px' }}>Matching Official NOC Duty</div>
-                        <div style={{ color: 'var(--text-muted)', marginBottom: '8px' }}>{result.matched_duties[0].official_noc_duty}</div>
-                        <div style={{ 
-                          fontSize: '0.82rem', color: '#059669', fontStyle: 'italic',
-                          background: '#F0FDF4', padding: '8px 12px', borderRadius: '8px',
-                          border: '1px solid #BBF7D0'
-                        }}>
-                          💡 {result.matched_duties[0].overlap_description}
-                        </div>
-                      </div>
+                      ))}
                     </div>
                   </div>
                 )}
 
-                {/* --- PREMIUM LOCKED SECTION --- */}
-                <div style={{ position: 'relative', marginTop: '20px' }}>
+                {/* Key Gaps — behind paywall */}
+                <div style={{ position: 'relative' }}>
                   <div style={!(result.is_premium_unlocked) ? { filter: 'blur(6px)', pointerEvents: 'none', userSelect: 'none', opacity: 0.6 } : {}}>
-                    {/* Explanation — now premium */}
-                    {result.explanation && (
-                      <div style={{ marginBottom: '24px' }}>
-                        <h4 style={{ fontSize: '0.95rem', fontWeight: 700, marginBottom: '8px' }}>Why This NOC Fits Your Duties:</h4>
-                        <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem', lineHeight: 1.6 }}>{result.explanation}</p>
-                      </div>
-                    )}
-                    {/* Render the REST of the duties (index 1 and beyond) inside the blur */}
-                    {result.matched_duties && result.matched_duties.length > 1 && (
-                      <div style={{ marginBottom: '24px' }}>
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                          {result.matched_duties.slice(1).map((duty, i) => (
-                            <div key={i+1} style={{
-                              background: '#F8FAFC',
-                              border: '1px solid var(--border-color)',
-                              borderRadius: '12px',
-                              padding: '16px 18px',
-                              fontSize: '0.88rem',
-                              lineHeight: 1.6
-                            }}>
-                              <div style={{ display: 'flex', alignItems: 'flex-start', gap: '8px', marginBottom: '10px' }}>
-                                <span style={{ 
-                                  background: 'var(--primary-color)', color: 'white', 
-                                  borderRadius: '50%', width: '22px', height: '22px', minWidth: '22px',
-                                  display: 'flex', alignItems: 'center', justifyContent: 'center',
-                                  fontSize: '0.7rem', fontWeight: 700, marginTop: '1px'
-                                }}>{i + 2}</span>
-                                <div>
-                                  <div style={{ fontSize: '0.7rem', textTransform: 'uppercase', letterSpacing: '0.5px', color: 'var(--text-muted)', fontWeight: 600, marginBottom: '3px' }}>Your Duty</div>
-                                  <div style={{ color: 'var(--text-color)', fontWeight: 500 }}>{duty.applicant_duty}</div>
-                                </div>
-                              </div>
-                              <div style={{ borderLeft: '2px solid #C7D2FE', paddingLeft: '14px', marginLeft: '10px' }}>
-                                <div style={{ fontSize: '0.7rem', textTransform: 'uppercase', letterSpacing: '0.5px', color: '#4338CA', fontWeight: 600, marginBottom: '3px' }}>Matching Official NOC Duty</div>
-                                <div style={{ color: 'var(--text-muted)', marginBottom: '8px' }}>{duty.official_noc_duty}</div>
-                                <div style={{ 
-                                  fontSize: '0.82rem', color: '#059669', fontStyle: 'italic',
-                                  background: '#F0FDF4', padding: '8px 12px', borderRadius: '8px',
-                                  border: '1px solid #BBF7D0'
-                                }}>
-                                  💡 {duty.overlap_description}
-                                </div>
-                              </div>
+                    {result.key_gaps && result.key_gaps.length > 0 && (
+                      <div style={{ marginBottom: '20px' }}>
+                        <h4 style={{ fontSize: '0.9rem', fontWeight: 700, marginBottom: '10px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                          <span style={{ color: '#DC2626' }}>⚠️</span> Gaps / Missing Areas
+                        </h4>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                          {result.key_gaps.map((gap, i) => (
+                            <div key={i} style={{ padding: '10px 14px', background: '#FEF2F2', borderRadius: '8px', border: '1px solid #FECACA', fontSize: '0.88rem', lineHeight: 1.5 }}>
+                              {gap}
                             </div>
                           ))}
                         </div>
                       </div>
                     )}
-                    
-                    {result.alternative_nocs && result.alternative_nocs.length > 0 && (
+
+                    {/* Alternatives */}
+                    {result.alternatives && result.alternatives.length > 0 && (
                       <div style={{ marginBottom: '24px', borderTop: '1px solid var(--border-color)', paddingTop: '20px' }}>
                         <h4 style={{ fontSize: '0.95rem', fontWeight: 700, marginBottom: '12px' }}>Other Potential Matches:</h4>
-                        <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginBottom: '16px' }}>Not sure about the primary match? Click any code below to re-evaluate your duties strictly against that target NOC.</p>
+                        <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginBottom: '16px' }}>Not sure about the primary match? Click any code below to re-evaluate against that NOC.</p>
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                          {result.alternative_nocs.map((alt, i) => {
-                            const label = alt.match_score >= 80 ? 'Strong Match' : alt.match_score >= 70 ? 'Good Match' : 'Moderate Match';
-                            const labelColor = alt.match_score >= 80 ? '#059669' : alt.match_score >= 70 ? '#D97706' : '#9CA3AF';
-                            const labelBg = alt.match_score >= 80 ? '#ECFDF5' : alt.match_score >= 70 ? '#FFFBEB' : '#F9FAFB';
+                          {result.alternatives.map((alt, i) => {
+                            const altBadge = getMatchBadge(
+                              alt.confidence >= 75 ? 'STRONG_MATCH' : alt.confidence >= 60 ? 'MODERATE_MATCH' : 'NO_MATCH'
+                            );
                             return (
                             <div 
                               key={i} 
-                              onClick={() => processInput(file, jobTitle, duties, alt.noc_code)}
+                              onClick={() => processInput(file, jobTitle, duties, alt.code)}
                               className="alternative-noc-card"
                               style={{ background: '#F8FAFC', padding: '16px', borderRadius: '8px', border: '1px solid var(--border-color)', cursor: 'pointer' }}
                             >
-                              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
-                                <div style={{ fontWeight: 600, fontSize: '0.95rem' }}>NOC {alt.noc_code} — {alt.noc_title}</div>
+                              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
+                                <div style={{ fontWeight: 600, fontSize: '0.95rem' }}>NOC {alt.code} — {alt.title}</div>
                                 <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                                  <span style={{ fontWeight: 600, color: labelColor, fontSize: '0.8rem', background: labelBg, padding: '4px 10px', borderRadius: '6px' }}>{label}</span>
+                                  <span style={{ fontWeight: 600, color: altBadge.color, fontSize: '0.8rem', background: altBadge.bg, padding: '4px 10px', borderRadius: '6px' }}>{altBadge.label}</span>
                                   <span style={{ fontSize: '0.8rem', color: 'var(--primary-color)', fontWeight: 600 }} className="target-btn">Re-evaluate →</span>
                                 </div>
                               </div>
-                              <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', lineHeight: 1.5, margin: 0 }}>{alt.explanation}</p>
                             </div>
                             );
                           })}
                         </div>
                       </div>
                     )}
-                  </div> {/* End Blurred Area */}
-                  
-                  {/* Paywall Overlay */}
-                  {!(result.is_premium_unlocked) && (
+                  </div>
+
+                  {/* Sign-in Gate — NOC Finder is free for signed-in users */}
+                  {!(result.is_premium_unlocked) && !isSignedIn && (
                     <div style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, zIndex: 10, pointerEvents: 'none' }}>
                       <div style={{ position: 'sticky', top: '25vh', display: 'flex', justifyContent: 'center', pointerEvents: 'auto', padding: '0 20px' }}>
                         <div className="card" style={{ width: '100%', maxWidth: '500px', background: 'white', border: '2px solid var(--primary-color)', textAlign: 'center', boxShadow: '0 20px 40px rgba(0,0,0,0.2)' }}>
-                          <div style={{ fontSize: '2.5rem', marginBottom: '10px' }}>🛡️</div>
-                        <h3 style={{ fontSize: '1.3rem', fontWeight: 800, marginBottom: '8px' }}>Don't Submit Until You're Sure</h3>
+                          <div style={{ fontSize: '2.5rem', marginBottom: '10px' }}>🔓</div>
+                        <h3 style={{ fontSize: '1.3rem', fontWeight: 800, marginBottom: '8px' }}>Sign In to See Your Full Results</h3>
                         <p style={{ color: 'var(--text-muted)', marginBottom: '16px', lineHeight: 1.5, fontSize: '0.93rem' }}>
-                          A wrong NOC code can get your application refused. Unlock the full analysis to:
+                          The NOC Finder is <strong>100% free</strong> for signed-in users. Create an account in seconds to:
                         </p>
                         <ul style={{ textAlign: 'left', listStyleType: 'none', padding: 0, margin: '0 0 20px 0', fontSize: '0.9rem', display: 'grid', gap: '8px' }}>
-                          <li>✅ See the remaining {result.matched_duties ? result.matched_duties.length - 1 : 0} duty alignments</li>
-                          <li>✅ Confirm this NOC is safe for your PR application</li>
-                          <li>✅ See exactly why it matches your duties</li>
-                          <li>✅ Identify risks or weak alignment before submission</li>
+                          <li>✅ See the {result.key_gaps?.length || 0} gap(s) IRCC may flag in your application</li>
+                          <li>✅ Confirm this NOC is safe for your PR submission</li>
                           <li>✅ Discover backup NOC options (if applicable)</li>
+                          <li>✅ Re-evaluate against any alternative NOC</li>
                         </ul>
                         
-                        {!isSignedIn ? (
-                          <SignInButton mode="modal" forceRedirectUrl={window.location.href} signUpForceRedirectUrl={window.location.href}>
-                            <button className="btn btn-primary" style={{ width: '100%', padding: '14px', fontSize: '1.05rem' }}>
-                              Get Confidence Before Submitting
-                            </button>
-                          </SignInButton>
-                        ) : credits > 0 ? (
-                          <button className="btn btn-primary" onClick={handleUnlock} disabled={isUnlocking} style={{ width: '100%', padding: '14px', fontSize: '1.05rem' }}>
-                            {isUnlocking ? 'Unlocking...' : `Unlock Full Analysis (1 Credit — ${credits} left)`}
+                        <SignInButton mode="modal" forceRedirectUrl={window.location.href} signUpForceRedirectUrl={window.location.href}>
+                          <button className="btn btn-primary" style={{ width: '100%', padding: '14px', fontSize: '1.05rem' }}>
+                            Sign In — It's Free
                           </button>
-                        ) : (
-                          <button className="btn btn-primary" onClick={handleCheckout} disabled={isBuying} style={{ width: '100%', padding: '14px', fontSize: '1.05rem', background: '#10b981', borderColor: '#10b981' }}>
-                            {isBuying ? 'Redirecting to Stripe...' : 'Unlock Full Analysis — $4.90 CAD'}
-                          </button>
-                        )}
-                        <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '12px', marginBottom: 0 }}>One-time purchase. No subscription.</p>
+                        </SignInButton>
+                        <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '12px', marginBottom: 0 }}>Free forever. No credit card required.</p>
                       </div>
                       </div>
                     </div>
                   )}
                 </div>
 
+                {/* CEC Eligibility Info */}
                 <div className={`highlight-box ${result.cec_eligible ? 'highlight-box-blue' : ''}`}>
                   {!result.cec_eligible ? (
-                    /* TEER 4 or 5 — not eligible regardless of location */
                     <p style={{ margin: 0, fontSize: '0.9rem', lineHeight: 1.7 }}>
                       ⚠️ <strong>NOC {result.noc_code} falls under TEER {result.teer_category}.</strong><br />
-                      Occupations in TEER 4 or 5 are generally <strong>NOT</strong> eligible for core Express Entry CRS points or the Canadian Experience Class. You may need to look into targeted Provincial Nominee Programs (PNPs) or specific industry pilots.
+                      Occupations in TEER 4 or 5 are generally <strong>NOT</strong> eligible for core Express Entry CRS points or the Canadian Experience Class.
                     </p>
                   ) : file && result.location_of_experience === 'canada' ? (
-                    /* File uploaded + Canadian experience detected */
                     <p style={{ margin: 0, fontSize: '0.9rem', lineHeight: 1.7 }}>
                       ✅ <strong>NOC {result.noc_code} falls under TEER {result.teer_category}.</strong><br />
-                      This occupation is eligible for the <strong>Canadian Experience Class (CEC)</strong> (Provided you have legally accumulated at least 1,560 hours of total qualifying Canadian experience in TEER 0, 1, 2, or 3 occupations).
+                      This occupation is eligible for the <strong>Canadian Experience Class (CEC)</strong> (Provided you have at least 1,560 hours of qualifying Canadian experience).
                     </p>
                   ) : file && result.location_of_experience === 'outside_canada' ? (
-                    /* File uploaded + Foreign experience detected */
                     <p style={{ margin: 0, fontSize: '0.9rem', lineHeight: 1.7 }}>
                       ✅ <strong>NOC {result.noc_code} falls under TEER {result.teer_category}.</strong><br />
-                      This foreign experience is highly valuable! While it does not count towards the Canadian Experience Class (CEC), having 1 to 3+ years of verifiable foreign work experience in TEER 0, 1, 2, or 3 can <strong>significantly increase your baseline Comprehensive Ranking System (CRS) score.</strong>
+                      This foreign experience doesn't count for CEC, but 1-3+ years of verifiable foreign work in TEER 0-3 can <strong>significantly increase your CRS score.</strong>
                     </p>
                   ) : (
-                    /* Manual entry OR location unknown — show both possibilities */
                     <div style={{ margin: 0, fontSize: '0.9rem', lineHeight: 1.7 }}>
                       <p style={{ margin: '0 0 8px 0' }}>
                         ✅ <strong>NOC {result.noc_code} falls under TEER {result.teer_category}.</strong><br />
                         This skilled occupation is highly valuable for Express Entry.
                       </p>
                       <ul style={{ margin: 0, paddingLeft: '20px' }}>
-                        <li><strong>If this was inside Canada:</strong> It counts toward your Canadian Experience Class (CEC) eligibility.</li>
-                        <li><strong>If this was outside Canada:</strong> It can significantly increase your baseline Comprehensive Ranking System (CRS) score.</li>
+                        <li><strong>If inside Canada:</strong> Counts toward CEC eligibility.</li>
+                        <li><strong>If outside Canada:</strong> Can significantly increase your CRS score.</li>
                       </ul>
                     </div>
                   )}
                 </div>
 
-                {/* Cross-sell CTA — shows different messaging based on unlock status */}
+                {/* Important Note */}
+                {result.important_note && (
+                  <div style={{ padding: '12px 16px', background: '#FFFBEB', border: '1px solid #FDE68A', borderRadius: '8px', marginTop: '16px', fontSize: '0.85rem', color: '#92400E', lineHeight: 1.6 }}>
+                    ⚠️ {result.important_note}
+                  </div>
+                )}
+
+                {/* Cross-sell CTA to Auditor */}
                 <div style={{ 
                   marginTop: '24px', 
                   padding: '28px', 
                   textAlign: 'center',
-                  background: result.is_premium_unlocked 
-                    ? 'linear-gradient(135deg, #FEF3C7, #FDE68A)'
-                    : 'linear-gradient(135deg, #EEF2FF, #E0E7FF)',
+                  background: 'linear-gradient(135deg, #FEF3C7, #FDE68A)',
                   borderRadius: '14px',
-                  border: result.is_premium_unlocked ? '1px solid #F59E0B' : '1px solid #C7D2FE'
+                  border: '1px solid #F59E0B'
                 }}>
-                  {result.is_premium_unlocked ? (
-                    <>
-                      <h4 style={{ fontSize: '1.05rem', fontWeight: 700, marginBottom: '8px', color: '#92400E' }}>
-                        Your NOC is {result.noc_code}. But does your employment letter actually prove it?
-                      </h4>
-                      <p style={{ fontSize: '0.9rem', color: '#78350F', marginBottom: '16px', lineHeight: 1.5 }}>
-                        IRCC won't accept your NOC claim if your letter doesn't list duties that match. Our AI auditor checks your letter against all 9 mandatory requirements — missing even one can delay or refuse your application.
-                      </p>
-                      <button className="btn btn-primary btn-lg" onClick={() => onNavigate('audit-employment-letter', { fileId: result.stored_file_id, targetNoc: result.noc_code })} style={{ background: '#D97706', borderColor: '#D97706' }}>
-                        📄 Audit My Letter — $4.90 CAD
-                      </button>
-                      <p style={{ fontSize: '0.75rem', color: '#92400E', marginTop: '10px', marginBottom: 0 }}>One-time purchase. Instant results.</p>
-                    </>
-                  ) : (
-                    <>
-                      <h4 style={{ fontSize: '1rem', fontWeight: 700, marginBottom: '8px', color: '#312E81' }}>Next Step: Audit Your Employment Letter</h4>
-                      <p style={{ fontSize: '0.9rem', color: '#4338CA', marginBottom: '16px', lineHeight: 1.5 }}>
-                        Now that you know your NOC code, make sure your letter has all 9 IRCC mandatory requirements. Missing even one can delay your application.
-                      </p>
-                      <button className="btn btn-primary btn-lg" onClick={() => onNavigate('audit-employment-letter', { fileId: result.stored_file_id, targetNoc: result.noc_code })}>
-                        📄 Audit My Employment Letter
-                      </button>
-                    </>
-                  )}
+                  <h4 style={{ fontSize: '1.05rem', fontWeight: 700, marginBottom: '8px', color: '#92400E' }}>
+                    Your NOC is {result.noc_code}. But does your employment letter actually prove it?
+                  </h4>
+                  <p style={{ fontSize: '0.9rem', color: '#78350F', marginBottom: '16px', lineHeight: 1.5 }}>
+                    {result.next_step || 'Run a full Employment Letter Audit to confirm eligibility and reduce refusal risk.'}
+                  </p>
+                  <button className="btn btn-primary btn-lg" onClick={() => onNavigate('audit-employment-letter', { fileId: result.stored_file_id, targetNoc: result.noc_code })} style={{ background: '#D97706', borderColor: '#D97706' }}>
+                    📄 Audit My Letter — $24.90 CAD
+                  </button>
+                  <p style={{ fontSize: '0.75rem', color: '#92400E', marginTop: '10px', marginBottom: 0 }}>One-time purchase. Instant results.</p>
                 </div>
               </div>
-            )}
+              );
+            })()}
 
             {/* Bottom CTA — only shown when no result yet */}
             {!result && !loading && (

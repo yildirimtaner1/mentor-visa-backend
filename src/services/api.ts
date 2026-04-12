@@ -26,7 +26,7 @@ export async function uploadDocument(file: File, targetNoc?: string): Promise<An
   }
 }
 
-export async function reevaluateDocument(fileId: string, targetNoc: string, token: string, mode: string = 'audit'): Promise<AnalysisResponse> {
+export async function reevaluateDocument(fileId: string, targetNoc: string, token: string, mode: string = 'audit'): Promise<any> {
   const response = await fetch(`${API_BASE_URL}/api/v1/reevaluate`, {
     method: 'POST',
     headers: {
