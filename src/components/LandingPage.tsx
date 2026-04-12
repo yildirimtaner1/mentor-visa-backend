@@ -209,7 +209,7 @@ export const LandingPage: FC<LandingPageProps> = ({ onNavigate }) => {
       {/* Pricing */}
       <section className="section section-dark">
         <h2 className="section-title">Simple Pricing</h2>
-        <p className="section-subtitle">Find your NOC code for less than a coffee. No subscriptions, no hidden fees.</p>
+        <p className="section-subtitle">Audit your employment letter before IRCC does. No subscriptions, no hidden fees.</p>
         <div style={{ maxWidth: '480px', margin: '0 auto' }}>
           <div className="feature-card" style={{ 
             textAlign: 'center', 
@@ -221,19 +221,19 @@ export const LandingPage: FC<LandingPageProps> = ({ onNavigate }) => {
               $24.90 <span style={{ fontSize: '1rem', color: 'var(--text-muted)', fontWeight: 400 }}>CAD</span>
             </div>
             <p style={{ color: 'var(--text-muted)', marginBottom: '24px', fontSize: '1rem' }}>
-              One-time purchase. One full NOC analysis.
+              One-time purchase. One full employment letter audit.
             </p>
             <ul style={{ listStyleType: 'none', padding: 0, margin: '0 0 32px 0', display: 'grid', gap: '12px', textAlign: 'left' }}>
-              <li style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>✅ Detailed explanation of why the NOC fits</li>
-              <li style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>✅ TEER category + CEC eligibility</li>
-              <li style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>✅ Alternative NOC matches with re-evaluate</li>
-              <li style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>✅ Saved to your account for future reference</li>
+              <li style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>✅ Check all 9 IRCC mandatory requirements</li>
+              <li style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>✅ NOC duty-by-duty coverage analysis</li>
+              <li style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>✅ PFL (Procedural Fairness Letter) risk assessment</li>
+              <li style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>✅ Re-evaluate against any NOC code</li>
             </ul>
-            <button className="btn btn-primary btn-lg" onClick={() => onNavigate('find-my-noc')} style={{ width: '100%' }}>
-              Find My NOC Code Now
+            <button className="btn btn-primary btn-lg" onClick={() => onNavigate('audit-employment-letter')} style={{ width: '100%' }}>
+              Audit My Employment Letter
             </button>
             <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginTop: '16px' }}>
-              Initial NOC match + confidence score is visible before purchase.
+              Instant results. Know exactly what to fix before you submit.
             </p>
           </div>
         </div>
@@ -243,13 +243,13 @@ export const LandingPage: FC<LandingPageProps> = ({ onNavigate }) => {
 
       {/* Also Available */}
       <section className="section">
-        <h2 className="section-title">Also Available</h2>
-        <p className="section-subtitle">Tools built specifically for Express Entry applicants.</p>
+        <h2 className="section-title">Free Tools for Express Entry</h2>
+        <p className="section-subtitle">Use these tools at no cost — just sign in to get started.</p>
         <div className="steps-grid">
-          <div className="step-card" onClick={() => onNavigate('audit-employment-letter')} style={{ cursor: 'pointer' }}>
-            <div className="step-icon">📄</div>
-            <h3>Employment Letter Auditor</h3>
-            <p>Upload your employment letter and check it against all 9 IRCC mandatory requirements. Catches missing elements before your officer does.</p>
+          <div className="step-card" onClick={() => onNavigate('find-my-noc')} style={{ cursor: 'pointer' }}>
+            <div className="step-icon">🎯</div>
+            <h3>NOC Finder <span style={{ fontSize: '0.7rem', background: '#059669', color: 'white', padding: '2px 8px', borderRadius: '4px', marginLeft: '6px', verticalAlign: 'middle' }}>FREE</span></h3>
+            <p>AI matches your job duties to the correct NOC 2021 code. Analyzes all 516 unit groups in seconds. Free for signed-in users.</p>
           </div>
           <div className="step-card" onClick={() => onNavigate('crs-calculator')} style={{ cursor: 'pointer' }}>
             <div className="step-icon">📊</div>
@@ -290,7 +290,7 @@ export const LandingPage: FC<LandingPageProps> = ({ onNavigate }) => {
           </details>
           <details className="faq-item">
             <summary>Can I try before I buy?</summary>
-            <p>Yes. The initial NOC match — your primary code, match score, and TEER category — is visible before purchase. The detailed duty-by-duty breakdown, alternative matches, and re-evaluation features are unlocked with a pass.</p>
+            <p>The NOC Finder tool is completely free for signed-in users. For the Employment Letter Auditor, you'll see a preview of your results before purchasing. The full audit — including compliance checks, duty coverage, and PFL risk assessment — is unlocked with a one-time $24.90 CAD payment.</p>
           </details>
         </div>
       </section>

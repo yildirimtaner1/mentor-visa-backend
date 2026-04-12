@@ -741,7 +741,7 @@ export const NOCFinderPage: FC<NOCFinderPageProps> = ({ onNavigate }) => {
                   </button>
                 </div>
                 <p style={{ fontSize: '0.75rem', opacity: 0.6, marginTop: '16px', marginBottom: 0 }}>
-                  No sign-up required. Initial NOC match + score shown before purchase.
+                  100% free for signed-in users. No credit card required.
                 </p>
               </div>
             )}
