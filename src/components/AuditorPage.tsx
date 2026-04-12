@@ -88,6 +88,30 @@ export const AuditorPage: FC = () => {
     }
   }, [location.state, getToken, isSignedIn]);
 
+  // When user signs in after uploading as anonymous, claim the record
+  const prevSignedIn = useRef(isSignedIn);
+  useEffect(() => {
+    if (!prevSignedIn.current && isSignedIn) {
+      // Restore result from sessionStorage if it was lost during sign-in redirect
+      let currentResult = result;
+      if (!currentResult) {
+        const saved = sessionStorage.getItem('mentorVisaAnalysisResult');
+        if (saved) {
+          currentResult = JSON.parse(saved);
+          setResult(currentResult);
+        }
+      }
+      if (currentResult) {
+        getToken().then((token) => {
+          if (token) {
+            saveEvaluation(currentResult!, token).catch(console.error);
+          }
+        });
+      }
+    }
+    prevSignedIn.current = isSignedIn;
+  }, [isSignedIn, result, getToken]);
+
   const handleDragOver = (e: DragEvent) => {
     e.preventDefault();
     setIsDragActive(true);
