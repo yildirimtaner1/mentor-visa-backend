@@ -1,0 +1,163 @@
+{
+  "document_type": "Employment Letter",
+  "role_name": "Site Engineer",
+  "company_name": "Yenigun Construction Company",
+  "decision": "PFL_RISK",
+  "confidence_score": 90,
+  "officer_narrative": "The applicant has provided an employment letter for the role of Site Engineer. While the letter is compliant with formatting requirements, the duties described raise concerns regarding alignment with the claimed NOC 21300 - Civil engineers. The role appears heavily focused on site supervision, coordination of trades, and quality control of materials, with a notable absence of duties related to engineering design, project planning, or pre-construction technical analysis. The demonstrated duties cover approximately 64% of the NOC's main responsibilities, which is insufficient to establish that the applicant performed the actions of a Civil Engineer for the majority of the employment period. A Procedural Fairness Letter may be warranted to address these discrepancies.",
+  "noc_analysis": {
+    "applicable": true,
+    "detected_code": "21300",
+    "detected_title": "Civil engineers",
+    "match_score": 64,
+    "confidence": 95,
+    "alternative_nocs": [],
+    "notes": "The selected NOC aligns with the 'Site Engineer' title and the engineering oversight duties. However, the letter is critically weak on the design, planning, and analytical duties central to this profession, focusing almost exclusively on site execution and supervision. This results in a match score that indicates significant risk.",
+    "lead_statement_official": "Civil engineers plan, design, develop and manage projects for the construction or repair of buildings, earth structures, powerhouses, roads, airports, railways, rapid transit facilities, bridges, tunnels, canals, dams, ports and coastal installations and systems related to highway and transportation services, water distribution and sanitation. Civil engineers may also specialize in foundation analysis, building and structural inspection, surveying, geomatics and municipal planning. They are employed by engineering consulting companies, in all levels of government, by construction firms and in many other industries, or they may be self-employed.",
+    "lead_statement_applicant": "During his employment, he performed professional engineering duties related to the execution and supervision of civil construction works.",
+    "lead_statement_overlap": "The applicant's role aligns with the management and supervision aspects of civil engineering projects mentioned in the lead statement, specifically within a construction firm context.",
+    "duties_match": [
+      {
+        "noc_duty": "Confer with clients and other members of the engineering team and conduct research to determine project requirements",
+        "letter_evidence": "NOT FOUND IN LETTER",
+        "match_strength": "missing",
+        "overlap_description": "The letter does not mention any client-facing or requirements-gathering duties."
+      },
+      {
+        "noc_duty": "Plan and design major civil projects such as buildings, roads, bridges, dams, water and waste management systems and structural steel fabrications",
+        "letter_evidence": "NOT FOUND IN LETTER",
+        "match_strength": "missing",
+        "overlap_description": "There is no evidence of planning or design work; the role is described as execution and supervision."
+      },
+      {
+        "noc_duty": "Develop construction specifications and procedures",
+        "letter_evidence": "Reviewed project technical specifications, relevant standards, and construction drawings, and ensured that all construction works were executed in accordance with approved method statements and construction procedures...",
+        "match_strength": "partial",
+        "overlap_description": "The applicant reviewed and ensured compliance with existing specifications and procedures, but did not develop them."
+      },
+      {
+        "noc_duty": "Evaluate and recommend appropriate building and construction materials",
+        "letter_evidence": "Evaluated the quality and compliance of construction materials received on site, carried out inspections, and prepared quality control and defect reports where applicable.",
+        "match_strength": "strong",
+        "overlap_description": "The letter confirms the applicant was responsible for evaluating the quality and compliance of construction materials."
+      },
+      {
+        "noc_duty": "Interpret, review and approve survey and civil design work",
+        "letter_evidence": "Reviewed project technical specifications, relevant standards, and construction drawings, and ensured that all construction works were executed in full compliance with approved specifications, drawings, and applicable engineering standards.",
+        "match_strength": "strong",
+        "overlap_description": "The applicant's duty to review technical specifications and drawings is a strong match for this NOC duty."
+      },
+      {
+        "noc_duty": "Conduct field services for civil works",
+        "letter_evidence": "...conducted these activities as part of on-site civil engineering field services.",
+        "match_strength": "strong",
+        "overlap_description": "The letter explicitly states the applicant conducted on-site civil engineering field services."
+      },
+      {
+        "noc_duty": "Ensure construction plans meet guidelines and specifications of building codes and other regulations",
+        "letter_evidence": "ensured that all construction works were executed in full compliance with approved specifications, drawings, and applicable engineering standards.",
+        "match_strength": "strong",
+        "overlap_description": "This duty is clearly demonstrated by ensuring work complied with approved specifications and standards."
+      },
+      {
+        "noc_duty": "Establish and monitor construction work schedules",
+        "letter_evidence": "Prepared and monitored weekly and daily construction work schedules for all assigned activities to ensure timely execution in accordance with approved project timelines.",
+        "match_strength": "strong",
+        "overlap_description": "The letter provides direct evidence of preparing and monitoring construction work schedules."
+      },
+      {
+        "noc_duty": "Conduct feasibility studies, economic analyses, municipal and regional traffic studies, environmental impact studies or other investigations",
+        "letter_evidence": "NOT FOUND IN LETTER",
+        "match_strength": "missing",
+        "overlap_description": "The letter contains no evidence of conducting feasibility studies or similar analytical investigations."
+      },
+      {
+        "noc_duty": "Monitor air, water and soil quality and develop procedures to clean up contaminated sites",
+        "letter_evidence": "NOT FOUND IN LETTER",
+        "match_strength": "missing",
+        "overlap_description": "Environmental monitoring duties are not mentioned in the letter."
+      },
+      {
+        "noc_duty": "Conduct technical analyses of survey and field data for development of topographic, soil, hydrological or other information and prepare reports",
+        "letter_evidence": "NOT FOUND IN LETTER",
+        "match_strength": "missing",
+        "overlap_description": "The letter does not mention any analysis of survey or field data."
+      },
+      {
+        "noc_duty": "Act as project or site supervisor for land survey or construction work",
+        "letter_evidence": "Acted as a site supervisor by overseeing and coordinating the work of general foremen, allocating work areas, and ensuring proper execution of construction activities on site.",
+        "match_strength": "strong",
+        "overlap_description": "The letter explicitly states the applicant acted as a site supervisor for construction work."
+      },
+      {
+        "noc_duty": "Prepare contract documents and review and evaluate tenders for construction projects",
+        "letter_evidence": "Reviewed and certified subcontractor payment certificates based on completed construction works and verified quantities.",
+        "match_strength": "partial",
+        "overlap_description": "The applicant performed post-contract administration (certifying payments) but there is no evidence of pre-contract work like preparing documents or evaluating tenders."
+      },
+      {
+        "noc_duty": "Supervise technicians, technologists and other engineers and review and approve designs, calculations and cost estimates.",
+        "letter_evidence": "Acted as a site supervisor by overseeing and coordinating the work of general foremen... Coordinated and liaised with subcontractors regarding their daily construction activities, monitored their performance...",
+        "match_strength": "strong",
+        "overlap_description": "The applicant supervised on-site personnel such as foremen and subcontractors, which aligns with this duty."
+      }
+    ],
+    "missing_critical_duties": [
+      "Confer with clients and other members of the engineering team and conduct research to determine project requirements",
+      "Plan and design major civil projects such as buildings, roads, bridges, dams, water and waste management systems and structural steel fabrications",
+      "Conduct feasibility studies, economic analyses, municipal and regional traffic studies, environmental impact studies or other investigations",
+      "Monitor air, water and soil quality and develop procedures to clean up contaminated sites",
+      "Conduct technical analyses of survey and field data for development of topographic, soil, hydrological or other information and prepare reports"
+    ],
+    "duty_coverage_percentage": 64,
+    "location_of_experience": "outside_canada"
+  },
+  "compliance": {
+    "score": 100,
+    "missing_elements": [],
+    "warnings": []
+  },
+  "mandatory_requirements": {
+    "company_letterhead": true,
+    "applicant_name": true,
+    "contact_information": true,
+    "job_title": true,
+    "dates_of_employment": true,
+    "hours_worked": true,
+    "salary_compensation": true,
+    "signatory": true
+  },
+  "risk_assessment": {
+    "overall_risk": "moderate",
+    "pfl_likelihood": "high",
+    "key_risks": [
+      {
+        "issue": "Insufficient Duty Coverage for NOC 21300",
+        "severity": "high",
+        "impact": "An officer may conclude the applicant was not performing the full range of duties of a Civil Engineer, but rather a role closer to a construction supervisor or technologist. This could lead to a finding that the experience does not match the claimed NOC.",
+        "recommendation": "Obtain a revised letter that provides specific examples of involvement in pre-construction planning, design review input, or technical problem-solving that goes beyond standard site supervision."
+      },
+      {
+        "issue": "Ambiguity Between Engineering and Supervisory Role",
+        "severity": "medium",
+        "impact": "The duties described could be interpreted as those of a construction supervisor (TEER 2) rather than a professional engineer (TEER 1), creating doubt about the skill level of the experience.",
+        "recommendation": "Revise the letter to emphasize the application of engineering principles and judgment in decision-making, rather than just overseeing the work of others."
+      }
+    ]
+  },
+  "refusal_reasons": [
+    "The duties described in the employment letter do not sufficiently demonstrate that the applicant performed a substantial number of the main duties of NOC 21300 - Civil engineers.",
+    "The provided letter lacks evidence of key engineering responsibilities such as project planning, design, and feasibility analysis, focusing primarily on site supervision and coordination, which raises concerns about whether the role meets the professional requirements of the claimed NOC."
+  ],
+  "action_plan": [
+    "Request a revised, more detailed letter of employment from Yenigun Construction Company that specifically addresses the missing duties of NOC 21300.",
+    "Ensure the new letter provides concrete examples of your involvement in design review, project planning, and technical analysis, demonstrating the application of engineering principles.",
+    "Provide your former employer with the suggested wording examples to help them accurately describe your engineering-level responsibilities."
+  ],
+  "suggested_wording": [
+    "To demonstrate design/planning involvement: 'Contributed to the project planning phase by reviewing civil engineering designs for constructability and providing technical feedback to the lead design team to optimize construction sequencing.'",
+    "To strengthen technical review duty: 'Conducted detailed technical reviews of engineering drawings and specifications, identifying and resolving conflicts between architectural plans and structural requirements before implementation on site.'",
+    "To show engineering-level problem solving: 'Applied civil engineering principles to analyze and resolve on-site technical challenges, such as unexpected soil conditions or material non-conformance, developing and documenting approved engineering solutions.'",
+    "To clarify supervisory role: 'As the lead engineering authority on site, supervised the work of foremen and subcontractors to ensure all construction activities adhered strictly to engineering standards and project specifications.'"
+  ]
+}
