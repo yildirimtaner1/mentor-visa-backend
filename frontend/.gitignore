@@ -1,0 +1,7 @@
+# Frontend - Mentor Visa Web
+node_modules/
+dist/
+.env
+.env.local
+
+.vercel

@@ -1,5 +1,31 @@
-# Frontend - Mentor Visa Web
-node_modules/
-dist/
+# Dependencies
+frontend/node_modules/
+backend/venv/
+
+# Build output
+frontend/dist/
+
+# Environment variables
 .env
-.env.local
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+backend/.dev_cache/
+backend/uploads/
+backend/mentor_visa.db
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+*.txt
+!requirements.txt
+!README.md
