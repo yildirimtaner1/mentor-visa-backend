@@ -1,0 +1,22 @@
+# Backend - Mentor Visa API
+venv/
+__pycache__/
+*.pyc
+.env
+error_log.txt
+pdf_structure.txt
+pdf_debug.txt
+noc_build_output.txt
+explore_pdf.py
+explore_pdf2.py
+build_noc_index.py
+test_ai.py
+uploads/
+.dev_cache/
+stripe-cli/
+check_credits.py
+show_users.py
+get_uid.py
+test_db.py
+update_db.py
+*.db

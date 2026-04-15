@@ -1,0 +1,152 @@
+{
+  "document_type": "Employment Letter - Outside Canada",
+  "role_name": "Site Engineer",
+  "company_name": "Yenigun Construction Company",
+  "decision": "PFL_RISK",
+  "confidence_score": 85,
+  "officer_narrative": "The applicant's employment letter indicates a role as a Site Engineer with significant responsibilities for the execution and supervision of civil construction works. While duties such as preparing schedules, monitoring progress, and overseeing foremen align with Construction Manager (NOC 70010), critical gaps exist. Specifically, the letter lacks explicit evidence of developing and implementing quality control programs, preparing initial project budget estimates, or negotiating contracts. These omissions suggest the role may not fully encompass the strategic and comprehensive managerial functions required for this NOC.",
+  "noc_analysis": {
+    "applicable": true,
+    "detected_code": "70010",
+    "detected_title": "Construction managers",
+    "match_score": 67,
+    "confidence": 85,
+    "alternative_nocs": [
+      {
+        "noc_code": "21300",
+        "noc_title": "Civil engineers",
+        "match_score": 64,
+        "explanation": "This NOC is a close match, but the applicant's duties lean more towards operational management and supervision rather than the core design and planning aspects emphasized in the Civil Engineer role."
+      },
+      {
+        "noc_code": "22300",
+        "noc_title": "Civil engineering technologists and technicians",
+        "match_score": 70,
+        "explanation": "While some duties align with technical support and inspection, the applicant's 'Site Engineer' title and supervisory responsibilities suggest a higher professional level than a typical technologist or technician."
+      }
+    ],
+    "notes": "The primary NOC selected is 70010 (Construction Managers) due to the strong alignment with supervisory, coordination, and project execution duties. Key duties missing or weak include the development and implementation of quality control programs, preparation of initial budget estimates, and negotiation of contracts. The letter focuses more on ensuring compliance and monitoring rather than the proactive development and negotiation aspects of a manager.",
+    "lead_statement_official": "Construction managers plan, organize, direct, control and evaluate the activities of a construction company or a construction department within a company, under the direction of a general manager or other senior manager. They are employed by residential, commercial and industrial construction companies and by construction departments of companies outside the construction industry.",
+    "lead_statement_applicant": "During his employment, he performed professional engineering duties related to the execution and supervision of civil construction works.",
+    "lead_statement_overlap": "The applicant's role involved the execution and supervision of civil construction works, which aligns with the management and control of construction project activities described in the lead statement for Construction Managers.",
+    "duties_match": [
+      {
+        "noc_duty": "Plan, organize, direct, control and evaluate construction projects from start to finish according to schedule, specifications and budget",
+        "letter_evidence": "Was responsible for all finishing construction activities on site, including block work and plastering, gypsum walls, painting, ceramic tiling, stone cladding, parquet and rubber flooring, raised floor systems, aluminum and precast facade cladding, waterproofing works and door installation and conducted these activities as part of on-site civil engineering field services. Prepared and monitored weekly and daily construction work schedules for all assigned activities to ensure timely execution in accordance with approved project timelines. Evaluated the quality and compliance of construction materials received on site, carried out inspections, and prepared quality control and defect reports where applicable. Reviewed project technical specifications, relevant standards, and construction drawings, and ensured that all construction works were executed in full compliance with approved specifications, drawings, and applicable engineering standards. Acted as a site supervisor by overseeing and coordinating the work of general foremen, allocating work areas, and ensuring proper execution of construction activities on site. Ensured that construction works were executed in accordance with approved method statements and construction procedures, and followed up on site implementation to confirm compliance. Coordinated and liaised with subcontractors regarding their daily construction activities, monitored their performance, and ensured fulfillment of their contractual obligations.",
+        "match_strength": "strong",
+        "overlap_description": "The applicant's extensive responsibilities for overseeing, coordinating, monitoring, and ensuring compliance across various construction activities directly demonstrate planning, organizing, directing, controlling, and evaluating project execution."
+      },
+      {
+        "noc_duty": "Prepare and submit construction project budget estimates",
+        "letter_evidence": "Reviewed and certified subcontractor payment certificates based on completed construction works and verified quantities.",
+        "match_strength": "weak",
+        "overlap_description": "The applicant's role involved verifying subcontractor payments, which is a post-contract financial control, but not the preparation or submission of initial project budget estimates."
+      },
+      {
+        "noc_duty": "Plan and prepare construction schedules and milestones and monitor progress against established schedules",
+        "letter_evidence": "Prepared and monitored weekly and daily construction work schedules for all assigned activities to ensure timely execution in accordance with approved project timelines.",
+        "match_strength": "strong",
+        "overlap_description": "The applicant explicitly prepared and monitored construction schedules, directly matching this duty."
+      },
+      {
+        "noc_duty": "Prepare contracts and negotiate revisions, changes and additions to contractual agreements with architects, consultants, clients, suppliers and subcontractors",
+        "letter_evidence": "Coordinated and liaised with subcontractors regarding their daily construction activities, monitored their performance, and ensured fulfillment of their contractual obligations.",
+        "match_strength": "partial",
+        "overlap_description": "The applicant coordinated with subcontractors and ensured contractual fulfillment, indicating involvement with existing agreements, but not explicitly preparing or negotiating new contracts or revisions."
+      },
+      {
+        "noc_duty": "Develop and implement quality control programs",
+        "letter_evidence": "Evaluated the quality and compliance of construction materials received on site, carried out inspections, and prepared quality control and defect reports where applicable.",
+        "match_strength": "partial",
+        "overlap_description": "The applicant performed quality evaluation and reporting, which is part of quality control, but the letter does not explicitly state they developed and implemented the programs themselves."
+      },
+      {
+        "noc_duty": "Represent company on matters such as business services and union contracts negotiation",
+        "letter_evidence": "NOT FOUND IN LETTER",
+        "match_strength": "missing",
+        "overlap_description": "There is no evidence in the letter that the applicant represented the company in business services or union contract negotiations."
+      },
+      {
+        "noc_duty": "Prepare progress reports and issue progress schedules to clients",
+        "letter_evidence": "Prepared and monitored weekly and daily construction work schedules for all assigned activities... prepared quality control and defect reports where applicable.",
+        "match_strength": "strong",
+        "overlap_description": "The preparation of work schedules and quality control reports serves as evidence of preparing and issuing progress reports."
+      },
+      {
+        "noc_duty": "Direct the purchase of building materials and land acquisitions",
+        "letter_evidence": "NOT FOUND IN LETTER",
+        "match_strength": "missing",
+        "overlap_description": "The letter does not provide any evidence of the applicant directing the purchase of building materials or land."
+      },
+      {
+        "noc_duty": "Hire and supervise the activities of subcontractors and subordinate staff.",
+        "letter_evidence": "Acted as a site supervisor by overseeing and coordinating the work of general foremen, allocating work areas, and ensuring proper execution of construction activities on site. Coordinated and liaised with subcontractors regarding their daily construction activities, monitored their performance, and ensured fulfillment of their contractual obligations.",
+        "match_strength": "strong",
+        "overlap_description": "The applicant's role as a site supervisor overseeing foremen and coordinating subcontractors directly aligns with supervising subordinate staff and subcontractors."
+      }
+    ],
+    "missing_critical_duties": [
+      "Prepare and submit construction project budget estimates",
+      "Represent company on matters such as business services and union contracts negotiation",
+      "Direct the purchase of building materials and land acquisitions",
+      "Develop and implement quality control programs",
+      "Prepare contracts and negotiate revisions, changes and additions to contractual agreements with architects, consultants, clients, suppliers and subcontractors"
+    ],
+    "duty_coverage_percentage": 67,
+    "location_of_experience": "outside_canada"
+  },
+  "compliance": {
+    "score": 100,
+    "missing_elements": [],
+    "warnings": []
+  },
+  "mandatory_requirements": {
+    "company_letterhead": true,
+    "applicant_name": true,
+    "contact_information": true,
+    "job_title": true,
+    "dates_of_employment": true,
+    "hours_worked": true,
+    "salary_compensation": true,
+    "signatory": true
+  },
+  "risk_assessment": {
+    "overall_risk": "moderate",
+    "pfl_likelihood": "medium",
+    "key_risks": [
+      {
+        "issue": "Insufficient evidence of developing and implementing quality control programs.",
+        "severity": "medium",
+        "impact": "The officer may conclude that the applicant's role was more focused on monitoring and reporting rather than the strategic development of quality processes, which is a key managerial duty.",
+        "recommendation": "Obtain a revised letter explicitly stating involvement in the development and implementation of quality control programs."
+      },
+      {
+        "issue": "Limited evidence of preparing and negotiating contracts or budget estimates.",
+        "severity": "medium",
+        "impact": "The letter only mentions reviewing and certifying subcontractor payments, which is a reactive financial task, not proactive contract or budget management. This weakens the claim of full managerial responsibility.",
+        "recommendation": "Seek clarification or additional documentation demonstrating involvement in budget preparation, tender evaluation, or contract negotiation."
+      },
+      {
+        "issue": "Lack of clarity on the level of supervision for 'other engineers/technologists'.",
+        "severity": "low",
+        "impact": "While the applicant supervised 'general foremen' and coordinated with 'subcontractors', the NOC specifically mentions supervising 'technicians, technologists and other engineers'. The current wording is slightly ambiguous regarding the professional level of those supervised.",
+        "recommendation": "Request a revised letter to specify if the applicant supervised other engineers or technologists, or if the general foremen were themselves supervising such professionals under the applicant's direction."
+      }
+    ]
+  },
+  "refusal_reasons": [
+    "The employment letter does not sufficiently demonstrate the applicant's involvement in developing and implementing quality control programs, a key duty for Construction Managers (NOC 70010).",
+    "Evidence for preparing and submitting construction project budget estimates, or preparing and negotiating contracts, is weak, suggesting a reactive rather than proactive financial management role.",
+    "The scope of supervisory duties, specifically regarding other engineers or technologists, is not explicitly detailed, which is a core aspect of the detected NOC."
+  ],
+  "action_plan": [
+    "Obtain a revised employment letter that explicitly details the applicant's involvement in developing and implementing quality control programs, not just evaluating and reporting.",
+    "Request the employer to clarify the applicant's responsibilities regarding preparing construction project budget estimates or negotiating contracts, if applicable, providing specific examples.",
+    "Seek clarification on the professional level of staff supervised, specifically if other engineers or technologists were under the applicant's direct supervision."
+  ],
+  "suggested_wording": [
+    "Mr. YILDIRIM was instrumental in developing and implementing site-specific quality control protocols and safety plans, ensuring all construction activities adhered to stringent industry standards and project specifications.",
+    "His responsibilities included preparing initial cost estimates for various construction phases and participating in the negotiation of contractual terms with key subcontractors and suppliers.",
+    "As a Site Supervisor, Mr. YILDIRIM directly supervised a team of junior engineers and construction technologists, in addition to coordinating general foremen, to ensure efficient project execution."
+  ]
+}

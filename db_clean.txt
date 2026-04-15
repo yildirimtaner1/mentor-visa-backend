@@ -1,0 +1,186 @@
+ID: 91
+Role: Unknown Role
+Premium: 1
+{
+  "document_valid": true,
+  "rejection_reason": "",
+  "noc_code": "",
+  "noc_title": "",
+  "teer_category": "",
+  "match_score": 0,
+  "alternative_nocs": [],
+  "explanation": "",
+  "matched_duties": [],
+  "cec_eligible": false,
+  "location_of_experience": "unknown",
+  "stored_file_id": "ae9d80b2-315c-4ef2-96cb-c2749d541f74",
+  "is_premium_unlocked": true,
+  "evaluation_type": "noc_finder"
+}
+----------------------------------------
+ID: 90
+Role: Unknown Role
+Premium: 0
+{
+  "document_valid": true,
+  "rejection_reason": "",
+  "noc_code": "22232",
+  "noc_title": "Occupational health and safety specialists",
+  "teer_category": "2",
+  "match_score": 88,
+  "alternative_nocs": [
+    {
+      "noc_code": "42101",
+      "noc_title": "Firefighters",
+      "match_score": 70,
+      "explanation": "This NOC has some overlap due to fire prevention and initial extinguishing duties, but the applicant's role is more focused on industrial safety and prevention during specific hot-work activities rather than general emergency response or municipal firefighting."
+    },
+    {
+      "noc_code": "64410",
+      "noc_title": "Security guards and related security service occupations",
+      "match_score": 65,
+      "explanation": "There is a minor overlap with patrolling and maintaining order, but this NOC lacks the specific technical expertise in fire hazard identification, risk control, and safety oversight required for the Fire Watch Team Member role."
+    }
+  ],
+  "explanation": "The role of a \"Fire Watch Team Member\" is highly specialized within the broader field of occupational health and safety. The duties emphasize proactive hazard identification, risk mitigation, adherence to safety procedures during hot-work, and initial emergency response, which are core functions of an OHS specialist. While the role includes extinguishing incipient fires, the primary focus is on prevention and oversight in an industrial setting, aligning well with the lead statement and duties of NOC 22232. The oversight of on-site employees during hot-work further supports the specialist aspect of ensuring compliance with safety protocols.",
+  "matched_duties": [
+    "\u2022 Conducted proactive inspections and patrols of assigned work areas for potential fire risks before, during, and after hot-work activities. \u2192 NOC: Lead and participate in workplace inspections to ensure that equipment, materials and production processes do not present a safety or health hazard to employees (The applicant's duty of conducting proactive inspections for fire risks directly corresponds to the official duty of performing workplace inspections to identify safety hazards.)",
+    "\u2022 Understood and executed safety procedures and oversaw on-site employees during hot-work operations. Completed client and contractor orientations and required training programs. Participated in health and safety training sessions. \u2192 NOC: Develop and implement health and safety programs, including standard operating procedures, policies and training to mitigate risk, optimize worker\u2019s health and safety and foster a positive occupational health and safety culture (The applicant's responsibility for understanding and executing safety procedures, overseeing employees, and participating in training directly reflects the implementation of health and safety programs and procedures.)",
+    "\u2022 Identified actual and potential fire hazards not identified by the client and recommended appropriate controls to eliminate or reduce risk. Reported incidents, injuries, illnesses, and hazards to supervisors. \u2192 NOC: Lead and participate in workplace audits and investigations of safety concerns, incidents and accidents (The applicant's task of identifying fire hazards and recommending controls, along with reporting incidents, aligns with participating in investigations and identifying safety concerns.)",
+    "\u2022 Extinguished incipient stage fires using fire extinguishers where safe, without endangering personal safety. Maintained work areas to ensure fire hazards were eliminated. \u2192 NOC: Initiate enforcement procedures on workplaces contravening organization and government health and safety standards and regulations (The applicant's direct action of extinguishing incipient fires and maintaining fire-safe work areas demonstrates immediate intervention and enforcement of safety standards to prevent larger incidents.)"
+  ],
+  "cec_eligible": true,
+  "location_of_experience": "canada",
+  "stored_file_id": "7077089d-3c96-453b-9e6e-e628b321472d",
+  "is_premium_unlocked": false,
+  "evaluation_type": "noc_finder"
+}
+----------------------------------------
+ID: 89
+Role: Unknown Role
+Premium: 1
+{
+  "document_valid": true,
+  "rejection_reason": "",
+  "noc_code": "",
+  "noc_title": "",
+  "teer_category": "",
+  "match_score": 0,
+  "alternative_nocs": [],
+  "explanation": "",
+  "matched_duties": [],
+  "cec_eligible": false,
+  "location_of_experience": "unknown",
+  "stored_file_id": "6edb52f3-f07b-4dac-ab2a-bbfc8fe2229a",
+  "is_premium_unlocked": true,
+  "evaluation_type": "noc_finder"
+}
+----------------------------------------
+ID: 88
+Role: Unknown Role
+Premium: 0
+{
+  "document_valid": true,
+  "rejection_reason": "",
+  "noc_analysis": {
+    "applicable": true,
+    "detected_code": "42101",
+    "detected_title": "Firefighters",
+    "match_score": 80,
+    "alternative_nocs": [
+      {
+        "noc_code": "22232",
+        "noc_title": "Occupational health and safety specialists",
+        "match_score": 65,
+        "explanation": "The role involves workplace inspections and executing safety procedures, which aligns with some OHS specialist duties, but lacks the program development and strategic risk mitigation aspects of this NOC."
+      }
+    ],
+    "notes": "The role of Fire Watch Team Member is highly specialized in fire prevention and initial suppression during hot-work activities. While not encompassing the full breadth of a municipal firefighter's duties (e.g., extensive rescue operations, advanced equipment), the core responsibilities of proactive risk identification, extinguishing incipient fires, and ensuring safety procedures are directly aligned with the fire prevention and initial response aspects of the Firefighters NOC. The role also involves overseeing on-site employees during hot-work, which is a key safety function.",
+    "lead_statement_official": "Firefighters carry out firefighting and fire prevention activities, and assist in other emergencies.",
+    "lead_statement_applicant": "Conducted proactive inspections and patrols of assigned work areas for potential fire risks before, during, and after hot-work activities. Extinguished incipient stage fires using fire extinguishers where safe, without endangering personal safety.",
+    "lead_statement_overlap": "The applicant's duties directly involve proactive fire prevention through inspections and the extinguishing of incipient fires, which are core components of a firefighter's responsibilities.",
+    "duties_match": [
+      {
+        "official_noc_duty": "Control and extinguish fires using manual and power equipment, such as axes, water hoses, aerial ladders and hydraulic equipment and various firefighting chemicals",
+        "applicant_duty": "Extinguished incipient stage fires using fire extinguishers where safe, without endangering personal safety.",
+        "overlap_description": "The applicant's duty involves actively extinguishing fires, specifically incipient stage fires, using fire extinguishers, which is a direct form of fire control and suppression."
+      },
+      {
+        "official_noc_duty": "Inform and educate the public on fire prevention",
+        "applicant_duty": "Conducted proactive inspections and patrols of assigned work areas for potential fire risks before, during, and after hot-work activities.",
+        "overlap_description": "The applicant's proactive inspections for fire risks directly align with fire prevention activities, identifying hazards before they escalate."
+      },
+      {
+        "official_noc_duty": "Ensure proper operation and maintenance of firefighting equipment",
+        "applicant_duty": "Understood and executed safety procedures and oversaw on-site employees during hot-work operations.",
+        "overlap_description": "The applicant's understanding and execution of safety procedures, particularly in a hot-work environment, indicate a practical application of fire safety knowledge and equipment use."
+      },
+      {
+        "official_noc_duty": "Prepare written reports on fire incidents",
+        "applicant_duty": "Completed employer-specific documentation to record hot-work conditions.",
+        "overlap_description": "The applicant's responsibility to complete employer-specific documentation directly corresponds to the administrative and reporting duties of a firefighter."
+      }
+    ],
+    "location_of_experience": "canada"
+  },
+  "stored_file_id": "a0dacc98-c709-4392-b932-a24e911fcd34",
+  "is_premium_unlocked": 0
+}
+----------------------------------------
+ID: 87
+Role: Unknown Role
+Premium: 0
+{
+  "document_valid": true,
+  "rejection_reason": "",
+  "noc_analysis": {
+    "applicable": true,
+    "detected_code": "41300",
+    "detected_title": "Social workers",
+    "match_score": 90,
+    "alternative_nocs": [
+      {
+        "noc_code": "42201",
+        "noc_title": "Social and community service workers",
+        "match_score": 80,
+        "explanation": "Many duties overlap, but the explicit responsibility for developing Individual Support Plans, leading Annual Progress Review meetings, and advocating for participants, along with the OCSWSSW registration requirement, suggests a more professional role than typically covered by this NOC."
+      },
+      {
+        "noc_code": "41301",
+        "noc_title": "Therapists in counselling and related specialized therapies",
+        "match_score": 70,
+        "explanation": "While the role involves providing emotional and behavioural support, the scope extends beyond direct counselling and therapy to include broader social functioning, program development, and advocacy, making it a less precise fit."
+      }
+    ],
+    "notes": "The role of 'Lifestyle Strategist - Level 2' at the Centre for Opportunities, Respect and Empowerment aligns strongly with the duties of a Social Worker. Key responsibilities include developing and implementing individual support plans, providing emotional and behavioural support, managing a caseload, facilitating skill development, leading annual progress reviews, and advocating for participants. The requirement for registration with the Ontario College of Social Workers and Social Service Workers (OCSWSSW) further supports this classification, indicating a professional level of practice, even with the 'Level 2' and 'with supervision' aspects which are common for social workers in various stages of their career or within structured organizational settings.",
+    "lead_statement_official": "Social workers help individuals, couples, families, groups, communities and organizations develop the skills and resources they need to enhance social functioning and provide counselling, therapy and referral to other supportive social services.",
+    "lead_statement_applicant": "Developing and implementing engaging activities based on participant goals, Providing emotional and behavioural support, Facilitating participant skill development, Advocating on behalf of participants.",
+    "lead_statement_overlap": "The applicant's role involves developing activities and providing emotional support to help participants achieve goals and enhance their social functioning, directly aligning with the social worker's role of helping individuals develop skills and resources.",
+    "duties_match": [
+      {
+        "official_noc_duty": "Interview clients individually, in families, or in groups, to assess their situation and problems and determine the types of services required",
+        "applicant_duty": "Familiarizing self with individual participant needs and goals",
+        "overlap_description": "The applicant's duty of familiarizing themselves with participant needs and goals is a direct action of assessing a client's situation to determine required services."
+      },
+      {
+        "official_noc_duty": "Provide counsel and therapy to assist clients in developing skills to deal with and resolve their social and personal problems",
+        "applicant_duty": "Providing emotional and behavioural support, Facilitating participant skill development, Using de-escalation techniques to prevent crisis situations",
+        "overlap_description": "The applicant provides direct emotional and behavioural support and facilitates skill development, including crisis prevention, which constitutes counselling and assistance in problem-solving."
+      },
+      {
+        "official_noc_duty": "Plan programs of assistance for clients including referral to agencies that provide financial assistance, legal aid, housing, medical treatment and other services",
+        "applicant_duty": "Developing and implementing engaging activities based on participant goals, Facilitating meaningful and safe community outings, Developing Individual Support Plans and Annual Progress Review documents as scheduled",
+        "overlap_description": "The applicant develops and implements activities and formal support plans, which are forms of planned assistance to help clients achieve their goals."
+      },
+      {
+        "official_noc_duty": "Act as advocates for client groups in the community, lobby for solutions to problems directly affecting client groups and develop prevention and intervention programs to meet community needs",
+        "applicant_duty": "Advocating on behalf of participants",
+        "overlap_description": "The applicant explicitly states advocating for participants, which is a core duty of social workers to represent and support their clients' interests."
+      }
+    ],
+    "location_of_experience": "canada"
+  },
+  "stored_file_id": "9c33fa5e-adb7-489d-b050-d11ac18660a7",
+  "is_premium_unlocked": 0
+}
+----------------------------------------
