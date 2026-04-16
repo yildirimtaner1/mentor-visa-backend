@@ -3,6 +3,41 @@ import { SignInButton, SignUpButton, useAuth, UserButton } from '@clerk/clerk-re
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useSmartNav } from '../../hooks/useSmartNav';
 import { fetchUserCredits } from '../../services/api';
+import { ChevronDown, FileText, Pickaxe, CheckSquare, LineChart, Map, BookOpen } from 'lucide-react';
+
+const DropdownMenu = ({ title, items, basePath }: { title: string, items: any[], basePath?: string }) => {
+  const [open, setOpen] = useState(false);
+  const location = useLocation();
+  const isActive = items.some(i => location.pathname === i.path) || (basePath && location.pathname.startsWith(basePath));
+  
+  return (
+    <div 
+      style={{ position: 'relative' }} 
+      onMouseEnter={() => setOpen(true)} 
+      onMouseLeave={() => setOpen(false)}
+    >
+      <div className={`nav-link ${isActive ? 'active' : ''}`} style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px' }}>
+        {title}
+        <ChevronDown size={14} style={{ transform: open ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s' }} />
+      </div>
+      {open && (
+        <div style={{ position: 'absolute', top: 'calc(100% + 5px)', left: '0', background: 'white', padding: '8px 0', borderRadius: '12px', boxShadow: '0 20px 40px rgba(0,0,0,0.08)', minWidth: '240px', zIndex: 100, border: '1px solid rgba(0,0,0,0.05)', display: 'flex', flexDirection: 'column' }}>
+          {items.map(i => (
+            <Link key={i.path} to={i.path} style={{ padding: '10px 16px', display: 'flex', alignItems: 'center', gap: '10px', textDecoration: 'none', transition: 'background 0.1s' }} onMouseOver={e => e.currentTarget.style.background = '#f8fafc'} onMouseOut={e => e.currentTarget.style.background = 'transparent'}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: '32px', height: '32px', borderRadius: '8px', background: 'var(--primary-light)', color: 'var(--primary-color)' }}>
+                {i.icon}
+              </div>
+              <div>
+                <div style={{ fontWeight: 600, fontSize: '0.9rem', color: 'var(--text-color)' }}>{i.label}</div>
+                {i.subtext && <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>{i.subtext}</div>}
+              </div>
+            </Link>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+};
 
 export const Navbar: FC = () => {
   const { isSignedIn, getToken } = useAuth();
@@ -10,7 +45,6 @@ export const Navbar: FC = () => {
   const { scrolled, hidden } = useSmartNav();
   const location = useLocation();
   const navigate = useNavigate();
-  const pagePath = location.pathname;
 
   // Credit balance
   const [credits, setCredits] = useState<{ noc: number; audit: number; builder: number; ita: number } | null>(null);
@@ -62,12 +96,25 @@ export const Navbar: FC = () => {
 
         {/* Desktop Nav Links */}
         <div className="nav-links-desktop">
-          <Link to="/find-my-noc" className={`nav-link ${pagePath === '/find-my-noc' ? 'active' : ''}`} style={{ textDecoration: 'none' }}>Find My NOC</Link>
-          <Link to="/crs-calculator" className={`nav-link ${pagePath === '/crs-calculator' ? 'active' : ''}`} style={{ textDecoration: 'none' }}>Build PR Strategy</Link>
-          <Link to="/build-employment-letter" className={`nav-link ${pagePath === '/build-employment-letter' ? 'active' : ''}`} style={{ textDecoration: 'none' }}>Build Employment Letter</Link>
-          <Link to="/audit-employment-letter" className={`nav-link ${pagePath === '/audit-employment-letter' ? 'active' : ''}`} style={{ textDecoration: 'none' }}>Audit Employment Letter</Link>
-          <Link to="/express-entry-cec-guide" className={`nav-link ${pagePath === '/express-entry-cec-guide' ? 'active' : ''}`} style={{ textDecoration: 'none' }}>Express Entry CEC Guide</Link>
-          <Link to="/cec-checklist" className={`nav-link ${pagePath === '/cec-checklist' ? 'active' : ''}`} style={{ textDecoration: 'none' }}>CEC Checklist</Link>
+          <DropdownMenu 
+            title="Premium Tools" 
+            items={[
+              { path: '/find-my-noc', label: 'Find My NOC', subtext: 'AI-powered duty matching', icon: <FileText size={16} /> },
+              { path: '/audit-employment-letter', label: 'Audit Employment Letter', subtext: 'Verify IRCC compliance', icon: <CheckSquare size={16} /> },
+              { path: '/build-employment-letter', label: 'Build Employment Letter', subtext: 'Generate custom drafts', icon: <Pickaxe size={16} /> },
+              { path: '/crs-calculator', label: 'Build PR Strategy', subtext: 'Calculate your CRS score', icon: <LineChart size={16} /> },
+            ]}
+          />
+          <DropdownMenu 
+            title="Resources" 
+            items={[
+              { path: '/draw-results', label: 'Draw Results', subtext: 'Live Express Entry trackers', icon: <LineChart size={16} /> },
+              { path: '/express-entry-cec-guide', label: 'CEC Guide', subtext: 'Requirements & process', icon: <BookOpen size={16} /> },
+              { path: '/cec-checklist', label: 'CEC Checklist', subtext: 'Document checklist generator', icon: <CheckSquare size={16} /> },
+              { path: '/noc-codes', label: 'NOC Directory', subtext: 'Browse the 2021 Matrix', icon: <Map size={16} /> },
+            ]}
+            basePath="/noc-codes"
+          />
           
           <div className="nav-auth">
             {!isSignedIn ? (
@@ -112,6 +159,7 @@ export const Navbar: FC = () => {
           <button className="mobile-menu-link" onClick={() => { navigate('/crs-calculator'); setMobileMenuOpen(false); }}>📊 Build PR Strategy</button>
           <button className="mobile-menu-link" onClick={() => { navigate('/build-employment-letter'); setMobileMenuOpen(false); }}>🔨 Build Employment Letter</button>
           <button className="mobile-menu-link" onClick={() => { navigate('/audit-employment-letter'); setMobileMenuOpen(false); }}>📄 Audit Employment Letter</button>
+          <button className="mobile-menu-link" onClick={() => { navigate('/draw-results'); setMobileMenuOpen(false); }}>📈 Draw Results</button>
           <button className="mobile-menu-link" onClick={() => { navigate('/express-entry-cec-guide'); setMobileMenuOpen(false); }}>📘 Express Entry CEC Guide</button>
           <button className="mobile-menu-link" onClick={() => { navigate('/cec-checklist'); setMobileMenuOpen(false); }}>✅ CEC Checklist</button>
           

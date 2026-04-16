@@ -2,6 +2,7 @@ import type { FC } from 'react';
 import { Navbar } from './common/Navbar';
 import { SEO } from './common/SEO';
 import { Testimonials } from './ui/testimonials-columns-1';
+import { Target, Search, XCircle, AlertTriangle, CheckCircle2, FileText, BrainCircuit, ListChecks, PieChart, FileDigit, RefreshCw, Zap, Pickaxe, LineChart } from 'lucide-react';
 
 interface LandingPageProps {
   onGetStarted: () => void;
@@ -71,7 +72,7 @@ export const LandingPage: FC<LandingPageProps> = ({ onNavigate }) => {
       {/* Hero Section */}
       <section className="hero relative overflow-hidden">
         <div className="hero-content relative z-10">
-          <div className="hero-badge">🎯 AI-Powered NOC 2021 Matching</div>
+          <div className="hero-badge" style={{ display: 'flex', alignItems: 'center', gap: '6px' }}><Target size={14} /> AI-Powered NOC 2021 Matching</div>
           <h1 className="hero-title">
             Wrong NOC Code?<br />
             <span className="hero-highlight">Your PR Gets Refused.</span>
@@ -81,8 +82,8 @@ export const LandingPage: FC<LandingPageProps> = ({ onNavigate }) => {
             Our AI reads your actual job duties and matches them against all 516 official NOC 2021 codes, so you don't have to guess.
           </p>
           <div className="hero-actions" style={{ marginBottom: '24px' }}>
-            <button className="btn btn-primary btn-lg" onClick={() => onNavigate('find-my-noc')}>
-              🔍 Find My NOC Code Now
+            <button className="btn btn-primary btn-lg" onClick={() => onNavigate('find-my-noc')} style={{ display: 'flex', alignItems: 'center', gap: '8px', margin: '0 auto' }}>
+              <Search size={18} /> Find My NOC Code Now
             </button>
           </div>
 
@@ -125,17 +126,17 @@ export const LandingPage: FC<LandingPageProps> = ({ onNavigate }) => {
         <p className="section-subtitle">IRCC doesn't care about your job title. They care about what you actually did.</p>
         <div className="features-grid">
           <div className="feature-card" style={{ borderLeft: '4px solid #EF4444' }}>
-            <div className="feature-icon">❌</div>
+            <div className="feature-icon"><XCircle size={32} color="#EF4444" /></div>
             <h3>Wrong NOC = Application Refused</h3>
             <p>If the duties on your employment letter don't match the NOC code you claim, IRCC will refuse your application. No second chances — you lose your filing fee and months of waiting.</p>
           </div>
           <div className="feature-card" style={{ borderLeft: '4px solid #F59E0B' }}>
-            <div className="feature-icon">⚠️</div>
+            <div className="feature-icon"><AlertTriangle size={32} color="#F59E0B" /></div>
             <h3>Job Titles Are Misleading</h3>
             <p>"Project Manager" at your company could be NOC 10019, 20012, or 13100 depending on what you actually do. IRCC officers match your duties, not your title. Guessing is risky.</p>
           </div>
           <div className="feature-card" style={{ borderLeft: '4px solid #10B981' }}>
-            <div className="feature-icon">✅</div>
+            <div className="feature-icon"><CheckCircle2 size={32} color="#10B981" /></div>
             <h3>Duty-Based Matching Is the Only Way</h3>
             <p>Our AI does exactly what an IRCC officer does: reads your actual duties and compares them line-by-line against the official NOC 2021 database. No guessing, no gut feeling.</p>
           </div>
@@ -149,19 +150,19 @@ export const LandingPage: FC<LandingPageProps> = ({ onNavigate }) => {
         <div className="steps-grid">
           <div className="step-card">
             <div className="step-number">1</div>
-            <div className="step-icon">📄</div>
+            <div className="step-icon"><FileText size={32} color="var(--primary-color)" /></div>
             <h3>Upload or Paste Your Duties</h3>
             <p>Upload your employment letter (PDF, Word, or photo). Or just paste your job title and duties directly — whatever is faster.</p>
           </div>
           <div className="step-card">
             <div className="step-number">2</div>
-            <div className="step-icon">🧠</div>
+            <div className="step-icon"><BrainCircuit size={32} color="var(--primary-color)" /></div>
             <h3>AI Matches Your Duties to NOC</h3>
             <p>Our AI compares your duties against the official duties of all 516 NOC 2021 unit groups and finds the strongest match — with a confidence score.</p>
           </div>
           <div className="step-card">
             <div className="step-number">3</div>
-            <div className="step-icon">🎯</div>
+            <div className="step-icon"><ListChecks size={32} color="var(--primary-color)" /></div>
             <h3>Get Your NOC Code + TEER</h3>
             <p>See your matched NOC code, TEER category, CEC eligibility, and alternative matches. Know exactly which code to claim on your application.</p>
           </div>
@@ -174,32 +175,32 @@ export const LandingPage: FC<LandingPageProps> = ({ onNavigate }) => {
         <p className="section-subtitle">Everything you need to confidently choose your NOC code.</p>
         <div className="features-grid">
           <div className="feature-card">
-            <div className="feature-icon">🎯</div>
+            <div className="feature-icon"><Target size={28} color="var(--primary-color)" /></div>
             <h3>Best-Match NOC Code</h3>
             <p>Your primary NOC match with a percentage score showing exactly how well your duties align with the official NOC description.</p>
           </div>
           <div className="feature-card">
-            <div className="feature-icon">📊</div>
+            <div className="feature-icon"><PieChart size={28} color="var(--primary-color)" /></div>
             <h3>TEER Category + CEC Check</h3>
             <p>Instantly know your TEER level and whether your occupation qualifies for the Canadian Experience Class — no manual lookup needed.</p>
           </div>
           <div className="feature-card">
-            <div className="feature-icon">🔄</div>
+            <div className="feature-icon"><RefreshCw size={28} color="var(--primary-color)" /></div>
             <h3>Alternative Matches</h3>
             <p>See other NOC codes that also match your duties. Click any alternative to re-evaluate your duties strictly against that target code.</p>
           </div>
           <div className="feature-card">
-            <div className="feature-icon">📋</div>
+            <div className="feature-icon"><FileDigit size={28} color="var(--primary-color)" /></div>
             <h3>Duty-by-Duty Breakdown</h3>
             <p>See exactly which of your duties match which official NOC duties — the same comparison an IRCC officer would do.</p>
           </div>
           <div className="feature-card">
-            <div className="feature-icon">📎</div>
+            <div className="feature-icon"><FileText size={28} color="var(--primary-color)" /></div>
             <h3>Works With Any Format</h3>
             <p>Upload a PDF, Word doc, or photo of your letter. Or skip the upload entirely and just type your duties. We handle it all.</p>
           </div>
           <div className="feature-card">
-            <div className="feature-icon">⚡</div>
+            <div className="feature-icon"><Zap size={28} color="var(--primary-color)" /></div>
             <h3>Results in Seconds</h3>
             <p>No waiting days for a consultant. Get your NOC match immediately. Re-evaluate against different codes as many times as you need.</p>
           </div>
@@ -214,7 +215,7 @@ export const LandingPage: FC<LandingPageProps> = ({ onNavigate }) => {
 
           {/* Letter Builder */}
           <div className="feature-card" style={{ textAlign: 'center', padding: '32px 24px', position: 'relative', display: 'flex', flexDirection: 'column' }}>
-            <div style={{ fontSize: '1.8rem', marginBottom: '8px' }}>🔨</div>
+            <div style={{ marginBottom: '16px', display: 'flex', justifyContent: 'center' }}><Pickaxe size={48} color="var(--primary-color)" /></div>
             <h3 style={{ fontSize: '1.1rem', fontWeight: 700, marginBottom: '4px' }}>Employment Letter Builder</h3>
             <div style={{ fontSize: '2rem', fontWeight: 800, color: 'var(--text-color)', margin: '12px 0 4px' }}>
               $14.90 <span style={{ fontSize: '0.85rem', color: 'var(--text-muted)', fontWeight: 400 }}>CAD</span>
@@ -223,10 +224,10 @@ export const LandingPage: FC<LandingPageProps> = ({ onNavigate }) => {
               One-time purchase. One full letter build.
             </p>
             <ul style={{ listStyleType: 'none', padding: 0, margin: '0 0 24px 0', display: 'grid', gap: '10px', textAlign: 'left', fontSize: '0.88rem' }}>
-              <li style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>✅ Step-by-step guided builder</li>
-              <li style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>✅ AI duty alignment coaching</li>
-              <li style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>✅ IRCC R10-compliant output</li>
-              <li style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>✅ NOC-targeted duty matching</li>
+              <li style={{ display: 'flex', alignItems: 'center', gap: '8px' }}><CheckCircle2 size={16} color="#10b981"/> Step-by-step guided builder</li>
+              <li style={{ display: 'flex', alignItems: 'center', gap: '8px' }}><CheckCircle2 size={16} color="#10b981"/> AI duty alignment coaching</li>
+              <li style={{ display: 'flex', alignItems: 'center', gap: '8px' }}><CheckCircle2 size={16} color="#10b981"/> IRCC R10-compliant output</li>
+              <li style={{ display: 'flex', alignItems: 'center', gap: '8px' }}><CheckCircle2 size={16} color="#10b981"/> NOC-targeted duty matching</li>
             </ul>
             <div style={{ marginTop: 'auto' }}>
               <button className="btn btn-primary" onClick={() => onNavigate('build-employment-letter')} style={{ width: '100%' }}>
@@ -238,7 +239,7 @@ export const LandingPage: FC<LandingPageProps> = ({ onNavigate }) => {
           {/* ITA Strategy — Featured */}
           <div className="feature-card" style={{ textAlign: 'center', border: '2px solid var(--primary-color)', boxShadow: '0 20px 40px rgba(37, 99, 235, 0.12)', padding: '32px 24px', position: 'relative', display: 'flex', flexDirection: 'column' }}>
             <div style={{ position: 'absolute', top: '-12px', left: '50%', transform: 'translateX(-50%)', background: 'var(--primary-color)', color: 'white', padding: '4px 16px', borderRadius: '20px', fontSize: '0.75rem', fontWeight: 700, letterSpacing: '0.5px' }}>MOST POPULAR</div>
-            <div style={{ fontSize: '1.8rem', marginBottom: '8px' }}>📊</div>
+            <div style={{ marginBottom: '16px', display: 'flex', justifyContent: 'center' }}><LineChart size={48} color="var(--primary-color)" /></div>
             <h3 style={{ fontSize: '1.1rem', fontWeight: 700, marginBottom: '4px' }}>AI PR Strategy Report</h3>
             <div style={{ fontSize: '2rem', fontWeight: 800, color: 'var(--text-color)', margin: '12px 0 4px' }}>
               $19.90 <span style={{ fontSize: '0.85rem', color: 'var(--text-muted)', fontWeight: 400 }}>CAD</span>
@@ -247,10 +248,10 @@ export const LandingPage: FC<LandingPageProps> = ({ onNavigate }) => {
               One-time purchase. One personalized strategy.
             </p>
             <ul style={{ listStyleType: 'none', padding: 0, margin: '0 0 24px 0', display: 'grid', gap: '10px', textAlign: 'left', fontSize: '0.88rem' }}>
-              <li style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>✅ Exact CRS score calculation</li>
-              <li style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>✅ Personalized ITA action plan</li>
-              <li style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>✅ Point improvement roadmap</li>
-              <li style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>✅ Provincial nomination guidance</li>
+              <li style={{ display: 'flex', alignItems: 'center', gap: '8px' }}><CheckCircle2 size={16} color="#10b981"/> Exact CRS score calculation</li>
+              <li style={{ display: 'flex', alignItems: 'center', gap: '8px' }}><CheckCircle2 size={16} color="#10b981"/> Historical draw comparison</li>
+              <li style={{ display: 'flex', alignItems: 'center', gap: '8px' }}><CheckCircle2 size={16} color="#10b981"/> Point maximization strategies</li>
+              <li style={{ display: 'flex', alignItems: 'center', gap: '8px' }}><CheckCircle2 size={16} color="#10b981"/> Personalized PR roadmap</li>
             </ul>
             <div style={{ marginTop: 'auto' }}>
               <button className="btn btn-primary" onClick={() => onNavigate('crs-calculator')} style={{ width: '100%' }}>
@@ -261,7 +262,7 @@ export const LandingPage: FC<LandingPageProps> = ({ onNavigate }) => {
 
           {/* Letter Auditor */}
           <div className="feature-card" style={{ textAlign: 'center', padding: '32px 24px', position: 'relative', display: 'flex', flexDirection: 'column' }}>
-            <div style={{ fontSize: '1.8rem', marginBottom: '8px' }}>📄</div>
+            <div style={{ marginBottom: '16px', display: 'flex', justifyContent: 'center' }}><Search size={48} color="var(--primary-color)" /></div>
             <h3 style={{ fontSize: '1.1rem', fontWeight: 700, marginBottom: '4px' }}>Employment Letter Auditor</h3>
             <div style={{ fontSize: '2rem', fontWeight: 800, color: 'var(--text-color)', margin: '12px 0 4px' }}>
               $24.90 <span style={{ fontSize: '0.85rem', color: 'var(--text-muted)', fontWeight: 400 }}>CAD</span>
@@ -270,10 +271,10 @@ export const LandingPage: FC<LandingPageProps> = ({ onNavigate }) => {
               One-time purchase. One full letter audit.
             </p>
             <ul style={{ listStyleType: 'none', padding: 0, margin: '0 0 24px 0', display: 'grid', gap: '10px', textAlign: 'left', fontSize: '0.88rem' }}>
-              <li style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>✅ All 9 IRCC mandatory checks</li>
-              <li style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>✅ NOC duty-by-duty coverage</li>
-              <li style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>✅ PFL risk assessment</li>
-              <li style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>✅ Re-evaluate against any NOC</li>
+              <li style={{ display: 'flex', alignItems: 'center', gap: '8px' }}><CheckCircle2 size={16} color="#10b981"/> Upload existing letters (PDF/Word)</li>
+              <li style={{ display: 'flex', alignItems: 'center', gap: '8px' }}><CheckCircle2 size={16} color="#10b981"/> Automatic duty extraction</li>
+              <li style={{ display: 'flex', alignItems: 'center', gap: '8px' }}><CheckCircle2 size={16} color="#10b981"/> NOC confidence scoring</li>
+              <li style={{ display: 'flex', alignItems: 'center', gap: '8px' }}><CheckCircle2 size={16} color="#10b981"/> Re-write suggestions for gaps</li>
             </ul>
             <div style={{ marginTop: 'auto' }}>
               <button className="btn btn-primary" onClick={() => onNavigate('audit-employment-letter')} style={{ width: '100%' }}>

@@ -1,0 +1,416 @@
+[
+  {
+    "date": "2026-04-15",
+    "drawType": "French",
+    "crsScore": 419,
+    "itasIssued": 4000
+  },
+  {
+    "date": "2026-04-14",
+    "drawType": "CEC",
+    "crsScore": 515,
+    "itasIssued": 2000
+  },
+  {
+    "date": "2026-04-13",
+    "drawType": "PNP",
+    "crsScore": 786,
+    "itasIssued": 324
+  },
+  {
+    "date": "2026-04-02",
+    "drawType": "Trades",
+    "crsScore": 477,
+    "itasIssued": 3000
+  },
+  {
+    "date": "2026-03-31",
+    "drawType": "CEC",
+    "crsScore": 509,
+    "itasIssued": 2250
+  },
+  {
+    "date": "2026-03-30",
+    "drawType": "PNP",
+    "crsScore": 802,
+    "itasIssued": 356
+  },
+  {
+    "date": "2026-03-18",
+    "drawType": "French",
+    "crsScore": 393,
+    "itasIssued": 4000
+  },
+  {
+    "date": "2026-03-17",
+    "drawType": "CEC",
+    "crsScore": 507,
+    "itasIssued": 4000
+  },
+  {
+    "date": "2026-03-16",
+    "drawType": "PNP",
+    "crsScore": 742,
+    "itasIssued": 362
+  },
+  {
+    "date": "2026-03-05",
+    "drawType": "Senior Managers",
+    "crsScore": 429,
+    "itasIssued": 250
+  },
+  {
+    "date": "2026-03-04",
+    "drawType": "French",
+    "crsScore": 397,
+    "itasIssued": 5500
+  },
+  {
+    "date": "2026-03-03",
+    "drawType": "CEC",
+    "crsScore": 508,
+    "itasIssued": 4000
+  },
+  {
+    "date": "2026-03-02",
+    "drawType": "PNP",
+    "crsScore": 710,
+    "itasIssued": 264
+  },
+  {
+    "date": "2026-02-20",
+    "drawType": "Healthcare",
+    "crsScore": 467,
+    "itasIssued": 4000
+  },
+  {
+    "date": "2026-02-19",
+    "drawType": "Physicians",
+    "crsScore": 169,
+    "itasIssued": 391
+  },
+  {
+    "date": "2026-02-17",
+    "drawType": "CEC",
+    "crsScore": 508,
+    "itasIssued": 6000
+  },
+  {
+    "date": "2026-02-16",
+    "drawType": "PNP",
+    "crsScore": 789,
+    "itasIssued": 279
+  },
+  {
+    "date": "2026-02-06",
+    "drawType": "French",
+    "crsScore": 400,
+    "itasIssued": 8500
+  },
+  {
+    "date": "2026-02-03",
+    "drawType": "PNP",
+    "crsScore": 749,
+    "itasIssued": 423
+  },
+  {
+    "date": "2026-01-21",
+    "drawType": "CEC",
+    "crsScore": 509,
+    "itasIssued": 6000
+  },
+  {
+    "date": "2026-01-20",
+    "drawType": "PNP",
+    "crsScore": 746,
+    "itasIssued": 681
+  },
+  {
+    "date": "2026-01-07",
+    "drawType": "CEC",
+    "crsScore": 511,
+    "itasIssued": 8000
+  },
+  {
+    "date": "2026-01-05",
+    "drawType": "PNP",
+    "crsScore": 711,
+    "itasIssued": 574
+  },
+  {
+    "date": "2025-12-17",
+    "drawType": "CEC",
+    "crsScore": 530,
+    "itasIssued": 5500
+  },
+  {
+    "date": "2025-12-15",
+    "drawType": "PNP",
+    "crsScore": 738,
+    "itasIssued": 589
+  },
+  {
+    "date": "2025-12-03",
+    "drawType": "French",
+    "crsScore": 389,
+    "itasIssued": 6500
+  },
+  {
+    "date": "2025-12-01",
+    "drawType": "CEC",
+    "crsScore": 529,
+    "itasIssued": 5500
+  },
+  {
+    "date": "2025-11-26",
+    "drawType": "PNP",
+    "crsScore": 699,
+    "itasIssued": 673
+  },
+  {
+    "date": "2025-11-19",
+    "drawType": "Healthcare",
+    "crsScore": 462,
+    "itasIssued": 2000
+  },
+  {
+    "date": "2025-11-17",
+    "drawType": "CEC",
+    "crsScore": 534,
+    "itasIssued": 4000
+  },
+  {
+    "date": "2025-11-03",
+    "drawType": "CEC",
+    "crsScore": 534,
+    "itasIssued": 4000
+  },
+  {
+    "date": "2025-10-20",
+    "drawType": "CEC",
+    "crsScore": 534,
+    "itasIssued": 4000
+  },
+  {
+    "date": "2025-10-06",
+    "drawType": "French",
+    "crsScore": 400,
+    "itasIssued": 4000
+  },
+  {
+    "date": "2025-10-01",
+    "drawType": "PNP",
+    "crsScore": 775,
+    "itasIssued": 500
+  },
+  {
+    "date": "2025-09-22",
+    "drawType": "CEC",
+    "crsScore": 533,
+    "itasIssued": 3200
+  },
+  {
+    "date": "2025-09-15",
+    "drawType": "Healthcare",
+    "crsScore": 469,
+    "itasIssued": 3000
+  },
+  {
+    "date": "2025-09-08",
+    "drawType": "CEC",
+    "crsScore": 533,
+    "itasIssued": 3200
+  },
+  {
+    "date": "2025-08-25",
+    "drawType": "French",
+    "crsScore": 397,
+    "itasIssued": 4000
+  },
+  {
+    "date": "2025-08-18",
+    "drawType": "CEC",
+    "crsScore": 533,
+    "itasIssued": 3000
+  },
+  {
+    "date": "2025-08-11",
+    "drawType": "PNP",
+    "crsScore": 810,
+    "itasIssued": 400
+  },
+  {
+    "date": "2025-08-06",
+    "drawType": "Education",
+    "crsScore": 479,
+    "itasIssued": 1000
+  },
+  {
+    "date": "2025-07-28",
+    "drawType": "CEC",
+    "crsScore": 539,
+    "itasIssued": 3200
+  },
+  {
+    "date": "2025-07-21",
+    "drawType": "French",
+    "crsScore": 379,
+    "itasIssued": 5000
+  },
+  {
+    "date": "2025-07-14",
+    "drawType": "Healthcare",
+    "crsScore": 478,
+    "itasIssued": 3000
+  },
+  {
+    "date": "2025-07-07",
+    "drawType": "CEC",
+    "crsScore": 540,
+    "itasIssued": 3000
+  },
+  {
+    "date": "2025-06-23",
+    "drawType": "CEC",
+    "crsScore": 541,
+    "itasIssued": 3000
+  },
+  {
+    "date": "2025-06-16",
+    "drawType": "PNP",
+    "crsScore": 820,
+    "itasIssued": 450
+  },
+  {
+    "date": "2025-06-09",
+    "drawType": "French",
+    "crsScore": 404,
+    "itasIssued": 4000
+  },
+  {
+    "date": "2025-06-02",
+    "drawType": "Healthcare",
+    "crsScore": 485,
+    "itasIssued": 2000
+  },
+  {
+    "date": "2025-05-26",
+    "drawType": "CEC",
+    "crsScore": 541,
+    "itasIssued": 3000
+  },
+  {
+    "date": "2025-05-19",
+    "drawType": "PNP",
+    "crsScore": 830,
+    "itasIssued": 400
+  },
+  {
+    "date": "2025-05-12",
+    "drawType": "Education",
+    "crsScore": 462,
+    "itasIssued": 1000
+  },
+  {
+    "date": "2025-05-05",
+    "drawType": "CEC",
+    "crsScore": 547,
+    "itasIssued": 3000
+  },
+  {
+    "date": "2025-04-28",
+    "drawType": "French",
+    "crsScore": 420,
+    "itasIssued": 4500
+  },
+  {
+    "date": "2025-04-21",
+    "drawType": "PNP",
+    "crsScore": 845,
+    "itasIssued": 500
+  },
+  {
+    "date": "2025-04-14",
+    "drawType": "Healthcare",
+    "crsScore": 490,
+    "itasIssued": 2000
+  },
+  {
+    "date": "2025-04-07",
+    "drawType": "CEC",
+    "crsScore": 542,
+    "itasIssued": 2800
+  },
+  {
+    "date": "2025-03-24",
+    "drawType": "Trades",
+    "crsScore": 505,
+    "itasIssued": 500
+  },
+  {
+    "date": "2025-03-17",
+    "drawType": "CEC",
+    "crsScore": 540,
+    "itasIssued": 2500
+  },
+  {
+    "date": "2025-03-10",
+    "drawType": "French",
+    "crsScore": 415,
+    "itasIssued": 4000
+  },
+  {
+    "date": "2025-03-03",
+    "drawType": "PNP",
+    "crsScore": 855,
+    "itasIssued": 350
+  },
+  {
+    "date": "2025-02-24",
+    "drawType": "Healthcare",
+    "crsScore": 510,
+    "itasIssued": 1500
+  },
+  {
+    "date": "2025-02-17",
+    "drawType": "CEC",
+    "crsScore": 538,
+    "itasIssued": 2500
+  },
+  {
+    "date": "2025-02-10",
+    "drawType": "PNP",
+    "crsScore": 840,
+    "itasIssued": 350
+  },
+  {
+    "date": "2025-02-03",
+    "drawType": "French",
+    "crsScore": 481,
+    "itasIssued": 2000
+  },
+  {
+    "date": "2025-01-27",
+    "drawType": "CEC",
+    "crsScore": 535,
+    "itasIssued": 2500
+  },
+  {
+    "date": "2025-01-20",
+    "drawType": "PNP",
+    "crsScore": 835,
+    "itasIssued": 300
+  },
+  {
+    "date": "2025-01-13",
+    "drawType": "CEC",
+    "crsScore": 515,
+    "itasIssued": 4000
+  },
+  {
+    "date": "2025-01-06",
+    "drawType": "PNP",
+    "crsScore": 800,
+    "itasIssued": 450
+  }
+]

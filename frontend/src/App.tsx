@@ -17,6 +17,7 @@ import { TermsOfServicePage } from './components/TermsOfServicePage';
 import { RefundPolicyPage } from './components/RefundPolicyPage';
 import { LetterBuilderPage } from './components/LetterBuilderPage';
 import { GlossaryPage } from './components/GlossaryPage';
+import { DrawResultsPage } from './components/DrawResultsPage';
 import { useAuth, UserButton } from '@clerk/clerk-react';
 import { saveEvaluation, cancelPaymentEvent } from './services/api';
 import { Navbar } from './components/common/Navbar';
@@ -125,6 +126,7 @@ const AppLayout = ({ children }: { children: React.ReactNode }) => {
         <div style={{ display: 'flex', gap: '16px', justifyContent: 'center', fontSize: '12px', flexWrap: 'wrap' }}>
           <a href="/glossary" style={{ color: 'var(--text-muted)', textDecoration: 'none' }}>Immigration Glossary</a>
           <a href="/noc-codes" style={{ color: 'var(--text-muted)', textDecoration: 'none' }}>NOC Directory</a>
+          <a href="/draw-results" style={{ color: 'var(--text-muted)', textDecoration: 'none' }}>Draw Results</a>
           <a href="/privacy-policy" style={{ color: 'var(--text-muted)', textDecoration: 'none' }}>Privacy Policy</a>
           <a href="/terms-of-service" style={{ color: 'var(--text-muted)', textDecoration: 'none' }}>Terms of Service</a>
           <a href="/refund-policy" style={{ color: 'var(--text-muted)', textDecoration: 'none' }}>Refund Policy</a>
@@ -297,6 +299,7 @@ function App() {
       <Route path="/noc-codes" element={<SharedLayout><NOCDirectoryPage onNavigate={(p) => navigate(`/${p}`)} /></SharedLayout>} />
       <Route path="/noc-codes/:code" element={<SharedLayout><NOCDetailsPage /></SharedLayout>} />
       <Route path="/glossary" element={<SharedLayout><GlossaryPage /></SharedLayout>} />
+      <Route path="/draw-results" element={<SharedLayout><DrawResultsPage onNavigate={(p) => navigate(`/${p}`)} /></SharedLayout>} />
 
       {/* Legal Pages */}
       <Route path="/privacy-policy" element={<SharedLayout><PrivacyPolicyPage /></SharedLayout>} />

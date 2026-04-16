@@ -723,6 +723,47 @@ def assemble_letter_text(employment_details: dict, noc_code: str, noc_title: str
 
 # ── ITA Strategy Report Generation ──
 
+def get_draw_context_string() -> str:
+    """Loads the draw results JSON from the frontend and returns a context string for the AI prompt."""
+    try:
+        json_path = os.path.join(os.path.dirname(__file__), '..', 'frontend', 'src', 'data', 'draw_results.json')
+        with open(json_path, 'r', encoding='utf-8') as f:
+            draws = json.load(f)
+
+        cec_draws = [d for d in draws if d.get('drawType') == 'CEC']
+        if not cec_draws:
+            return "Latest Express Entry general draw cutoff is approximately 520-540 points."
+            
+        latest_cec = cec_draws[0]['crsScore']
+        recent_cec = cec_draws[:15]
+        avg_cec = sum(d['crsScore'] for d in recent_cec) // len(recent_cec)
+        
+        trend = "stable"
+        if len(recent_cec) >= 6:
+            older_avg = sum(d['crsScore'] for d in recent_cec[3:6]) / 3
+            newer_avg = sum(d['crsScore'] for d in recent_cec[:3]) / 3
+            if newer_avg > older_avg + 5:
+                trend = "rising"
+            elif newer_avg < older_avg - 5:
+                trend = "falling"
+
+        french_draws = [d for d in draws if d.get('drawType') == 'French']
+        latest_french = french_draws[0]['crsScore'] if french_draws else "Unknown"
+
+        pnp_draws = [d for d in draws if d.get('drawType') == 'PNP']
+        latest_pnp = pnp_draws[0]['crsScore'] if pnp_draws else "Unknown"
+        
+        return (f"CURRENT EXPRESS ENTRY CLIMATE (Provide objective advice based on these numbers, do NOT state statistical probabilities or guarantees):\n"
+                f"- Latest CEC (General) Cutoff: {latest_cec}\n"
+                f"- 6-Month CEC Average: {avg_cec} (Trend: {trend})\n"
+                f"- Latest French Category Cutoff: {latest_french}\n"
+                f"- Latest PNP Cutoff: {latest_pnp}\n\n"
+                f"You MUST use this data to perform a 'gap analysis'. Tell the user exactly how many points they are away from the 6-month CEC Average, and acknowledge recent trends. "
+                f"If their score is very low, mention alternative pathways like French language (NCLC 7) if applicable.")
+    except Exception as e:
+        print(f"Warning: Could not load draw context: {e}")
+        return "The latest Express Entry general draw cutoff is approximately 520-540 points. Category-based draws can have lower cutoffs."
+
 def generate_ita_strategy(raw_inputs: dict, score: dict, breakdown: dict) -> dict:
     """
     Generate a personalized ITA (Invitation to Apply) strategy report
@@ -820,7 +861,7 @@ USER PROFILE:
 {score_summary}
 ═══════════════════════════════════════
 
-The latest Express Entry general draw cutoff is approximately 520-540 points (as of early 2026). Category-based draws (French language, healthcare, STEM, trades, agriculture) can have lower cutoffs.
+{get_draw_context_string()}
 
 ═══════════════════════════════════════
 OFFICIAL CRS SCORING REFERENCE
@@ -874,7 +915,28 @@ C. ADDITIONAL POINTS:
     - IF user has NCLC 7+ in all 4 French abilities AND English is CLB 5 or higher in all 4 abilities: +50 points
     (Note: You MUST check the user's English CLB levels before applying this bonus. If they have strong English, use 50.)
 
+D. SKILL TRANSFERABILITY FACTORS (Max 100 points total combination limit)
+  Education + Language:
+    1-yr/2-yr credential + CLB 7/8 = 13 pts. With CLB 9+ = 25 pts.
+    Two or more / Masters / PhD + CLB 7/8 = 25 pts. With CLB 9+ = 50 pts.
+  Education + Canadian Work Experience:
+    1-yr/2-yr credential + 1 yr Cdn Work = 13 pts. With 2+ yr Cdn Work = 25 pts.
+    Two or more / Masters / PhD + 1 yr Cdn Work = 25 pts. With 2+ yr Cdn Work = 50 pts.
+  Foreign Work + Language:
+    1-2 yrs Exp + CLB 7/8 = 13 pts. With CLB 9+ = 25 pts.
+    3+ yrs Exp + CLB 7/8 = 25 pts. With CLB 9+ = 50 pts.
+  Foreign Work + Canadian Work Experience:
+    1-2 yrs Foreign Exp + 1 yr Cdn = 13 pts. With 2+ yr Cdn = 25 pts.
+    3+ yrs Foreign Exp + 1 yr Cdn = 25 pts. With 2+ yr Cdn = 50 pts.
+  Certificate of Qualification (Trades) + Language:
+    With Cert + CLB 5/6 = 25 pts. With CLB 7+ = 50 pts.
+
 ═══════════════════════════════════════
+STRATEGIC DIRECTIVES & WARNINGS:
+1. AGE DECAY WARNING: Check the user's age. If they are exactly 29, emphasize they will start losing 5 points every birthday. If they are >29, warn them that processing delays cost 5-6 points per year so speed is critical.
+2. UNACCOMPANYING SPOUSE STRATEGY: If the user's accompanying spouse has low education (no degree) AND low language scores (CLB < 7), you MUST run a simulation and explicitly recommend considering declaring the spouse as 'Non-Accompanying' to leverage the higher single-applicant scoring grid.
+3. 100-POINT TRANSFERABILITY CAP: The absolute maximum for ALL Skill Transferability points (Section D) combined is 100 points. Do NOT project point gains that push someone over this cap.
+
 CRITICAL: When recommending actions, you MUST calculate the EXACT point difference
 between the user's current level and the target level using these tables.
 For example: Spouse going from no language test (0 pts) to CLB 9 all abilities = 5×4 = +20 points, NOT a rough estimate.
