@@ -384,6 +384,7 @@ export const CRSCalculatorPage: FC<CRSCalculatorPageProps> = ({ onNavigate: _onN
       };
       saveToDb();
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isSignedIn, isResults, getToken, score, age, maritalStatus, education, hasCanadianEducation, canadianEducation, canadianWork, foreignWork, provincialNom, siblingInCanada, certOfQualification, lang1Test, lang1R, lang1W, lang1L, lang1S, lang2Test, lang2R, lang2W, lang2L, lang2S]);
 
   // Breakdown bars for results

@@ -81,6 +81,7 @@ export const NOCFinderPage: FC<NOCFinderPageProps> = ({ onNavigate }) => {
       // Clear the state to prevent re-triggering on subsequent renders
       window.history.replaceState({}, '', window.location.pathname);
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [(location.state as any)?.fromHistory]);
   const [error, setError] = useState('');
   const [isDragActive, setIsDragActive] = useState(false);

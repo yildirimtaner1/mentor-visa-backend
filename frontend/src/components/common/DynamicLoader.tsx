@@ -63,6 +63,7 @@ export const DynamicLoader: FC<DynamicLoaderProps> = ({ tool, targetNoc }) => {
           : `Re-evaluating Against NOC ${targetNoc || ''}`;
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setMessageIndex(0);
     setProgress(0);
   }, [tool, targetNoc]);

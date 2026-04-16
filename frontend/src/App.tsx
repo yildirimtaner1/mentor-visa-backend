@@ -187,7 +187,7 @@ function App() {
     if (ev.document_type === "NOC Finder Query") {
       let rawData = ev.payload;
       if (typeof rawData === 'string') {
-        try { rawData = JSON.parse(rawData); } catch(e) {}
+        try { rawData = JSON.parse(rawData); } catch(e) { /* ignore */ }
       }
 
       if (rawData) {
@@ -268,7 +268,7 @@ function App() {
     } else {
       let payload = ev.payload;
       if (typeof payload === 'string') {
-        try { payload = JSON.parse(payload); } catch(e) {}
+        try { payload = JSON.parse(payload); } catch(e) { /* ignore */ }
       }
       payload = { ...payload, is_premium_unlocked: ev.is_premium_unlocked };
       // Store in sessionStorage so AuditorPage picks it up with full hero/upload context

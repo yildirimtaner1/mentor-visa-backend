@@ -132,6 +132,7 @@ export const LetterBuilderPage: FC = () => {
   }, [details, nocCode, duties, isPaid, currentStep]);
 
   // Check credits on sign-in
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => {
     if (isSignedIn) {
       checkCreditsAsync();
@@ -139,6 +140,7 @@ export const LetterBuilderPage: FC = () => {
   }, [isSignedIn]);
 
   // Check for payment success redirect
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     if (params.get('payment_success') === 'true') {

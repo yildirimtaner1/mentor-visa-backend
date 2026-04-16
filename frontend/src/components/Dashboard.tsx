@@ -240,6 +240,7 @@ export const Dashboard: FC<DashboardProps> = ({ data, onReset, onUpdate }) => {
         }
       }
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isSignedIn, toFullPDF, toNocPDF, getToken, data]);
 
   useEffect(() => {

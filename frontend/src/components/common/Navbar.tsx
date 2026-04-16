@@ -49,6 +49,7 @@ export const Navbar: FC = () => {
   const [credits, setCredits] = useState<{ noc: number; audit: number; builder: number; ita: number } | null>(null);
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     if (!isSignedIn) { setCredits(null); return; }
     const load = async () => {
       const tk = await getToken();
@@ -66,7 +67,7 @@ export const Navbar: FC = () => {
 
   const totalCredits = credits ? credits.noc + credits.audit + credits.builder + credits.ita : 0;
 
-  const CreditBadge = () => credits !== null ? (
+  const creditBadgeElement = credits !== null ? (
     <div
       onClick={() => navigate('/dashboard')}
       title={`NOC Finder: ${credits.noc} | Letter Builder: ${credits.builder} | Letter Auditor: ${credits.audit} | PR Strategy: ${credits.ita}`}
@@ -127,7 +128,7 @@ export const Navbar: FC = () => {
               </>
             ) : (
               <>
-                <CreditBadge />
+                {creditBadgeElement}
                 <button 
                   className="btn btn-outline" 
                   onClick={() => navigate('/dashboard')} 
@@ -183,7 +184,7 @@ export const Navbar: FC = () => {
                 </button>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '12px', paddingLeft: '8px' }}>
                   <UserButton />
-                  <CreditBadge />
+                  {creditBadgeElement}
                 </div>
               </div>
             )}
