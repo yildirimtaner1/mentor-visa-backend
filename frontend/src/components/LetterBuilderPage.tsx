@@ -132,15 +132,13 @@ export const LetterBuilderPage: FC = () => {
   }, [details, nocCode, duties, isPaid, currentStep]);
 
   // Check credits on sign-in
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => {
     if (isSignedIn) {
       checkCreditsAsync();
     }
-  }, [isSignedIn]);
+  }, [isSignedIn, checkCreditsAsync]);
 
   // Check for payment success redirect
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     if (params.get('payment_success') === 'true') {
@@ -150,7 +148,7 @@ export const LetterBuilderPage: FC = () => {
       url.searchParams.delete('payment_success');
       window.history.replaceState({}, '', url);
     }
-  }, []);
+  }, [checkCreditsAsync]);
 
   const checkCreditsAsync = useCallback(async () => {
     if (!isSignedIn) return;
