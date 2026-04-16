@@ -43,7 +43,6 @@ export const Navbar: FC = () => {
   const { isSignedIn, getToken } = useAuth();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const { scrolled, hidden } = useSmartNav();
-  const location = useLocation();
   const navigate = useNavigate();
 
   // Credit balance
