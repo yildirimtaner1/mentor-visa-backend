@@ -131,6 +131,20 @@ export const LetterBuilderPage: FC = () => {
     }));
   }, [details, nocCode, duties, isPaid, currentStep]);
 
+  const checkCreditsAsync = useCallback(async () => {
+    if (!isSignedIn) return;
+    setCheckingCredits(true);
+    try {
+      const token = await getToken();
+      if (token) {
+        const data = await fetchUserCredits(token);
+        setCredits(data.letter_builder_credits || 0);
+        if (data.letter_builder_credits > 0) setIsPaid(true);
+      }
+    } catch { /* ignore */ }
+    setCheckingCredits(false);
+  }, [isSignedIn, getToken]);
+
   // Check credits on sign-in
   useEffect(() => {
     if (isSignedIn) {
@@ -149,20 +163,6 @@ export const LetterBuilderPage: FC = () => {
       window.history.replaceState({}, '', url);
     }
   }, [checkCreditsAsync]);
-
-  const checkCreditsAsync = useCallback(async () => {
-    if (!isSignedIn) return;
-    setCheckingCredits(true);
-    try {
-      const token = await getToken();
-      if (token) {
-        const data = await fetchUserCredits(token);
-        setCredits(data.letter_builder_credits || 0);
-        if (data.letter_builder_credits > 0) setIsPaid(true);
-      }
-    } catch { /* ignore */ }
-    setCheckingCredits(false);
-  }, [isSignedIn, getToken]);
 
   // ── Step 1: Validation ──
   const validateStep1 = (): boolean => {
