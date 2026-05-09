@@ -183,6 +183,7 @@
 .war-room-locked-wrapper {
   position: relative;
   margin-top: 1.5rem;
+  padding-bottom: 25rem;
 }
 
 .war-room-locked-blur {
@@ -208,9 +209,9 @@
 
 .war-room-unlock-sticky {
   position: absolute;
-  top: 40%; /* slightly above center */
+  top: 2rem;
   left: 50%;
-  transform: translate(-50%, -50%);
+  transform: translateX(-50%);
   width: 100%;
   max-width: 800px;
   z-index: 10;
