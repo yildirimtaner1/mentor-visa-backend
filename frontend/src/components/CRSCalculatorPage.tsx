@@ -1,6 +1,7 @@
 import { type FC, useState, useMemo, useEffect, useRef } from 'react';
 import { useAuth, SignInButton } from '@clerk/clerk-react';
 import { saveCRSEvaluation, fetchUserCredits } from '../services/api';
+import { getJourney } from '../services/journeyApi';
 import './common/PaywallGate.css';
 import { SEO } from './common/SEO';
 import { CRSWarRoom } from './CRSWarRoom';
@@ -77,8 +78,69 @@ export const CRSCalculatorPage: FC<CRSCalculatorPageProps> = ({ onNavigate: _onN
     }
   }, [isSignedIn]);
 
+  // ── Auto-unlock after Stripe payment ──
+  // When Stripe redirects back with ?payment_success=true, wait briefly for the
+  // webhook to process, then re-fetch credits + journey tier and hydrate the store
+  // so hasWarRoomAccess flips to true without a manual refresh.
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('payment_success') !== 'true' || !isSignedIn) return;
+
+    const attemptRefresh = async (attemptsLeft: number): Promise<void> => {
+      try {
+        const token = await getToken();
+        if (!token) return;
+
+        // Fetch both in parallel
+        const [creditsRes, journeyData] = await Promise.all([
+          fetchUserCredits(token),
+          getJourney(token),
+        ]);
+
+        // Update credits state
+        if (creditsRes && typeof creditsRes.ita_strategy_credits === 'number') {
+          setCredits(creditsRes);
+        }
+
+        // Hydrate store so tier updates (e.g. 'free' → 'starter')
+        hydrateFromBackend(journeyData);
+
+        // If tier still free and we have retries left, try again (webhook may be slow)
+        if ((journeyData.subscription_tier || 'free') === 'free' && attemptsLeft > 0) {
+          setTimeout(() => attemptRefresh(attemptsLeft - 1), 2500);
+          return;
+        }
+
+        // Clean the URL
+        const url = new URL(window.location.href);
+        url.searchParams.delete('payment_success');
+        url.searchParams.delete('session_id');
+        window.history.replaceState({}, '', url.toString());
+
+        // Scroll the user to the War Room section
+        setTimeout(() => {
+          const el = document.getElementById('war-room-paywall') ||
+                     document.querySelector('.war-room');
+          if (el) {
+            el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+          }
+        }, 300);
+
+      } catch (err) {
+        console.error('Failed to refresh post-payment state:', err);
+        if (attemptsLeft > 0) {
+          setTimeout(() => attemptRefresh(attemptsLeft - 1), 2500);
+        }
+      }
+    };
+
+    // Initial 2s delay to allow Stripe webhook to reach the backend
+    setTimeout(() => attemptRefresh(3), 2000);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   // If score doesn't exist but profile is somewhat complete, run a silent calculation
-  const { tier, setCRS, setProfileSilent, profile, profileUpdatedAt } = useJourneyStore();
+  const { tier, setCRS, setProfileSilent, profile, profileUpdatedAt, hydrateFromBackend } = useJourneyStore();
 
   // ── Session persistence: restore saved CRS inputs after Clerk sign-in ──
   const CRS_STORAGE_KEY = 'crsCalculatorData';
