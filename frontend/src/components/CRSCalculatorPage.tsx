@@ -1006,7 +1006,7 @@ export const CRSCalculatorPage: FC<CRSCalculatorPageProps> = ({ onNavigate: _onN
                   </div>
                 </div>
 
-                <SignInButton mode="modal" fallbackRedirectUrl="/crs-calculator">
+                <SignInButton mode="modal" forceRedirectUrl="/crs-calculator" signUpForceRedirectUrl="/crs-calculator">
                   <button className="btn btn-primary btn-lg" style={{ width: '100%', maxWidth: '380px', fontSize: '1.05rem', padding: '16px 24px', boxShadow: '0 8px 20px rgba(37, 99, 235, 0.25)' }}>
                     Unlock My Score & Improvement Plan
                   </button>
