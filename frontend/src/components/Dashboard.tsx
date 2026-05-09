@@ -79,7 +79,7 @@ export const Dashboard: FC<DashboardProps> = ({ data, onReset, onUpdate }) => {
     try {
         const tk = await getToken();
         if (!tk) return;
-        const result = await createCheckoutSession('auditor', tk, '/results');
+        const result = await createCheckoutSession('auditor', tk, '/audit-employment-letter');
         if (result?.session_url) window.location.href = result.session_url;
     } catch (e: any) {
         alert("Failed to initiate checkout: " + (e.message || "Unknown error"));
@@ -811,7 +811,7 @@ export const Dashboard: FC<DashboardProps> = ({ data, onReset, onUpdate }) => {
                                 try {
                                   const tk = await getToken();
                                   if (!tk) return;
-                                  const result = await createCheckoutSession(userTier === 'starter' ? 'complete' : 'starter', tk, '/results');
+                                  const result = await createCheckoutSession(userTier === 'starter' ? 'complete' : 'starter', tk, '/audit-employment-letter');
                                   if (result?.session_url) window.location.href = result.session_url;
                                 } catch (e: any) {
                                   alert('Failed to start checkout: ' + (e.message || 'Unknown error'));
