@@ -1,15 +1,12 @@
 import { type FC, useState, useMemo, useEffect, useRef } from 'react';
 import { useAuth, SignInButton } from '@clerk/clerk-react';
-import { saveCRSEvaluation, generateITAStrategy, createCheckoutSession, fetchUserCredits } from '../services/api';
+import { saveCRSEvaluation, fetchUserCredits } from '../services/api';
 import './common/PaywallGate.css';
 import { SEO } from './common/SEO';
-import { DynamicLoader } from './common/DynamicLoader';
 import { CRSWarRoom } from './CRSWarRoom';
 import { useJourneyStore } from '../stores/journeyStore';
 import {
-  getAgePoints, getEducationPoints, getLanguageAbilityPoints,
-  getSpouseLanguagePoints, getSecondLanguagePoints, getSpouseEducationPoints,
-  getSpouseCanadianWorkPoints, getCanadianWorkPoints, extractCLB, getLangOptions,
+  extractCLB, getLangOptions,
   calculateCRSScore, type CRSInputs
 } from '../lib/crs-math';
 
@@ -62,30 +59,26 @@ export const CRSCalculatorPage: FC<CRSCalculatorPageProps> = ({ onNavigate: _onN
   const { isSignedIn, getToken } = useAuth();
   const hasSavedRef = useRef(false);
   const [isSaving, setIsSaving] = useState(false);
-  const [savedEvalId, setSavedEvalId] = useState<number | null>(null);
-  const [isSyncing, setIsSyncing] = useState(false);
+  const [, setSavedEvalId] = useState<number | null>(null);
   const [credits, setCredits] = useState<any>(null);
 
   // Fetch credits on mount if signed in
   useEffect(() => {
     if (isSignedIn) {
-      fetchUserCredits().then(res => {
-        if (res && typeof res.ita_strategy_credits === 'number') {
-          setCredits(res);
+      getToken().then(token => {
+        if (token) {
+          fetchUserCredits(token).then(res => {
+            if (res && typeof res.ita_strategy_credits === 'number') {
+              setCredits(res);
+            }
+          }).catch(err => console.error("Failed to fetch credits:", err));
         }
-      }).catch(err => console.error("Failed to fetch credits:", err));
+      });
     }
   }, [isSignedIn]);
 
   // If score doesn't exist but profile is somewhat complete, run a silent calculation
   const { tier, setCRS, setProfileSilent, profile, profileUpdatedAt } = useJourneyStore();
-
-  // ITA Strategy state
-  const [strategyReport, setStrategyReport] = useState<any>(null);
-  const [isGeneratingStrategy, setIsGeneratingStrategy] = useState(false);
-  const [strategyError, setStrategyError] = useState<string | null>(null);
-  const [itaCredits, setItaCredits] = useState(0);
-  const [userTier, setUserTier] = useState<string>('free');
 
   // ── Session persistence: restore saved CRS inputs after Clerk sign-in ──
   const CRS_STORAGE_KEY = 'crsCalculatorData';
@@ -491,10 +484,7 @@ export const CRSCalculatorPage: FC<CRSCalculatorPageProps> = ({ onNavigate: _onN
             }, token);
             if (result?.id) setSavedEvalId(result.id);
 
-            // Fetch ITA strategy credits
-            const credits = await fetchUserCredits(token);
-            setItaCredits(credits.ita_strategy_credits || 0);
-            setUserTier(credits.subscription_tier || 'free');
+
           }
         } catch (e) {
           console.error('Failed to save CRS score:', e);
@@ -1097,141 +1087,6 @@ export const CRSCalculatorPage: FC<CRSCalculatorPageProps> = ({ onNavigate: _onN
                 </div>
 
 
-                {/* ═══════ ITA STRATEGY REPORT (hidden — redesign pending) ═══════ */}
-                {false && strategyReport && (
-                  <div style={{ marginTop: '40px' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
-                      <h3 style={{ fontSize: '1.4rem', fontWeight: 800 }}>🎯 Your Personalized ITA Strategy</h3>
-                      <button
-                        className="btn btn-outline"
-                        style={{ fontSize: '0.82rem' }}
-                        onClick={() => {
-                          const printDiv = document.getElementById('ita-strategy-print');
-                          if (printDiv) {
-                            const w = window.open('', '_blank');
-                            if (w) {
-                              w.document.write('<html><head><title>ITA Strategy Report</title><style>body{font-family:system-ui,sans-serif;padding:40px;max-width:800px;margin:0 auto;color:#1e293b;line-height:1.6}h2{color:#1e3a8a;border-bottom:2px solid #dbeafe;padding-bottom:8px}h3{color:#0f172a;margin-top:24px}table{width:100%;border-collapse:collapse;margin:16px 0}td,th{padding:10px 14px;border:1px solid #e2e8f0;text-align:left;font-size:14px}th{background:#f8fafc;font-weight:700}.badge{display:inline-block;padding:2px 10px;border-radius:12px;font-size:12px;font-weight:700}</style></head><body>');
-                              w.document.write(printDiv.innerHTML);
-                              w.document.write('</body></html>');
-                              w.document.close();
-                              w.print();
-                            }
-                          }
-                        }}
-                      >
-                        📄 Download PDF
-                      </button>
-                    </div>
-
-                    <div id="ita-strategy-print">
-                      {/* Overall Assessment */}
-                      <div style={{ padding: '24px', background: 'linear-gradient(135deg, #EFF6FF, #F0FDF4)', borderRadius: '12px', border: '1px solid #DBEAFE', marginBottom: '24px' }}>
-                        <div style={{ display: 'flex', gap: '24px', flexWrap: 'wrap', justifyContent: 'center', marginBottom: '16px' }}>
-                          <div style={{ textAlign: 'center' }}>
-                            <div style={{ fontSize: '0.7rem', textTransform: 'uppercase', color: '#64748B', fontWeight: 700, letterSpacing: '0.5px' }}>Your Score</div>
-                            <div style={{ fontSize: '2rem', fontWeight: 900, color: '#1E3A8A' }}>{strategyReport.current_score}</div>
-                          </div>
-                          <div style={{ textAlign: 'center' }}>
-                            <div style={{ fontSize: '0.7rem', textTransform: 'uppercase', color: '#64748B', fontWeight: 700, letterSpacing: '0.5px' }}>Cutoff</div>
-                            <div style={{ fontSize: '2rem', fontWeight: 900, color: '#059669' }}>~{strategyReport.estimated_cutoff}</div>
-                          </div>
-                          <div style={{ textAlign: 'center' }}>
-                            <div style={{ fontSize: '0.7rem', textTransform: 'uppercase', color: '#64748B', fontWeight: 700, letterSpacing: '0.5px' }}>Gap</div>
-                            <div style={{ fontSize: '2rem', fontWeight: 900, color: strategyReport.gap > 0 ? '#DC2626' : '#059669' }}>{strategyReport.gap > 0 ? `-${strategyReport.gap}` : '+' + Math.abs(strategyReport.gap)}</div>
-                          </div>
-                        </div>
-                        <p style={{ fontSize: '0.95rem', color: '#334155', textAlign: 'center', maxWidth: '600px', margin: '0 auto', lineHeight: 1.6 }}>
-                          {strategyReport.overall_assessment}
-                        </p>
-                      </div>
-
-                      {/* Ranked Actions */}
-                      <h3 style={{ fontSize: '1.15rem', fontWeight: 700, marginBottom: '16px' }}>📋 Ranked Actions</h3>
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', marginBottom: '32px' }}>
-                        {(strategyReport.actions || []).map((action: any) => (
-                          <div key={action.rank} style={{ padding: '20px', background: '#FAFAFA', borderRadius: '12px', border: '1px solid var(--border-color)' }}>
-                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '8px', flexWrap: 'wrap', gap: '8px' }}>
-                              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                                <span style={{ width: '28px', height: '28px', borderRadius: '50%', background: '#1E3A8A', color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.8rem', fontWeight: 800, flexShrink: 0 }}>{action.rank}</span>
-                                <span style={{ fontWeight: 700, fontSize: '1rem' }}>{action.title}</span>
-                              </div>
-                              <span style={{ padding: '4px 12px', background: '#DBEAFE', color: '#1D4ED8', borderRadius: '20px', fontSize: '0.8rem', fontWeight: 700 }}>{action.potential_points}</span>
-                            </div>
-                            <p style={{ fontSize: '0.9rem', color: '#475569', lineHeight: 1.6, marginBottom: '12px' }}>{action.description}</p>
-                            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '12px', fontSize: '0.8rem' }}>
-                              <span style={{ padding: '2px 10px', background: action.priority === 'Critical' ? '#FEE2E2' : action.priority === 'High' ? '#FEF3C7' : '#F0FDF4', color: action.priority === 'Critical' ? '#991B1B' : action.priority === 'High' ? '#92400E' : '#166534', borderRadius: '8px', fontWeight: 600 }}>{action.priority}</span>
-                              <span style={{ color: '#64748B' }}>⏱️ {action.estimated_timeline}</span>
-                              <span style={{ color: '#64748B' }}>💰 {action.estimated_cost}</span>
-                              <span style={{ color: '#64748B' }}>📈 {action.effort_level} effort</span>
-                            </div>
-                            {action.specific_targets && (
-                              <div style={{ marginTop: '10px', padding: '10px 14px', background: '#EFF6FF', borderRadius: '8px', fontSize: '0.85rem', color: '#1E40AF', fontWeight: 500 }}>
-                                🎯 Target: {action.specific_targets}
-                              </div>
-                            )}
-                          </div>
-                        ))}
-                      </div>
-
-                      {/* Language Optimization */}
-                      {strategyReport.language_optimization && (
-                        <>
-                          <h3 style={{ fontSize: '1.15rem', fontWeight: 700, marginBottom: '16px' }}>🗣️ Language Score Optimization</h3>
-                          <div style={{ padding: '20px', background: '#FFFBEB', borderRadius: '12px', border: '1px solid #FDE68A', marginBottom: '32px' }}>
-                            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '12px' }}>
-                              <span style={{ fontWeight: 600 }}>Current 1st language points</span>
-                              <span style={{ fontWeight: 700 }}>{strategyReport.language_optimization.current_first_language_points}</span>
-                            </div>
-                            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '12px' }}>
-                              <span style={{ fontWeight: 600 }}>Maximum possible</span>
-                              <span style={{ fontWeight: 700, color: '#059669' }}>{strategyReport.language_optimization.max_first_language_points}</span>
-                            </div>
-                            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '16px' }}>
-                              <span style={{ fontWeight: 600 }}>Points you can gain</span>
-                              <span style={{ fontWeight: 700, color: '#1D4ED8' }}>+{strategyReport.language_optimization.improvement_possible}</span>
-                            </div>
-                            <p style={{ fontSize: '0.9rem', color: '#92400E', lineHeight: 1.6 }}><strong>Target scores:</strong> {strategyReport.language_optimization.specific_targets}</p>
-                            {strategyReport.language_optimization.second_language_recommendation && (
-                              <p style={{ fontSize: '0.9rem', color: '#92400E', lineHeight: 1.6, marginTop: '8px' }}><strong>2nd language:</strong> {strategyReport.language_optimization.second_language_recommendation}</p>
-                            )}
-                          </div>
-                        </>
-                      )}
-
-                      {/* PNP Recommendations */}
-                      {strategyReport.pnp_recommendations?.length > 0 && (
-                        <>
-                          <h3 style={{ fontSize: '1.15rem', fontWeight: 700, marginBottom: '16px' }}>🗺️ Provincial Nominee Programs (PNP)</h3>
-                          <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', marginBottom: '32px' }}>
-                            {strategyReport.pnp_recommendations.map((pnp: any, i: number) => (
-                              <div key={i} style={{ padding: '20px', background: '#F0FDF4', borderRadius: '12px', border: '1px solid #BBF7D0' }}>
-                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
-                                  <span style={{ fontWeight: 700 }}>{pnp.province} — {pnp.stream}</span>
-                                  <span style={{ padding: '4px 12px', background: '#059669', color: 'white', borderRadius: '20px', fontSize: '0.8rem', fontWeight: 700 }}>{pnp.points_impact}</span>
-                                </div>
-                                <p style={{ fontSize: '0.9rem', color: '#166534', lineHeight: 1.6, marginBottom: '8px' }}>{pnp.why_suitable}</p>
-                                <p style={{ fontSize: '0.82rem', color: '#15803D' }}><strong>Key requirements:</strong> {pnp.requirements_summary}</p>
-                              </div>
-                            ))}
-                          </div>
-                        </>
-                      )}
-
-                      {/* Timeline Summary */}
-                      {strategyReport.timeline_summary && (
-                        <div style={{ padding: '20px', background: '#EFF6FF', borderRadius: '12px', border: '1px solid #BFDBFE', marginBottom: '24px' }}>
-                          <h3 style={{ fontSize: '1rem', fontWeight: 700, marginBottom: '8px', color: '#1E3A8A' }}>⏱️ Recommended Timeline</h3>
-                          <p style={{ fontSize: '0.9rem', color: '#1E40AF', lineHeight: 1.6 }}>{strategyReport.timeline_summary}</p>
-                        </div>
-                      )}
-
-                      {/* Disclaimer */}
-                      <div style={{ padding: '16px', background: '#F8FAFC', borderRadius: '8px', border: '1px solid #E2E8F0', fontSize: '0.78rem', color: '#94A3B8', lineHeight: 1.5, fontStyle: 'italic' }}>
-                        {strategyReport.disclaimer || 'This report provides general guidance based on publicly available CRS criteria. It is not legal advice. For personalized legal advice, consult a Regulated Canadian Immigration Consultant (RCIC) or immigration lawyer.'}
-                      </div>
-                    </div>
-                  </div>
-                )}
                 {/* ══════ CRS War Room ══════ */}
                 <CRSWarRoom 
                   userScore={score.total} 

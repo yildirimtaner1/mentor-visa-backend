@@ -53,9 +53,9 @@ const QUICK_CHIPS = [
 
 export default function ProfileBuilderPage() {
   const { isSignedIn, getToken } = useAuth();
-  const { user: clerkUser } = useUser();
+  const { user: _clerkUser } = useUser();
   const clerk = useClerk();
-  const navigate = useNavigate();
+  useNavigate(); // available for future use
 
   // Journey store data (for welcome message context)
   const { noc, crs, eligibility } = useJourneyStore();
@@ -72,7 +72,7 @@ export default function ProfileBuilderPage() {
     anonymousUsed,
     creditsExhausted,
     upgradeTier,
-    currentTier,
+    currentTier: _ct,
     sendMessage,
     loadConversation,
     startNewConversation,

@@ -52,7 +52,7 @@ interface CRSWarRoomProps {
   unlockCTA?: React.ReactNode;
 }
 
-export function CRSWarRoom({ userScore, tier, hasWarRoomAccess = false, crsInputs: propsCrsInputs, unlockCTA }: CRSWarRoomProps) {
+export function CRSWarRoom({ userScore, tier: _tier, hasWarRoomAccess = false, crsInputs: propsCrsInputs, unlockCTA }: CRSWarRoomProps) {
   const { noc, profile } = useJourneyStore();
   const [selectedDrawType, setSelectedDrawType] = useState('General');
   const [expandedScenario, setExpandedScenario] = useState<string | null>(null);
@@ -175,7 +175,6 @@ export function CRSWarRoom({ userScore, tier, hasWarRoomAccess = false, crsInput
     return ['all', ...Array.from(types)];
   }, []);
 
-  const isPaid = tier !== 'free';
 
   return (
     <div className="war-room">
@@ -593,11 +592,6 @@ function ScenarioCard({
   onToggle: () => void;
   rank: number;
 }) {
-  const effortColors = {
-    low: '#10b981',
-    medium: '#f59e0b',
-    high: '#ef4444',
-  };
 
   const categoryIcons: Record<string, string> = {
     language: '🗣️',

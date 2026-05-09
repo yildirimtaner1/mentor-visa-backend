@@ -2,7 +2,7 @@ import type { FC } from 'react';
 import { Navbar } from './common/Navbar';
 import { SEO } from './common/SEO';
 import { Testimonials } from './ui/testimonials-columns-1';
-import { CheckCircle2, Search, LineChart, FileText, Clock, DollarSign, Brain, ShieldCheck, Users, ArrowRight, TrendingDown } from 'lucide-react';
+import { CheckCircle2, Search, LineChart, FileText, DollarSign, ShieldCheck, ArrowRight, TrendingDown } from 'lucide-react';
 import { ALL_DRAWS } from '../data/drawResults';
 import './LandingPage.css';
 import './PricingPage.css';

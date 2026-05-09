@@ -12,7 +12,7 @@
  */
 
 import { useMemo } from 'react';
-import { ALL_DRAWS, getLatestCutoff, getTrend } from '../data/drawResults';
+import { ALL_DRAWS, getTrend } from '../data/drawResults';
 import { getCategoriesForNoc, CATEGORY_INFO } from '../data/nocCategoryMap';
 import { checkDrawEligibility, type SimulatorProfile } from '../utils/crsSimulator';
 import { useJourneyStore } from '../stores/journeyStore';

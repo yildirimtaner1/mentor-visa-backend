@@ -1,7 +1,6 @@
 import { getCategoriesForNoc } from '../data/nocCategoryMap';
 import {
-  getLanguageAbilityPoints, getEducationPoints, getCanadianWorkPoints,
-  getAgePoints, calculateCRSScore, type CRSInputs
+  getLanguageAbilityPoints, calculateCRSScore, type CRSInputs
 } from '../lib/crs-math';
 
 export interface ImprovementScenario {

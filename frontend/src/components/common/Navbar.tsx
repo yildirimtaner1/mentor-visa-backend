@@ -3,7 +3,7 @@ import { SignInButton, SignUpButton, useAuth, UserButton } from '@clerk/clerk-re
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useSmartNav } from '../../hooks/useSmartNav';
 import { fetchUserCredits } from '../../services/api';
-import { ChevronDown, FileText, Pickaxe, CheckSquare, LineChart, Map, BookOpen, Zap, MessageCircle } from 'lucide-react';
+import { ChevronDown, FileText, CheckSquare, LineChart, Map, BookOpen, MessageCircle } from 'lucide-react';
 
 const DropdownMenu = ({ title, items, basePath, columns = 1 }: { title: string, items: any[], basePath?: string, columns?: number }) => {
   const [open, setOpen] = useState(false);
