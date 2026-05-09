@@ -102,7 +102,7 @@ export function PricingPage() {
           </ul>
           <div className="pricing-card-footer">
             {!isSignedIn ? (
-              <SignInButton mode="modal">
+              <SignInButton mode="modal" fallbackRedirectUrl="/pricing">
                 <button className="pricing-btn outline">Create Free Account</button>
               </SignInButton>
             ) : isCurrentTier('free') ? (
@@ -131,7 +131,7 @@ export function PricingPage() {
           </ul>
           <div className="pricing-card-footer">
             {!isSignedIn ? (
-              <SignInButton mode="modal">
+              <SignInButton mode="modal" fallbackRedirectUrl="/pricing">
                 <button className="pricing-btn secondary">Optimize My Profile</button>
               </SignInButton>
             ) : isCurrentTier('starter') ? (
@@ -166,7 +166,7 @@ export function PricingPage() {
           </ul>
           <div className="pricing-card-footer">
             {!isSignedIn ? (
-              <SignInButton mode="modal">
+              <SignInButton mode="modal" fallbackRedirectUrl="/pricing">
                 <button className="pricing-btn primary">Get Execute Access</button>
               </SignInButton>
             ) : isCurrentTier('complete') ? (

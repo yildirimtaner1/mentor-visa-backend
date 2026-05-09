@@ -722,7 +722,7 @@ export const NOCFinderPage: FC<NOCFinderPageProps> = ({ onNavigate }) => {
                           <li>✅ Re-evaluate against any alternative NOC</li>
                         </ul>
                         
-                        <SignInButton mode="modal">
+                        <SignInButton mode="modal" fallbackRedirectUrl="/find-my-noc">
                           <button className="btn btn-primary" style={{ width: '100%', padding: '14px', fontSize: '1.05rem' }}>
                             Sign In — It's Free
                           </button>

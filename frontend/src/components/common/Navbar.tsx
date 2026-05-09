@@ -150,7 +150,7 @@ export const Navbar: FC = () => {
                 >
                   Start Free →
                 </button>
-                <SignInButton mode="modal">
+                <SignInButton mode="modal" fallbackRedirectUrl={window.location.pathname}>
                   <button className="btn btn-outline" style={{ padding: '8px 16px', fontSize: '0.9rem' }}>Login</button>
                 </SignInButton>
               </>
@@ -209,10 +209,10 @@ export const Navbar: FC = () => {
           <div style={{ borderTop: '1px solid var(--border-color)', paddingTop: '12px', marginTop: '8px', display: 'flex', gap: '12px' }}>
             {!isSignedIn ? (
               <>
-                <SignInButton mode="modal">
+                <SignInButton mode="modal" fallbackRedirectUrl={window.location.pathname}>
                   <button className="btn btn-ghost" style={{ flex: 1, fontSize: '0.9rem' }}>Login</button>
                 </SignInButton>
-                <SignUpButton mode="modal">
+                <SignUpButton mode="modal" fallbackRedirectUrl={window.location.pathname}>
                   <button className="btn btn-primary" style={{ flex: 1, fontSize: '0.9rem' }}>Sign Up</button>
                 </SignUpButton>
               </>

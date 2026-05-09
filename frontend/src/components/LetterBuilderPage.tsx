@@ -347,7 +347,7 @@ export const LetterBuilderPage: FC = () => {
             <div className="page-hero-badge">🔨 Interactive Letter Builder</div>
             <h1>Write an Employment Letter <br /><span className="hero-highlight" style={{ color: 'var(--primary-light)' }}>IRCC Will Accept</span></h1>
             <p style={{ maxWidth: '700px', margin: '0 auto 24px auto', fontSize: '1.1rem', lineHeight: '1.6' }}>A single mismatched duty can cause an Express Entry rejection. Build your letter with real-time AI coaching that ensures your experience aligns perfectly with the official NOC requirements.</p>
-            <SignInButton mode="modal">
+            <SignInButton mode="modal" fallbackRedirectUrl="/build-employment-letter">
               <button className="btn btn-primary btn-lg" style={{ marginBottom: '12px' }}>
                 Start Building Now
               </button>
@@ -367,7 +367,7 @@ export const LetterBuilderPage: FC = () => {
               <p style={{ color: 'var(--text-muted)', marginBottom: '20px', lineHeight: 1.6 }}>
                 The Interactive Letter Builder requires a signed-in account to save your progress and generate your letter.
               </p>
-              <SignInButton mode="modal">
+              <SignInButton mode="modal" fallbackRedirectUrl="/build-employment-letter">
                 <button className="btn btn-primary btn-lg" style={{ width: '100%' }}>Sign In to Start Building</button>
               </SignInButton>
             </div>

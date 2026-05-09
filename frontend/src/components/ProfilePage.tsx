@@ -200,7 +200,7 @@ export const ProfilePage: FC = () => {
             <div className="profile-auth-gate-icon">👤</div>
             <h2>Sign In to Access Your Profile</h2>
             <p>Your profile keeps all your immigration details in one place — eligibility, NOC code, CRS score, and documents.</p>
-            <SignInButton mode="modal"><button className="btn btn-primary btn-lg">Sign In to Continue</button></SignInButton>
+            <SignInButton mode="modal" fallbackRedirectUrl="/profile"><button className="btn btn-primary btn-lg">Sign In to Continue</button></SignInButton>
           </div>
         </section>
       </div>
