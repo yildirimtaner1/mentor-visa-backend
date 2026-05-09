@@ -787,7 +787,7 @@ export const NOCFinderPage: FC<NOCFinderPageProps> = ({ onNavigate }) => {
                   <p style={{ fontSize: '0.9rem', color: '#78350F', marginBottom: '16px', lineHeight: 1.5 }}>
                     {result.next_step || 'Run a full Employment Letter Audit to confirm eligibility and reduce refusal risk.'}
                   </p>
-                  <button className="btn btn-primary btn-lg" onClick={() => onNavigate('audit-employment-letter', { fileId: result.stored_file_id, targetNoc: 'auto' })} style={{ background: '#D97706', borderColor: '#D97706' }}>
+                  <button className="btn btn-primary btn-lg" onClick={() => onNavigate('audit-employment-letter', { fileId: result.stored_file_id, targetNoc: result.noc_code })} style={{ background: '#D97706', borderColor: '#D97706' }}>
                     📄 Audit My Letter →
                   </button>
                   <p style={{ fontSize: '0.75rem', color: '#92400E', marginTop: '10px', marginBottom: 0 }}>Included in Optimize ($49) or available individually.</p>
