@@ -541,7 +541,7 @@ def analyze_document_with_ai(uploaded_doc_bytes: bytes, file_extension: str, is_
 
 def get_noc_details(noc_code: str) -> dict | None:
     """Look up a single NOC code from the loaded index. Returns the entry or None."""
-    for entry in NOC_INDEX:
+    for entry in NOC_INDEX.values():
         if entry.get("code") == noc_code:
             return entry
     return None
