@@ -75,6 +75,11 @@ export const AuditorPage: FC = () => {
           
           setResult(res);
           sessionStorage.setItem('mentorVisaAnalysisResult', JSON.stringify(res));
+          // Scroll to the beginning of the analysis results so the user
+          // sees the value (Preliminary Assessment) before the paywall
+          setTimeout(() => {
+            document.getElementById('audit-results-section')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+          }, 300);
           // Backend reevaluate endpoint already saves the record — no need to double-save
         } catch (err) {
           const message = err instanceof Error ? err.message : 'An error occurred during auto-analysis.';
@@ -360,7 +365,7 @@ export const AuditorPage: FC = () => {
         </section>
 
         {result && !loading && (
-          <section className="page-section" style={{ paddingTop: '20px' }}>
+          <section id="audit-results-section" className="page-section" style={{ paddingTop: '20px' }}>
             <Dashboard 
               data={result} 
               onReset={handleReset} 
