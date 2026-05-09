@@ -790,7 +790,7 @@ export const NOCFinderPage: FC<NOCFinderPageProps> = ({ onNavigate }) => {
                   <button className="btn btn-primary btn-lg" onClick={() => onNavigate('audit-employment-letter', { fileId: result.stored_file_id, targetNoc: result.noc_code })} style={{ background: '#D97706', borderColor: '#D97706' }}>
                     📄 Audit My Letter →
                   </button>
-                  <p style={{ fontSize: '0.75rem', color: '#92400E', marginTop: '10px', marginBottom: 0 }}>Included in Optimize ($49) or available individually.</p>
+                  <p style={{ fontSize: '0.75rem', color: '#92400E', marginTop: '10px', marginBottom: 0 }}>Available individually ($24.90) or included in Optimize ($49)</p>
                 </div>
               </div>
               );
