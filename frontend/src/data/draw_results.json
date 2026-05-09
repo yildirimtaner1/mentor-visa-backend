@@ -1,5 +1,23 @@
 [
   {
+    "date": "2026-04-29",
+    "drawType": "French",
+    "crsScore": 400,
+    "itasIssued": 4000
+  },
+  {
+    "date": "2026-04-28",
+    "drawType": "CEC",
+    "crsScore": 514,
+    "itasIssued": 2000
+  },
+  {
+    "date": "2026-04-27",
+    "drawType": "PNP",
+    "crsScore": 795,
+    "itasIssued": 473
+  },
+  {
     "date": "2026-04-15",
     "drawType": "French",
     "crsScore": 419,

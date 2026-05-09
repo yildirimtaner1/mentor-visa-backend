@@ -4,6 +4,7 @@ import { useLocation } from 'react-router-dom';
 import { findNOCCode, reevaluateDocument } from '../services/api';
 import { SEO } from './common/SEO';
 import { DynamicLoader } from './common/DynamicLoader';
+import { useJourneyStore } from '../stores/journeyStore';
 
 interface AlternativeNOC {
   code: string;
@@ -58,6 +59,7 @@ export const NOCFinderPage: FC<NOCFinderPageProps> = ({ onNavigate }) => {
   const [jobTitle, setJobTitle] = useState('');
   const [duties, setDuties] = useState('');
   const [file, setFile] = useState<File | null>(null);
+  const setNoc = useJourneyStore((s) => s.setNoc);
   
   const [loading, setLoading] = useState(false);
   // Initialize from sessionStorage so result survives a Stripe redirect
@@ -116,6 +118,14 @@ export const NOCFinderPage: FC<NOCFinderPageProps> = ({ onNavigate }) => {
         const unblurred = { ...currentResult, is_signed_in: true };
         setResult(unblurred);
         sessionStorage.setItem('nocFinderResult', JSON.stringify(unblurred));
+        // Also write to journey store
+        setNoc({
+          code: unblurred.noc_code,
+          title: unblurred.noc_title,
+          teerCategory: unblurred.teer_category,
+          cecEligible: unblurred.cec_eligible,
+          confidence: unblurred.confidence,
+        });
 
         // 2. Auto-scroll to the result card
         setTimeout(() => {
@@ -213,6 +223,14 @@ export const NOCFinderPage: FC<NOCFinderPageProps> = ({ onNavigate }) => {
         const mapped = mapApiResponse(rawData);
         setResult(mapped);
         sessionStorage.setItem('nocFinderResult', JSON.stringify(mapped));
+        // Write to journey store so progress bar updates
+        setNoc({
+          code: mapped.noc_code,
+          title: mapped.noc_title,
+          teerCategory: mapped.teer_category,
+          cecEligible: mapped.cec_eligible,
+          confidence: mapped.confidence,
+        });
         // Backend /api/v1/noc-finder already persists evaluation for signed-in users — no need to double-save
       } else {
         setResult({
@@ -259,6 +277,14 @@ export const NOCFinderPage: FC<NOCFinderPageProps> = ({ onNavigate }) => {
         mapped.stored_file_id = rawData.stored_file_id || fileId;
         mapped.is_signed_in = !!rawData.is_signed_in || !!result?.is_signed_in;
         setResult(mapped);
+        // Update journey store with re-evaluated NOC
+        setNoc({
+          code: mapped.noc_code,
+          title: mapped.noc_title,
+          teerCategory: mapped.teer_category,
+          cecEligible: mapped.cec_eligible,
+          confidence: mapped.confidence,
+        });
         // Re-evaluations are already saved by backend, no need to double-save
       } else {
         setError('Re-evaluation returned no NOC analysis. Please try again.');
@@ -336,6 +362,8 @@ export const NOCFinderPage: FC<NOCFinderPageProps> = ({ onNavigate }) => {
         canonical="/find-my-noc"
         schema={nocSchema}
       />
+      <div style={{ maxWidth: '900px', margin: '0 auto', padding: '0 1rem' }}>
+      </div>
       <section className="page-hero">
         <div className="page-hero-content">
           <div className="page-hero-badge">🎯 Trusted by Express Entry applicants</div>
@@ -694,7 +722,7 @@ export const NOCFinderPage: FC<NOCFinderPageProps> = ({ onNavigate }) => {
                           <li>✅ Re-evaluate against any alternative NOC</li>
                         </ul>
                         
-                        <SignInButton mode="modal" forceRedirectUrl={window.location.href} signUpForceRedirectUrl={window.location.href}>
+                        <SignInButton mode="modal">
                           <button className="btn btn-primary" style={{ width: '100%', padding: '14px', fontSize: '1.05rem' }}>
                             Sign In — It's Free
                           </button>
@@ -760,9 +788,9 @@ export const NOCFinderPage: FC<NOCFinderPageProps> = ({ onNavigate }) => {
                     {result.next_step || 'Run a full Employment Letter Audit to confirm eligibility and reduce refusal risk.'}
                   </p>
                   <button className="btn btn-primary btn-lg" onClick={() => onNavigate('audit-employment-letter', { fileId: result.stored_file_id, targetNoc: 'auto' })} style={{ background: '#D97706', borderColor: '#D97706' }}>
-                    📄 Audit My Letter — $24.90 CAD
+                    📄 Audit My Letter →
                   </button>
-                  <p style={{ fontSize: '0.75rem', color: '#92400E', marginTop: '10px', marginBottom: 0 }}>One-time purchase. Instant results.</p>
+                  <p style={{ fontSize: '0.75rem', color: '#92400E', marginTop: '10px', marginBottom: 0 }}>Included in Optimize ($49) or available individually.</p>
                 </div>
               </div>
               );

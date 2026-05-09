@@ -2,6 +2,30 @@ import { type FC, useState, useEffect, useRef, useCallback } from 'react';
 import { useAuth, SignInButton } from '@clerk/clerk-react';
 import { SEO } from './common/SEO';
 import { fetchNocDuties, analyzeDuty, generateLetter, createCheckoutSession, fetchUserCredits } from '../services/api';
+import { CheckCircle2, X } from 'lucide-react';
+import './common/PaywallGate.css';
+import './PricingPage.css';
+
+function Feature({ 
+  children, 
+  included = false, 
+  highlight = false 
+}: { 
+  children: React.ReactNode; 
+  included?: boolean;
+  highlight?: boolean;
+}) {
+  return (
+    <li className={`pricing-feature ${highlight ? 'highlight' : ''}`}>
+      {included ? (
+        <CheckCircle2 size={16} className="feature-check" />
+      ) : (
+        <X size={16} className="feature-x" />
+      )}
+      <span>{children}</span>
+    </li>
+  );
+}
 
 // ── Types ──
 
@@ -111,6 +135,7 @@ export const LetterBuilderPage: FC = () => {
   // Payment state
   const [isPaid, setIsPaid] = useState(false);
   const [_credits, setCredits] = useState(0);
+  const [userTier, setUserTier] = useState<string>('free');
   const [_checkingCredits, setCheckingCredits] = useState(false);
 
   // Letter generation state
@@ -139,7 +164,9 @@ export const LetterBuilderPage: FC = () => {
       if (token) {
         const data = await fetchUserCredits(token);
         setCredits(data.letter_builder_credits || 0);
-        if (data.letter_builder_credits > 0) setIsPaid(true);
+        setUserTier(data.subscription_tier || 'free');
+        // Execute tier users get unlimited Letter Builder access
+        if (data.subscription_tier === 'complete' || data.letter_builder_credits > 0) setIsPaid(true);
       }
     } catch { /* ignore */ }
     setCheckingCredits(false);
@@ -269,8 +296,8 @@ export const LetterBuilderPage: FC = () => {
     try {
       const token = await getToken();
       if (!token) return;
-      const url = await createCheckoutSession('letter_builder', token, '/build-employment-letter');
-      window.location.href = url;
+      const result = await createCheckoutSession('letter_builder', token, '/build-employment-letter');
+      if (result?.session_url) window.location.href = result.session_url;
     } catch (e) {
       setDutyError(e instanceof Error ? e.message : 'Payment failed');
     }
@@ -320,7 +347,7 @@ export const LetterBuilderPage: FC = () => {
             <div className="page-hero-badge">🔨 Interactive Letter Builder</div>
             <h1>Write an Employment Letter <br /><span className="hero-highlight" style={{ color: 'var(--primary-light)' }}>IRCC Will Accept</span></h1>
             <p style={{ maxWidth: '700px', margin: '0 auto 24px auto', fontSize: '1.1rem', lineHeight: '1.6' }}>A single mismatched duty can cause an Express Entry rejection. Build your letter with real-time AI coaching that ensures your experience aligns perfectly with the official NOC requirements.</p>
-            <SignInButton mode="modal" forceRedirectUrl={window.location.href} signUpForceRedirectUrl={window.location.href}>
+            <SignInButton mode="modal">
               <button className="btn btn-primary btn-lg" style={{ marginBottom: '12px' }}>
                 Start Building Now
               </button>
@@ -340,7 +367,7 @@ export const LetterBuilderPage: FC = () => {
               <p style={{ color: 'var(--text-muted)', marginBottom: '20px', lineHeight: 1.6 }}>
                 The Interactive Letter Builder requires a signed-in account to save your progress and generate your letter.
               </p>
-              <SignInButton mode="modal" forceRedirectUrl={window.location.href} signUpForceRedirectUrl={window.location.href}>
+              <SignInButton mode="modal">
                 <button className="btn btn-primary btn-lg" style={{ width: '100%' }}>Sign In to Start Building</button>
               </SignInButton>
             </div>
@@ -602,30 +629,51 @@ export const LetterBuilderPage: FC = () => {
 
                 {/* Payment Gate */}
                 {needsPayment && (
-                  <div style={{
-                    padding: '32px', textAlign: 'center', background: 'linear-gradient(135deg, #0F172A, #1E3A8A)',
-                    borderRadius: '16px', color: 'white', marginBottom: '24px',
-                  }}>
-                    <div style={{ fontSize: '2rem', marginBottom: '12px' }}>🔓</div>
-                    <h3 style={{ fontSize: '1.2rem', fontWeight: 800, marginBottom: '8px', color: 'white' }}>
-                      You've Seen the Value — Unlock the Full Builder
-                    </h3>
-                    <p style={{ opacity: 0.85, marginBottom: '20px', lineHeight: 1.6, fontSize: '0.95rem', maxWidth: '480px', marginLeft: 'auto', marginRight: 'auto' }}>
-                      Continue adding duties, get alignment coaching on each one, and generate your complete IRCC-compliant employment letter.
-                    </p>
-                    <ul style={{ listStyle: 'none', padding: 0, margin: '0 0 24px 0', display: 'grid', gap: '8px', textAlign: 'left', maxWidth: '380px', marginLeft: 'auto', marginRight: 'auto' }}>
-                      <li style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.9rem' }}>✅ Unlimited duty coaching</li>
-                      <li style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.9rem' }}>✅ Full NOC duty coverage tracking</li>
-                      <li style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.9rem' }}>✅ Complete letter generation</li>
-                      <li style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.9rem' }}>✅ Download-ready format</li>
-                    </ul>
-                    <button className="btn btn-payment btn-lg" onClick={handlePurchase} style={{
-                      fontWeight: 700, border: 'none',
-                      padding: '14px 40px', fontSize: '1.05rem', cursor: 'pointer',
-                    }}>
-                      💳 Unlock Full Builder — $14.90 CAD
-                    </button>
-                    <p style={{ fontSize: '0.75rem', opacity: 0.6, marginTop: '12px', marginBottom: 0 }}>One-time purchase. Instant access.</p>
+                  <div className="pricing-grid-2" style={{ marginTop: '2rem', marginBottom: '2rem', width: '100%', margin: '2rem auto' }}>
+                    {/* A la carte Option */}
+                    <div className="pricing-card" style={{ background: '#ffffff', maxWidth: '350px' }}>
+                      <div className="pricing-card-header">
+                        <h3>Unlock the Full Builder</h3>
+                        <div className="pricing-price">$14<span>.90</span> <span>CAD</span></div>
+                        <p className="pricing-desc">Unlock just this one letter.</p>
+                      </div>
+                      <ul className="pricing-features">
+                        <Feature included>Unlimited duty coaching</Feature>
+                        <Feature included>Full NOC duty coverage tracking</Feature>
+                        <Feature included>Complete letter generation</Feature>
+                        <Feature included>Download-ready format</Feature>
+                        <Feature highlight>No Optimize Features Included</Feature>
+                      </ul>
+                      <div className="pricing-card-footer">
+                        <button className="pricing-btn secondary" style={{ width: '100%' }} onClick={handlePurchase}>
+                          {userTier === 'complete' ? 'Buy 1 More Use — $14.90 CAD' : 'Buy Single Pass — $14.90 CAD'}
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Subscription Option */}
+                    {userTier !== 'complete' && (
+                      <div className="pricing-card featured animate-reveal delay-1" style={{ maxWidth: '350px' }}>
+                        <div className="pricing-popular-badge">⭐ BEST VALUE</div>
+                        <div className="pricing-card-header">
+                          <h3>Optimize</h3>
+                          <div className="pricing-price">$49 <span>CAD</span></div>
+                          <p className="pricing-desc">Everything you need to perfect your profile.</p>
+                        </div>
+                        <ul className="pricing-features">
+                          <Feature included>20 Question Credits - Express Entry AI Assistant</Feature>
+                          <Feature included>Unlimited Employment Letter Audits</Feature>
+                          <Feature included>Unlimited CRS Point Simulator (What-If Scenarios)</Feature>
+                          <Feature included>Personalized Document Checklist</Feature>
+                          <Feature included>Document Expiry Tracking</Feature>
+                        </ul>
+                        <div className="pricing-card-footer">
+                          <button className="pricing-btn primary" style={{ width: '100%' }} onClick={() => window.location.href = '/pricing?upgrade=complete'}>
+                            Get Optimize — $49 CAD
+                          </button>
+                        </div>
+                      </div>
+                    )}
                   </div>
                 )}
 

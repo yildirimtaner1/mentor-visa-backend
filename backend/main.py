@@ -1,5 +1,6 @@
 import os
 import uuid
+import json
 from pathlib import Path
 from fastapi import FastAPI, UploadFile, File, HTTPException, Depends, Security, Form
 from typing import Optional
@@ -21,6 +22,7 @@ from slowapi.errors import RateLimitExceeded
 
 import database
 import db_models
+import journey_models  # PR Journey system models
 from sqlalchemy.orm import Session
 
 # Create uploads directory
@@ -70,6 +72,10 @@ if SUPABASE_URL and SUPABASE_KEY:
 
 # Create tables
 db_models.Base.metadata.create_all(bind=database.engine)
+journey_models.PRJourney.__table__.create(bind=database.engine, checkfirst=True)
+journey_models.DocumentItem.__table__.create(bind=database.engine, checkfirst=True)
+journey_models.DrawResult.__table__.create(bind=database.engine, checkfirst=True)
+journey_models.NOCCategoryMapping.__table__.create(bind=database.engine, checkfirst=True)
 
 ALLOWED_EXTENSIONS = {'.pdf', '.docx', '.doc', '.jpg', '.jpeg', '.png', '.bmp', '.tiff', '.tif', '.webp'}
 IMAGE_EXTENSIONS = {'.jpg', '.jpeg', '.png', '.bmp', '.tiff', '.tif', '.webp'}
@@ -85,6 +91,10 @@ app = FastAPI(
 limiter = Limiter(key_func=get_remote_address)
 app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+
+# Register Journey routes
+from journey_routes import router as journey_router
+app.include_router(journey_router)
 
 app.add_middleware(
     CORSMiddleware,
@@ -288,12 +298,13 @@ def get_current_user_optional(credentials: Optional[HTTPAuthorizationCredentials
 
 def ensure_user_exists(user_id: str, db: Session):
     """Create a UserAccount row if one doesn't exist yet (idempotent).
-    Must be called before inserting any row with a FK to users.user_id."""
+    Must be called before inserting any row with a FK to users.user_id.
+    New users receive 5 free AI Assistant credits."""
     if not user_id or user_id == "anonymous":
         return
     existing = db.query(db_models.UserAccount).filter_by(user_id=user_id).first()
     if not existing:
-        db.add(db_models.UserAccount(user_id=user_id, find_noc_credits=0, audit_letter_credits=0))
+        db.add(db_models.UserAccount(user_id=user_id, find_noc_credits=0, audit_letter_credits=0, profile_builder_credits=5))
         db.commit()
 
 @app.post("/api/v1/evaluations")
@@ -377,8 +388,10 @@ def get_evaluations(
     audit_records = db.query(db_models.Evaluation).filter_by(evaluation_type='audit', user_id=user_id).all()
     
     noc_records = db.query(db_models.Evaluation).filter_by(evaluation_type='noc_finder', user_id=user_id).all()
+
+    crs_records = db.query(db_models.Evaluation).filter_by(evaluation_type='crs_calculator', user_id=user_id).all()
     
-    all_records = audit_records + noc_records
+    all_records = audit_records + noc_records + crs_records
     
     result = []
     for r in all_records:
@@ -801,7 +814,97 @@ async def noc_finder_endpoint(
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"NOC Finder failed: {str(e)}")
 
+# --- Bank Letter Auditor Tool ---
+
+import bank_letter_service
+
+@app.post("/api/v1/bank-letter-audit")
+@limiter.limit("5/hour")
+async def bank_letter_audit_endpoint(
+    request: Request,
+    document: UploadFile = File(...),
+    user_id: str = Depends(get_current_user_optional),
+    db: Session = Depends(database.get_db)
+):
+    """
+    Accepts a bank letter (PDF, Word, or Image) and audits it against IRCC's
+    7 required elements for proof of settlement funds.
+    """
+    ensure_user_exists(user_id, db)
+    
+    filename = document.filename or ""
+    ext = os.path.splitext(filename)[1].lower()
+    
+    if ext not in ALLOWED_EXTENSIONS:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Unsupported file type '{ext}'. Accepted: PDF, Word (.docx), and images."
+        )
+    
+    try:
+        doc_bytes = await document.read()
+        
+        MAX_FILE_SIZE = 5 * 1024 * 1024
+        if len(doc_bytes) > MAX_FILE_SIZE:
+            raise HTTPException(status_code=413, detail="File too large. Maximum 5MB.")
+        
+        is_image = ext in IMAGE_EXTENSIONS
+        
+        # Save the original file
+        file_id = str(uuid.uuid4())
+        stored_filename = f"{file_id}{ext}"
+        
+        if supabase:
+            _MIME_MAP = {
+                '.pdf': 'application/pdf',
+                '.docx': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+                '.doc': 'application/msword',
+            }
+            content_type = _MIME_MAP.get(ext, f"image/{ext.replace('.', '')}")
+            supabase.storage.from_("documents").upload(
+                path=stored_filename,
+                file=doc_bytes,
+                file_options={"content-type": content_type}
+            )
+        else:
+            file_path = UPLOADS_DIR / stored_filename
+            with open(file_path, "wb") as f:
+                f.write(doc_bytes)
+        
+        # Run the AI audit
+        result_json = bank_letter_service.audit_bank_letter(doc_bytes, ext, is_image)
+        
+        # Inject file metadata
+        result_json["stored_file_id"] = file_id
+        result_json["original_filename"] = filename
+        result_json["evaluation_type"] = "bank_letter_audit"
+        
+        # Save to DB
+        compliance = result_json.get("overall_compliance", "unknown")
+        record = db_models.Evaluation(
+            evaluation_type='bank_letter_audit',
+            user_id=user_id,
+            document_type="Bank Letter",
+            role_name="Proof of Funds",
+            company_name=result_json.get("bank_name", "Unknown Bank"),
+            original_filename=filename,
+            stored_file_id=file_id,
+            compliance_status=compliance,
+            is_premium_unlocked=0,  # Requires payment to unlock
+            payload=result_json,
+        )
+        db.add(record)
+        db.commit()
+        
+        return result_json
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Bank letter audit failed: {str(e)}")
+
 # --- Letter Builder Tool ---
+
 
 from letter_builder_models import DutyAnalysisRequest, LetterGenerationRequest
 
@@ -853,13 +956,14 @@ async def generate_letter_endpoint(
     Requires a letter_builder credit."""
     ensure_user_exists(user_id, db)
     
-    # Check credits
+    # Check access: Complete tier gets unlimited, otherwise need credits
     user = db.query(db_models.UserAccount).filter_by(user_id=user_id).first()
-    if not user or user.letter_builder_credits <= 0:
-        raise HTTPException(status_code=403, detail="No Letter Builder credits available. Please purchase to continue.")
-    
-    # Consume credit
-    user.letter_builder_credits -= 1
+    has_tier_access = user and user.subscription_tier == 'complete'
+    if not has_tier_access:
+        if not user or user.letter_builder_credits <= 0:
+            raise HTTPException(status_code=403, detail="No Letter Builder credits available. Please upgrade to Complete or purchase a credit.")
+        # Only deduct credits for non-tier users
+        user.letter_builder_credits -= 1
     
     try:
         result = ai_service.assemble_letter_text(
@@ -910,12 +1014,14 @@ def get_user_credits(
     """Fetch user credit balance."""
     user = db.query(db_models.UserAccount).filter_by(user_id=user_id).first()
     if not user:
-        return {"find_noc_credits": 0, "audit_letter_credits": 0, "ita_strategy_credits": 0}
+        return {"find_noc_credits": 0, "audit_letter_credits": 0, "ita_strategy_credits": 0, "profile_builder_credits": 0}
     return {
         "find_noc_credits": user.find_noc_credits,
         "audit_letter_credits": user.audit_letter_credits,
         "letter_builder_credits": user.letter_builder_credits,
-        "ita_strategy_credits": user.ita_strategy_credits
+        "ita_strategy_credits": user.ita_strategy_credits,
+        "profile_builder_credits": user.profile_builder_credits,
+        "subscription_tier": user.subscription_tier or "free"
     }
 
 @app.post("/api/v1/dev/grant-credits")
@@ -934,6 +1040,7 @@ def dev_grant_credits(
     user.audit_letter_credits += 5
     user.letter_builder_credits += 5
     user.ita_strategy_credits += 5
+    user.profile_builder_credits += 100
     db.commit()
     return {
         "status": "granted",
@@ -941,12 +1048,14 @@ def dev_grant_credits(
         "find_noc_credits": user.find_noc_credits,
         "audit_letter_credits": user.audit_letter_credits,
         "letter_builder_credits": user.letter_builder_credits,
-        "ita_strategy_credits": user.ita_strategy_credits
+        "ita_strategy_credits": user.ita_strategy_credits,
+        "profile_builder_credits": user.profile_builder_credits
     }
 
 class CheckoutRequest(BaseModel):
     pass_type: str # 'finder' or 'auditor'
     return_path: Optional[str] = None
+    return_url: Optional[str] = None
 
 @app.post("/api/v1/create-checkout-session")
 def create_checkout_session(
@@ -972,12 +1081,37 @@ def create_checkout_session(
         # 19.90 CAD
         amount = 1990
         name = "Personalized ITA Strategy Report (1 Use)"
+    elif req.pass_type == 'war_room':
+        # 19.00 CAD
+        amount = 1900
+        name = "CRS Point Simulator & Draw Matcher Unlock"
+    elif req.pass_type == 'starter':
+        # 49.00 CAD — Optimize tier
+        amount = 4900
+        name = "Mentor Visa Optimize — Employment Audits + CRS Simulator"
+    elif req.pass_type == 'complete':
+        # Check if user is upgrading from Starter → pay only the difference
+        upgrade_db = database.SessionLocal()
+        try:
+            existing_user = upgrade_db.query(db_models.UserAccount).filter_by(user_id=user_id).first()
+            if existing_user and existing_user.subscription_tier == 'starter':
+                # Differential upgrade: $99 - $49 = $50
+                amount = 5000
+                name = "Mentor Visa Execute Upgrade (from Optimize)"
+            else:
+                amount = 9900
+                name = "Mentor Visa Execute — All Tools + AI Assistant"
+        finally:
+            upgrade_db.close()
     else:
         # NOC Finder is free for signed-in users — this path shouldn't be hit anymore
         amount = 0
         name = "NOC Finder Pass (1 Use)"
 
     try:
+        success_url = f"{req.return_url}?payment_success=true" if req.return_url else f"{FRONTEND_URL}{req.return_path}?payment_success=true" if req.return_path else f"{FRONTEND_URL}/dashboard?payment_success=true"
+        cancel_url = f"{req.return_url}?payment_canceled=true&session_id={{CHECKOUT_SESSION_ID}}" if req.return_url else f"{FRONTEND_URL}{req.return_path}?payment_canceled=true&session_id={{CHECKOUT_SESSION_ID}}" if req.return_path else f"{FRONTEND_URL}/dashboard?payment_canceled=true&session_id={{CHECKOUT_SESSION_ID}}"
+
         session = stripe.checkout.Session.create(
             payment_method_types=['card'],
             line_items=[{
@@ -991,8 +1125,8 @@ def create_checkout_session(
                 'quantity': 1,
             }],
             mode='payment',
-            success_url=f"{FRONTEND_URL}{req.return_path}?payment_success=true" if req.return_path else f"{FRONTEND_URL}/dashboard?payment_success=true",
-            cancel_url=f"{FRONTEND_URL}{req.return_path}?payment_canceled=true&session_id={{CHECKOUT_SESSION_ID}}" if req.return_path else f"{FRONTEND_URL}/dashboard?payment_canceled=true&session_id={{CHECKOUT_SESSION_ID}}",
+            success_url=success_url,
+            cancel_url=cancel_url,
             client_reference_id=user_id, # Safely tie purchase to user explicitly
             metadata={
                 "pass_type": req.pass_type
@@ -1058,6 +1192,31 @@ async def stripe_webhook(request: Request, db: Session = Depends(database.get_db
                 user.letter_builder_credits += 1
             elif pass_type == 'ita_strategy':
                 user.ita_strategy_credits += 1
+            elif pass_type == 'war_room':
+                user.ita_strategy_credits += 1
+            elif pass_type == 'starter':
+                user.subscription_tier = 'starter'
+                # Starter tier includes some credits
+                user.audit_letter_credits += 2
+                user.ita_strategy_credits += 2
+                user.profile_builder_credits += 20  # 20 AI Assistant questions
+            elif pass_type == 'complete':
+                # Grant differential credits based on whether upgrading from starter
+                was_starter = user.subscription_tier == 'starter'
+                user.subscription_tier = 'complete'
+                if was_starter:
+                    # Upgrading from Starter — grant only the difference
+                    # Starter gave: 2 audit + 2 strategy + 20 profile builder
+                    # Complete total: 5 audit + 3 builder + 5 strategy + unlimited profile builder
+                    # Difference: 3 audit + 3 builder + 3 strategy (profile builder is unlimited for complete)
+                    user.audit_letter_credits += 3
+                    user.letter_builder_credits += 3
+                    user.ita_strategy_credits += 3
+                else:
+                    # Fresh Complete purchase — full credits
+                    user.audit_letter_credits += 5
+                    user.letter_builder_credits += 3
+                    user.ita_strategy_credits += 5
             else:
                 user.find_noc_credits += 1
                 
@@ -1082,13 +1241,20 @@ def unlock_evaluation(
         raise HTTPException(status_code=403, detail="No credits available. Please purchase a pass.")
         
     if req.pass_type == 'auditor':
-        if user.audit_letter_credits <= 0:
-            raise HTTPException(status_code=403, detail="No audit credits available.")
-        user.audit_letter_credits -= 1
+        # Starter and Complete tiers get unlimited audits
+        has_tier_access = user.subscription_tier in ('starter', 'complete')
+        if not has_tier_access:
+            if user.audit_letter_credits <= 0:
+                raise HTTPException(status_code=403, detail="No audit credits available. Please upgrade to Starter or purchase a credit.")
+            user.audit_letter_credits -= 1
+        # Tier users: no credit deduction, just unlock
     elif req.pass_type == 'letter_builder':
-        if user.letter_builder_credits <= 0:
-            raise HTTPException(status_code=403, detail="No letter builder credits available.")
-        user.letter_builder_credits -= 1
+        # Complete tier gets unlimited letter builder
+        has_tier_access = user.subscription_tier == 'complete'
+        if not has_tier_access:
+            if user.letter_builder_credits <= 0:
+                raise HTTPException(status_code=403, detail="No letter builder credits available. Please upgrade to Complete or purchase a credit.")
+            user.letter_builder_credits -= 1
     else:
         if user.find_noc_credits <= 0:
             raise HTTPException(status_code=403, detail="No finder credits available.")
@@ -1224,3 +1390,280 @@ def get_ita_strategy(
             }
     
     return {"success": False, "strategy": None}
+
+
+# --- Profile Builder Agent Endpoints ---
+
+import profile_builder_service
+from profile_builder_models import ChatRequest, Conversation
+from fastapi.responses import StreamingResponse
+import asyncio
+import base64
+
+# Ensure conversations table exists
+Conversation.__table__.create(bind=database.engine, checkfirst=True)
+
+
+@app.post("/api/v1/profile-builder/chat")
+@limiter.limit("120/hour")
+async def profile_builder_chat(
+    request: Request,
+    req: ChatRequest,
+    user_id: str = Depends(get_current_user_optional),
+    db: Session = Depends(database.get_db)
+):
+    """Stream a chat response from the Profile Builder AI agent.
+    
+    Graduated access:
+    - Anonymous: 2 questions/day (IP rate limited), no conversation save
+    - Free tier: 5 credits (granted on sign-up)
+    - Starter tier: 20 credits (granted on purchase)
+    - Complete tier: Unlimited
+    
+    Returns Server-Sent Events (SSE) stream.
+    """
+    is_anonymous = (user_id == "anonymous")
+    user = None
+    credits_after = 0
+    
+    if is_anonymous:
+        # Anonymous: IP rate limit handles gating (2/day set above via limiter)
+        # No credit deduction, no DB save
+        credits_after = 0  # Signals "sign in for more" to frontend
+    else:
+        ensure_user_exists(user_id, db)
+        user = db.query(db_models.UserAccount).filter_by(user_id=user_id).first()
+        
+        if user and user.subscription_tier == 'complete':
+            # Complete tier: unlimited
+            credits_after = -1  # -1 signals "unlimited" to frontend
+        elif user and user.profile_builder_credits > 0:
+            # Free or Starter tier with credits remaining: deduct 1
+            user.profile_builder_credits -= 1
+            credits_after = user.profile_builder_credits
+            db.commit()
+        else:
+            # No credits remaining — tell frontend which tier to upgrade to
+            current_tier = user.subscription_tier if user else 'free'
+            upgrade_to = 'starter' if current_tier == 'free' else 'complete'
+            raise HTTPException(
+                status_code=403,
+                detail=json.dumps({
+                    "code": "credits_exhausted",
+                    "current_tier": current_tier,
+                    "upgrade_to": upgrade_to,
+                    "message": f"No AI Assistant credits remaining. Upgrade to {upgrade_to} for more."
+                })
+            )
+    
+    # 4. Handle image in latest message (upload to Supabase Storage)
+    image_data = None
+    image_mime = None
+    latest_msg = req.messages[-1] if req.messages else None
+    image_url_for_storage = None
+    
+    if latest_msg and latest_msg.image_data:
+        try:
+            # Decode base64 image
+            # Handle data URL format: "data:image/png;base64,xxxxx"
+            b64_str = latest_msg.image_data
+            if "," in b64_str:
+                header, b64_str = b64_str.split(",", 1)
+                # Extract MIME from header like "data:image/png;base64"
+                image_mime = header.split(":")[1].split(";")[0] if ":" in header else "image/png"
+            else:
+                image_mime = "image/png"
+            
+            image_data = base64.b64decode(b64_str)
+            
+            # Upload to Supabase Storage (or save locally)
+            ext_map = {"image/png": ".png", "image/jpeg": ".jpg", "image/webp": ".webp"}
+            ext = ext_map.get(image_mime, ".png")
+            img_file_id = str(uuid.uuid4())
+            stored_name = f"chat-images/{img_file_id}{ext}"
+            
+            if supabase:
+                supabase.storage.from_("documents").upload(
+                    path=stored_name,
+                    file=image_data,
+                    file_options={"content-type": image_mime}
+                )
+                # Get a signed URL for storage reference
+                image_url_for_storage = stored_name
+            else:
+                # Local dev: save to uploads dir
+                chat_img_dir = UPLOADS_DIR / "chat-images"
+                chat_img_dir.mkdir(exist_ok=True)
+                with open(chat_img_dir / f"{img_file_id}{ext}", "wb") as f:
+                    f.write(image_data)
+                image_url_for_storage = stored_name
+                
+        except Exception as img_err:
+            print(f"Warning: failed to process chat image: {img_err}")
+            image_data = None
+            image_mime = None
+    
+    # 5. Build user context from journey data (skip for anonymous)
+    user_context = ""
+    if not is_anonymous:
+        journey = db.query(journey_models.PRJourney).filter_by(user_id=user_id).first()
+        journey_dict = {}
+        profile_dict = {}
+        if journey:
+            journey_dict = {
+                "noc_code": journey.noc_code,
+                "noc_title": journey.noc_title,
+                "teer_category": journey.teer_category,
+                "crs_score": journey.crs_score,
+                "crs_calculated_at": journey.crs_calculated_at.isoformat() if journey.crs_calculated_at else None,
+                "eligible_programs": journey.eligible_programs,
+            }
+            profile_dict = journey.profile_data or {}
+        user_context = profile_builder_service.build_user_context(journey_dict, profile_dict)
+    
+    # 6. Prepare messages for LLM (prune history)
+    msg_dicts = [{"role": m.role, "content": m.content, "image_url": m.image_data} for m in req.messages]
+    # Replace latest message's image_data with the storage URL
+    if image_url_for_storage and msg_dicts:
+        msg_dicts[-1]["image_url"] = image_url_for_storage
+    
+    pruned = profile_builder_service.prepare_messages_for_llm(msg_dicts)
+    
+    # 7. Stream response
+    conversation_id = req.conversation_id or str(uuid.uuid4())
+    assistant_content = []  # Accumulate for persistence
+    credit_refunded = False
+    
+    async def event_stream():
+        nonlocal credit_refunded
+        try:
+            first_chunk = True
+            async for chunk in profile_builder_service.stream_chat_response(
+                messages=pruned,
+                user_context=user_context,
+                image_data=image_data,
+                image_mime=image_mime,
+            ):
+                first_chunk = False
+                assistant_content.append(chunk)
+                yield f"data: {json.dumps({'type': 'token', 'content': chunk})}\n\n"
+            
+            # Send completion event with metadata
+            yield f"data: {json.dumps({'type': 'done', 'conversation_id': conversation_id, 'credits_remaining': credits_after})}\n\n"
+            
+        except Exception as stream_err:
+            print(f"Profile Builder stream error: {stream_err}")
+            # Refund credit if we deducted one (non-anonymous, non-complete)
+            if not is_anonymous and user and user.subscription_tier != 'complete':
+                try:
+                    refund_db = database.SessionLocal()
+                    refund_user = refund_db.query(db_models.UserAccount).filter_by(user_id=user_id).first()
+                    if refund_user:
+                        refund_user.profile_builder_credits += 1
+                        refund_db.commit()
+                        credit_refunded = True
+                    refund_db.close()
+                except Exception as refund_err:
+                    print(f"Warning: failed to refund credit: {refund_err}")
+            
+            yield f"data: {json.dumps({'type': 'error', 'message': str(stream_err), 'credit_refunded': credit_refunded})}\n\n"
+        finally:
+            # Save conversation to DB (skip for anonymous users)
+            if is_anonymous:
+                return
+            try:
+                save_db = database.SessionLocal()
+                full_assistant_text = "".join(assistant_content)
+                
+                # Build the message list for storage (no base64 — only URLs)
+                stored_messages = []
+                for m in req.messages:
+                    stored_msg = {"role": m.role, "content": m.content}
+                    if m == latest_msg and image_url_for_storage:
+                        stored_msg["image_url"] = image_url_for_storage
+                    stored_messages.append(stored_msg)
+                
+                # Add assistant response
+                if full_assistant_text:
+                    stored_messages.append({"role": "assistant", "content": full_assistant_text})
+                
+                # Upsert conversation
+                existing = save_db.query(Conversation).filter_by(conversation_id=conversation_id).first()
+                if existing:
+                    existing.messages = stored_messages
+                    existing.updated_at = datetime.datetime.utcnow()
+                else:
+                    # Auto-title from first user message
+                    first_user_msg = next((m.content for m in req.messages if m.role == "user"), "New conversation")
+                    title = first_user_msg[:80] + ("..." if len(first_user_msg) > 80 else "")
+                    
+                    new_convo = Conversation(
+                        conversation_id=conversation_id,
+                        user_id=user_id,
+                        title=title,
+                        messages=stored_messages,
+                    )
+                    save_db.add(new_convo)
+                
+                save_db.commit()
+                save_db.close()
+            except Exception as save_err:
+                print(f"Warning: failed to save conversation: {save_err}")
+    
+    return StreamingResponse(
+        event_stream(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+            "X-Accel-Buffering": "no",  # Disable nginx buffering
+        }
+    )
+
+
+@app.get("/api/v1/profile-builder/conversations")
+def list_profile_builder_conversations(
+    user_id: str = Depends(get_current_user),
+    db: Session = Depends(database.get_db)
+):
+    """List the user's past Profile Builder conversations."""
+    convos = (
+        db.query(Conversation)
+        .filter_by(user_id=user_id)
+        .order_by(Conversation.updated_at.desc())
+        .all()
+    )
+    return {
+        "conversations": [
+            {
+                "conversation_id": c.conversation_id,
+                "title": c.title or "Untitled",
+                "updated_at": c.updated_at.isoformat() if c.updated_at else None,
+            }
+            for c in convos
+        ]
+    }
+
+
+@app.get("/api/v1/profile-builder/conversations/{conversation_id}")
+def get_profile_builder_conversation(
+    conversation_id: str,
+    user_id: str = Depends(get_current_user),
+    db: Session = Depends(database.get_db)
+):
+    """Load a specific conversation's full message history."""
+    convo = db.query(Conversation).filter_by(
+        conversation_id=conversation_id,
+        user_id=user_id
+    ).first()
+    
+    if not convo:
+        raise HTTPException(status_code=404, detail="Conversation not found.")
+    
+    return {
+        "conversation_id": convo.conversation_id,
+        "title": convo.title,
+        "messages": convo.messages or [],
+        "created_at": convo.created_at.isoformat() if convo.created_at else None,
+        "updated_at": convo.updated_at.isoformat() if convo.updated_at else None,
+    }

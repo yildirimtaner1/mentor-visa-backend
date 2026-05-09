@@ -15,11 +15,18 @@ import { NOCDetailsPage } from './components/NOCDetailsPage';
 import { PrivacyPolicyPage } from './components/PrivacyPolicyPage';
 import { TermsOfServicePage } from './components/TermsOfServicePage';
 import { RefundPolicyPage } from './components/RefundPolicyPage';
-import { LetterBuilderPage } from './components/LetterBuilderPage';
+// import { LetterBuilderPage } from './components/LetterBuilderPage'; // Set aside for redesign
+import { GCKeyGuidePage } from './components/GCKeyGuidePage';
 import { GlossaryPage } from './components/GlossaryPage';
 import { DrawResultsPage } from './components/DrawResultsPage';
+import { EligibilityWizardPage } from './components/EligibilityWizardPage';
+import { DocumentsPage } from './components/DocumentsPage';
+import { PricingPage } from './components/PricingPage';
+import { ProfilePage } from './components/ProfilePage';
+import ProfileBuilderPage from './components/ProfileBuilderPage';
 import { useAuth, UserButton } from '@clerk/clerk-react';
 import { saveEvaluation, cancelPaymentEvent } from './services/api';
+import { useJourneySync } from './hooks/useJourneySync';
 import { Navbar } from './components/common/Navbar';
 import { Routes, Route, useNavigate } from 'react-router-dom';
 import './components/LandingPage.css';
@@ -43,7 +50,7 @@ const SharedLayout = ({ children }: { children: React.ReactNode }) => {
       />
       <div className="relative z-10 flex flex-col min-h-screen">
         <Navbar />
-        <div className="flex-grow">
+        <div className="flex-grow" style={{ paddingTop: '72px' }}>
           {children}
         </div>
         <footer className="landing-footer">
@@ -141,6 +148,9 @@ function App() {
   const { isSignedIn, getToken } = useAuth();
   const navigate = useNavigate();
   
+  // Initialize journey sync — fetches from backend on sign-in, debounced sync on changes
+  useJourneySync();
+  
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     if (params.get('payment_canceled') === 'true') {
@@ -184,6 +194,26 @@ function App() {
   };
 
   const handleHistorySelection = (ev: any) => {
+    // ── CRS Calculator evaluations ──
+    const isCRS = ev.document_type === 'CRS Calculator' || ev.payload?.evaluation_type === 'crs_calculator';
+    if (isCRS) {
+      let payload = ev.payload;
+      if (typeof payload === 'string') {
+        try { payload = JSON.parse(payload); } catch(e) { /* ignore */ }
+      }
+      // Restore the raw inputs to sessionStorage so CRSCalculatorPage picks them up
+      if (payload?.raw_inputs) {
+        const restored = {
+          ...payload.raw_inputs,
+          currentPhaseIndex: 4, // Jump straight to the results/summary phase
+          _savedAt: new Date().toISOString(),
+        };
+        sessionStorage.setItem('crsCalculatorData', JSON.stringify(restored));
+      }
+      navigate('/crs-calculator');
+      return;
+    }
+
     if (ev.document_type === "NOC Finder Query") {
       let rawData = ev.payload;
       if (typeof rawData === 'string') {
@@ -198,7 +228,8 @@ function App() {
           nocResult = {
             ...rawData,
             stored_file_id: rawData.stored_file_id || ev.stored_file_id,
-            is_premium_unlocked: rawData.is_premium_unlocked || ev.is_premium_unlocked
+            is_premium_unlocked: rawData.is_premium_unlocked || ev.is_premium_unlocked,
+            is_signed_in: true
           };
         } else if (rawData.recommended_noc) {
           // New v2 NOCFinderResponseSchema from backend
@@ -228,7 +259,8 @@ function App() {
             important_note: rawData.important_note || '',
             next_step: rawData.next_step || '',
             stored_file_id: rawData.stored_file_id || ev.stored_file_id,
-            is_premium_unlocked: rawData.is_premium_unlocked || ev.is_premium_unlocked
+            is_premium_unlocked: rawData.is_premium_unlocked || ev.is_premium_unlocked,
+            is_signed_in: true
           };
         } else if (rawData.noc_analysis) {
           // Legacy old schema from backend — convert to v2 format
@@ -259,7 +291,8 @@ function App() {
             important_note: '',
             next_step: '',
             stored_file_id: rawData.stored_file_id || ev.stored_file_id,
-            is_premium_unlocked: rawData.is_premium_unlocked || ev.is_premium_unlocked
+            is_premium_unlocked: rawData.is_premium_unlocked || ev.is_premium_unlocked,
+            is_signed_in: true
           };
         }
         sessionStorage.setItem('nocFinderResult', JSON.stringify(nocResult));
@@ -293,7 +326,15 @@ function App() {
       <Route path="/express-entry-cec-guide" element={<SharedLayout><CECGuidePage onNavigate={(p) => navigate(`/${p}`)} /></SharedLayout>} />
       <Route path="/crs-calculator" element={<SharedLayout><CRSCalculatorPage onNavigate={(p) => navigate(`/${p}`)} /></SharedLayout>} />
       <Route path="/cec-checklist" element={<SharedLayout><CECChecklistPage onNavigate={(p) => navigate(`/${p}`)} /></SharedLayout>} />
-      <Route path="/build-employment-letter" element={<SharedLayout><LetterBuilderPage /></SharedLayout>} />
+      {/* Letter Builder route removed — set aside for redesign */}
+      <Route path="/gckey-setup-guide" element={<SharedLayout><GCKeyGuidePage /></SharedLayout>} />
+
+      {/* PR Journey Routes */}
+      <Route path="/get-started" element={<SharedLayout><EligibilityWizardPage /></SharedLayout>} />
+      <Route path="/documents" element={<SharedLayout><DocumentsPage /></SharedLayout>} />
+      <Route path="/pricing" element={<SharedLayout><PricingPage /></SharedLayout>} />
+      <Route path="/my-profile" element={<SharedLayout><ProfilePage /></SharedLayout>} />
+      <Route path="/ai-profile-assistant" element={<SharedLayout><ProfileBuilderPage /></SharedLayout>} />
       
       {/* Content Silos */}
       <Route path="/noc-codes" element={<SharedLayout><NOCDirectoryPage onNavigate={(p) => navigate(`/${p}`)} /></SharedLayout>} />

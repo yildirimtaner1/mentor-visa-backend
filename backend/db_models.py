@@ -16,6 +16,8 @@ class UserAccount(Base):
     audit_letter_credits = Column(Integer, default=0, nullable=False)
     letter_builder_credits = Column(Integer, default=0, nullable=False)
     ita_strategy_credits = Column(Integer, default=0, nullable=False)
+    profile_builder_credits = Column(Integer, default=0, nullable=False)
+    subscription_tier = Column(String, default="free", nullable=False)  # "free", "starter", "complete"
 
 
 class Evaluation(Base):

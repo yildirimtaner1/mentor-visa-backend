@@ -40,68 +40,88 @@ export const MyEvaluations: FC<MyEvaluationsProps> = ({ onSelectEvaluation }) =>
         <p style={{ color: 'var(--text-muted)' }}>No saved evaluations found. Upload a document to get started!</p>
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-          {evaluations.map((ev) => (
-            <div 
-              key={ev.id} 
-              onClick={() => onSelectEvaluation(ev)}
-              style={{
-                border: '1px solid var(--border-color)',
-                padding: '16px',
-                borderRadius: '8px',
-                cursor: 'pointer',
-                display: 'flex',
-                justifyContent: 'space-between',
-                alignItems: 'center',
-                transition: 'border-color 0.2s',
-              }}
-              onMouseEnter={(e) => e.currentTarget.style.borderColor = 'var(--primary-color)'}
-              onMouseLeave={(e) => e.currentTarget.style.borderColor = 'var(--border-color)'}
-            >
-              <div>
-                <div style={{ fontWeight: 'bold', fontSize: '1.1rem', display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
-                    {ev.is_premium_unlocked ? <span title="Premium Unlocked">🔓</span> : <span title="Premium Locked">🔒</span>}
-                    
-                    {ev.document_type === "NOC Finder Query" ? (
-                      <span style={{ fontSize: '0.8rem', background: '#e0e7ff', color: '#3730a3', padding: '2px 8px', borderRadius: '12px', fontWeight: 600 }}>🎯 NOC Check</span>
-                    ) : (
-                      <span style={{ fontSize: '0.8rem', background: '#f3e8ff', color: '#6b21a8', padding: '2px 8px', borderRadius: '12px', fontWeight: 600 }}>📄 Letter Audit</span>
-                    )}
+          {evaluations.map((ev) => {
+            const isCRS = ev.document_type === 'CRS Calculator' || ev.payload?.evaluation_type === 'crs_calculator';
+            const isNOC = ev.document_type === "NOC Finder Query";
 
-                    {/* Show reevaluation badge if this was a targeted reevaluation */}
-                    {ev.payload?.reevaluated_against_noc && (
-                      <span style={{ fontSize: '0.75rem', background: '#FEF3C7', color: '#92400E', padding: '2px 8px', borderRadius: '12px', fontWeight: 600 }}>🔄 vs NOC {ev.payload.reevaluated_against_noc}</span>
-                    )}
+            return (
+              <div 
+                key={ev.id} 
+                onClick={() => onSelectEvaluation(ev)}
+                style={{
+                  border: '1px solid var(--border-color)',
+                  padding: '16px',
+                  borderRadius: '8px',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  transition: 'border-color 0.2s',
+                }}
+                onMouseEnter={(e) => e.currentTarget.style.borderColor = 'var(--primary-color)'}
+                onMouseLeave={(e) => e.currentTarget.style.borderColor = 'var(--border-color)'}
+              >
+                <div>
+                  <div style={{ fontWeight: 'bold', fontSize: '1.1rem', display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                      {ev.is_premium_unlocked ? <span title="Premium Unlocked">🔓</span> : <span title="Premium Locked">🔒</span>}
+                      
+                      {isCRS ? (
+                        <span style={{ fontSize: '0.8rem', background: '#ecfdf5', color: '#059669', padding: '2px 8px', borderRadius: '12px', fontWeight: 600 }}>📊 CRS Score</span>
+                      ) : isNOC ? (
+                        <span style={{ fontSize: '0.8rem', background: '#e0e7ff', color: '#3730a3', padding: '2px 8px', borderRadius: '12px', fontWeight: 600 }}>🎯 NOC Check</span>
+                      ) : (
+                        <span style={{ fontSize: '0.8rem', background: '#f3e8ff', color: '#6b21a8', padding: '2px 8px', borderRadius: '12px', fontWeight: 600 }}>📄 Letter Audit</span>
+                      )}
 
-                    {`${ev.role_name && ev.role_name !== 'Unknown Role' ? ev.role_name : 'Unknown Role'} - ${ev.company_name && ev.company_name !== 'N/A' ? ev.company_name : 'Unknown Company'}`}
+                      {/* Show reevaluation badge if this was a targeted reevaluation */}
+                      {ev.payload?.reevaluated_against_noc && (
+                        <span style={{ fontSize: '0.75rem', background: '#FEF3C7', color: '#92400E', padding: '2px 8px', borderRadius: '12px', fontWeight: 600 }}>🔄 vs NOC {ev.payload.reevaluated_against_noc}</span>
+                      )}
+
+                      {isCRS ? (
+                        <span>{ev.payload?.score?.total ?? '—'} points</span>
+                      ) : (
+                        `${ev.role_name && ev.role_name !== 'Unknown Role' ? ev.role_name : 'Unknown Role'} - ${ev.company_name && ev.company_name !== 'N/A' ? ev.company_name : 'Unknown Company'}`
+                      )}
+                  </div>
+                  <div style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginTop: '4px', display: 'flex', gap: '12px', alignItems: 'center' }}>
+                    <span>Analyzed on: {new Date(ev.timestamp).toLocaleDateString()} at {new Date(ev.timestamp).toLocaleTimeString()}</span>
+                    {ev.payload?.noc_analysis?.detected_code && (
+                      <span style={{ fontSize: '0.75rem', color: '#4B5563', background: '#F3F4F6', padding: '2px 6px', borderRadius: '4px' }}>
+                        NOC {ev.payload.noc_analysis.detected_code}
+                      </span>
+                    )}
+                    {isCRS && ev.payload?.score && (
+                      <span style={{ fontSize: '0.75rem', color: '#4B5563', background: '#F3F4F6', padding: '2px 6px', borderRadius: '4px' }}>
+                        Core: {ev.payload.score.core} · Spouse: {ev.payload.score.spouse} · Transfer: {ev.payload.score.transferability} · Additional: {ev.payload.score.additional}
+                      </span>
+                    )}
+                  </div>
                 </div>
-                <div style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginTop: '4px', display: 'flex', gap: '12px', alignItems: 'center' }}>
-                  <span>Analyzed on: {new Date(ev.timestamp).toLocaleDateString()} at {new Date(ev.timestamp).toLocaleTimeString()}</span>
-                  {ev.payload?.noc_analysis?.detected_code && (
-                    <span style={{ fontSize: '0.75rem', color: '#4B5563', background: '#F3F4F6', padding: '2px 6px', borderRadius: '4px' }}>
-                      NOC {ev.payload.noc_analysis.detected_code}
+                <div>
+                  {isCRS ? (
+                    <span className="badge" style={{ background: '#ECFDF5', color: '#059669', border: '1px solid #A7F3D0', fontWeight: 700, fontSize: '1rem' }}>
+                      {ev.payload?.score?.total ?? '—'}
                     </span>
+                  ) : ev.payload?.noc_analysis?.applicable === false ? (
+                    <span className="badge" style={{ background: '#FEF3C7', color: '#92400E', border: '1px solid #F59E0B' }}>Rejected</span>
+                  ) : isNOC ? (
+                    <span className="badge" style={{ background: '#EFF6FF', color: '#1D4ED8', border: '1px solid #BFDBFE' }}>NOC Match</span>
+                  ) : (
+                    <>
+                      {ev.compliance_status === 'ACCEPT' && <span className="badge badge-success">Accepted</span>}
+                      {ev.compliance_status === 'PFL_RISK' && <span className="badge badge-warning">PFL Risk</span>}
+                      {ev.compliance_status === 'REFUSE' && <span className="badge badge-danger">Refused</span>}
+                      {/* Legacy fallback */}
+                      {ev.compliance_status === 'compliant' && <span className="badge badge-success">Compliant</span>}
+                      {ev.compliance_status === 'risk' && <span className="badge badge-warning">Risk</span>}
+                      {ev.compliance_status === 'non_compliant' && <span className="badge badge-danger">Non-Compliant</span>}
+                    </>
                   )}
                 </div>
               </div>
-              <div>
-                {ev.payload?.noc_analysis?.applicable === false ? (
-                  <span className="badge" style={{ background: '#FEF3C7', color: '#92400E', border: '1px solid #F59E0B' }}>Rejected</span>
-                ) : ev.document_type === "NOC Finder Query" ? (
-                  <span className="badge" style={{ background: '#EFF6FF', color: '#1D4ED8', border: '1px solid #BFDBFE' }}>NOC Match</span>
-                ) : (
-                  <>
-                    {ev.compliance_status === 'ACCEPT' && <span className="badge badge-success">Accepted</span>}
-                    {ev.compliance_status === 'PFL_RISK' && <span className="badge badge-warning">PFL Risk</span>}
-                    {ev.compliance_status === 'REFUSE' && <span className="badge badge-danger">Refused</span>}
-                    {/* Legacy fallback */}
-                    {ev.compliance_status === 'compliant' && <span className="badge badge-success">Compliant</span>}
-                    {ev.compliance_status === 'risk' && <span className="badge badge-warning">Risk</span>}
-                    {ev.compliance_status === 'non_compliant' && <span className="badge badge-danger">Non-Compliant</span>}
-                  </>
-                )}
-              </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       )}
     </div>

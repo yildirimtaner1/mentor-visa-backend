@@ -365,7 +365,7 @@ export const NOCDetailsPage: FC = () => {
                 <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', margin: '6px 0 0' }}>Check if your employment letter matches NOC {code} duties</p>
               </Link>
 
-              <Link to="/build-employment-letter" style={{
+              <Link to="/documents" style={{
                 padding: '24px', borderRadius: '12px', background: 'white', border: '1px solid var(--border-color)',
                 textAlign: 'center', textDecoration: 'none', color: 'inherit',
                 transition: 'transform 0.15s, box-shadow 0.15s'
@@ -373,9 +373,9 @@ export const NOCDetailsPage: FC = () => {
                 onMouseOver={(e) => { e.currentTarget.style.transform = 'translateY(-2px)'; e.currentTarget.style.boxShadow = '0 6px 12px rgba(0,0,0,0.06)'; }}
                 onMouseOut={(e) => { e.currentTarget.style.transform = 'none'; e.currentTarget.style.boxShadow = 'none'; }}
               >
-                <div style={{ fontSize: '1.5rem', marginBottom: '8px' }}>🔨</div>
-                <strong>Build Your Letter</strong>
-                <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', margin: '6px 0 0' }}>Generate an IRCC-aligned employment letter from scratch</p>
+                <div style={{ fontSize: '1.5rem', marginBottom: '8px' }}>📋</div>
+                <strong>Track Your Documents</strong>
+                <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', margin: '6px 0 0' }}>Avoid the 12 most common mistakes that get applications refused</p>
               </Link>
 
               <Link to="/crs-calculator" style={{

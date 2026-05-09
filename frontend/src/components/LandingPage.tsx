@@ -2,12 +2,24 @@ import type { FC } from 'react';
 import { Navbar } from './common/Navbar';
 import { SEO } from './common/SEO';
 import { Testimonials } from './ui/testimonials-columns-1';
-import { Target, Search, XCircle, AlertTriangle, CheckCircle2, FileText, BrainCircuit, ListChecks, PieChart, FileDigit, RefreshCw, Zap, Pickaxe, LineChart } from 'lucide-react';
+import { CheckCircle2, Search, LineChart, FileText, Clock, DollarSign, Brain, ShieldCheck, Users, ArrowRight, TrendingDown } from 'lucide-react';
+import { ALL_DRAWS } from '../data/drawResults';
+import './LandingPage.css';
+import './PricingPage.css';
 
 interface LandingPageProps {
   onGetStarted: () => void;
   onNavigate: (page: string) => void;
 }
+
+// Get the latest non-PNP draw for a meaningful CRS cutoff
+const getLatestGeneralDraw = () => {
+  const draw = ALL_DRAWS.find(d => d.drawType === 'CEC' || d.drawType === 'General');
+  if (!draw) return null;
+  const date = new Date(draw.date);
+  const formatted = date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+  return { score: draw.crsScore, date: formatted, type: draw.drawType };
+};
 
 const faqSchema = JSON.stringify({
   "@context": "https://schema.org",
@@ -15,359 +27,338 @@ const faqSchema = JSON.stringify({
   "mainEntity": [
     {
       "@type": "Question",
-      "name": "What happens if I choose the wrong NOC code?",
+      "name": "Is Mentor Visa a replacement for an immigration consultant?",
       "acceptedAnswer": {
         "@type": "Answer",
-        "text": "If the duties in your employment letter don't match the NOC code you claim, IRCC can refuse your Express Entry application. You may lose your filing fee and have to re-apply, which can take months."
+        "text": "No — and that's the point. We cover everything a consultant does in the first $300 consultation: eligibility checks, CRS calculation, NOC matching, and document preparation. For complex legal cases, we recommend a licensed RCIC. But for straightforward Express Entry applications, most people don't need one."
       }
     },
     {
       "@type": "Question",
-      "name": "Why can't I just use my job title to find my NOC?",
+      "name": "What do I get for free vs. paid?",
       "acceptedAnswer": {
         "@type": "Answer",
-        "text": "Job titles vary between companies — 'Project Coordinator' at one company might be NOC 13100, while at another it could be NOC 11102. IRCC matches based on your actual duties, not your title. That's why duty-matching is critical."
+        "text": "The Eligibility Check, CRS Calculator, NOC Finder, and 12 Mistakes Guide are completely free. The Optimize plan ($49) adds 20 AI Assistant question credits, unlimited employment letter audits, a personalized document checklist with expiry tracking, and the CRS point simulator. The Execute plan ($99) includes everything plus unlimited Express Entry AI Assistant access and priority early access to new features."
       }
     },
     {
       "@type": "Question",
-      "name": "How does this tool match my NOC code?",
+      "name": "How accurate is the AI NOC matching?",
       "acceptedAnswer": {
         "@type": "Answer",
-        "text": "Our AI reads the duties from your employment letter or pasted text and compares them against the official duties of all 516 NOC 2021 unit groups. It returns the best match with a confidence score and shows you exactly which duties align."
-      }
-    },
-    {
-      "@type": "Question",
-      "name": "Is this tool a replacement for an immigration consultant?",
-      "acceptedAnswer": {
-        "@type": "Answer",
-        "text": "No. This tool helps you identify your NOC code quickly and accurately. For complex cases, we recommend consulting a licensed RCIC. But for straightforward NOC matching, this AI tool gives you the same answer in seconds instead of days."
-      }
-    },
-    {
-      "@type": "Question",
-      "name": "What TEER categories are eligible for Express Entry CEC?",
-      "acceptedAnswer": {
-        "@type": "Answer",
-        "text": "Express Entry's Canadian Experience Class (CEC) requires work experience in TEER 0, 1, 2, or 3 occupations. TEER 4 and 5 are generally not eligible. Our tool automatically tells you your TEER category and CEC eligibility."
+        "text": "Our AI cross-references your job duties against the official duties of all 516 NOC 2021 unit groups — the exact same comparison an IRCC officer performs. It returns a confidence score and duty-by-duty alignment breakdown so you can verify every match yourself."
       }
     }
   ]
 });
 
 export const LandingPage: FC<LandingPageProps> = ({ onNavigate }) => {
+  const latestDraw = getLatestGeneralDraw();
+
   return (
     <div className="landing">
       <SEO 
-        title="Find My NOC Code | AI-Powered NOC Matcher for Express Entry Canada" 
-        description="Don't risk your PR application. Match your job duties to the correct NOC 2021 code in seconds. AI-powered duty matching across all 516 unit groups."
-        keywords="NOC code finder, Express Entry NOC, find my NOC code 2021, NOC code for PR Canada, Canadian Experience Class NOC, TEER category finder"
+        title="Canada PR Platform — Your Complete DIY Express Entry Toolkit | Mentor Visa" 
+        description="Check eligibility, calculate CRS, find your NOC code, and track every document. Everything a consultant covers in the first $300 consultation — free. The smarter first step to Canadian PR."
+        keywords="Canada PR, Express Entry, CRS calculator, NOC code finder, immigration DIY, eligibility assessment, document tracker"
         canonical="/"
         schema={faqSchema}
       />
-      {/* Navigation */}
       <Navbar />
 
-      {/* Hero Section */}
+      {/* ═══════════════════════════════════════════ */}
+      {/* HERO — Single CTA, outcome-focused          */}
+      {/* ═══════════════════════════════════════════ */}
       <section className="hero relative overflow-hidden">
         <div className="hero-content relative z-10">
-          <div className="hero-badge" style={{ display: 'flex', alignItems: 'center', gap: '6px' }}><Target size={14} /> AI-Powered NOC 2021 Matching</div>
+          {/* Social Proof Pill */}
+          <div className="trust-pill">
+            <div className="trust-pill-avatars">
+              <img src="https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?q=80&w=48&auto=format&fit=crop" alt="" />
+              <img src="https://images.unsplash.com/photo-1560250097-0b93528c311a?q=80&w=48&auto=format&fit=crop" alt="" />
+              <img src="https://images.unsplash.com/photo-1580489944761-15a19d654956?q=80&w=48&auto=format&fit=crop" alt="" />
+              <img src="https://images.unsplash.com/photo-1519085360753-af0119f7cbe7?q=80&w=48&auto=format&fit=crop" alt="" />
+            </div>
+            <span className="trust-pill-stars">★★★★★</span>
+            <span>2,847 applicants trust Mentor Visa</span>
+          </div>
+
           <h1 className="hero-title">
-            Wrong NOC Code?<br />
-            <span className="hero-highlight">Your PR Gets Refused.</span>
+            Get Canadian PR Without<br />
+            <span className="hero-highlight">a $5,000 Consultant.</span>
           </h1>
           <p className="hero-subtitle">
-            Your job title doesn't determine your NOC code — your duties do. 
-            Our AI reads your actual job duties and matches them against all 516 official NOC 2021 codes, so you don't have to guess.
+            Check your eligibility, calculate your exact CRS score, find your NOC code, and track every document — all in one platform. The smarter first step before hiring anyone.
           </p>
-          <div className="hero-actions" style={{ marginBottom: '24px' }}>
-            <button className="btn btn-primary btn-lg" onClick={() => onNavigate('find-my-noc')} style={{ display: 'flex', alignItems: 'center', gap: '8px', margin: '0 auto' }}>
-              <Search size={18} /> Find My NOC Code Now
+
+          {/* Single Primary CTA */}
+          <div className="hero-actions" style={{ flexDirection: 'column', alignItems: 'center', gap: '12px' }}>
+            <button className="btn btn-primary btn-lg" id="hero-cta-primary" onClick={() => onNavigate('find-my-noc')} style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '1.05rem', padding: '16px 36px' }}>
+              <Search size={20} /> Find My NOC Code — Free
+            </button>
+            <button className="btn-ghost" onClick={() => onNavigate('audit-employment-letter')} style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.95rem' }}>
+              or Audit My Employment Letter <ArrowRight size={14} />
             </button>
           </div>
 
-          <div className="hero-trust-badges">
-            <div className="trust-badge">
-              <div className="trust-icon-check">✓</div>
-              <span className="trust-text"><strong>516 NOC codes.</strong> Every single one checked against your duties — in seconds, not hours.</span>
+          {/* Live Draw Urgency Badge */}
+          {latestDraw && (
+            <div className="urgency-badge" onClick={() => onNavigate('draw-results')} style={{ cursor: 'pointer' }}>
+              <TrendingDown size={16} />
+              <span>Latest {latestDraw.type} cutoff: <strong>{latestDraw.score} CRS</strong> — {latestDraw.date}</span>
+              <ArrowRight size={14} />
             </div>
-            <div className="trust-badge">
-              <div className="trust-icon-check">✓</div>
-              <span className="trust-text"><strong>Strict IRCC Compliance.</strong> 100% based on the official NOC 2021 Version 1.0 Matrix. No AI hallucinations.</span>
-            </div>
-            <div className="trust-badge">
-              <div className="trust-icon-check">✓</div>
-              <span className="trust-text"><strong>Proven Accuracy.</strong> Model developed using thousands of real, successful PR employment letters.</span>
-            </div>
-          </div>
+          )}
+
+          {/* Stats Bar */}
           <div className="hero-stats">
             <div className="hero-stat">
-              <div className="hero-stat-number">516</div>
-              <div className="hero-stat-label">NOC Codes Analyzed</div>
+              <div className="hero-stat-number">2,847+</div>
+              <div className="hero-stat-label">Users</div>
             </div>
             <div className="hero-stat-divider" />
             <div className="hero-stat">
-              <div className="hero-stat-number">4,974</div>
-              <div className="hero-stat-label">Official Duties Compared</div>
+              <div className="hero-stat-number">12</div>
+              <div className="hero-stat-label">Critical Mistakes Covered</div>
             </div>
             <div className="hero-stat-divider" />
             <div className="hero-stat">
-              <div className="hero-stat-number">~30s</div>
-              <div className="hero-stat-label">Average Result Time</div>
+              <div className="hero-stat-number">3</div>
+              <div className="hero-stat-label">EE Programs Covered</div>
             </div>
           </div>
         </div>
       </section>
 
-      {/* Why This Matters */}
-      <section className="section">
-        <h2 className="section-title">Why Getting Your NOC Right Matters</h2>
-        <p className="section-subtitle">IRCC doesn't care about your job title. They care about what you actually did.</p>
-        <div className="features-grid">
-          <div className="feature-card" style={{ borderLeft: '4px solid #EF4444' }}>
-            <div className="feature-icon"><XCircle size={32} color="#EF4444" /></div>
-            <h3>Wrong NOC = Application Refused</h3>
-            <p>If the duties on your employment letter don't match the NOC code you claim, IRCC will refuse your application. No second chances — you lose your filing fee and months of waiting.</p>
+      {/* ═══════════════════════════════════════════ */}
+      {/* CONSULTANT COMPARISON — Positioning          */}
+      {/* ═══════════════════════════════════════════ */}
+      <section className="section" id="comparison">
+        <h2 className="section-title">The Smarter First Step</h2>
+        <p className="section-subtitle">Everything a consultant covers in the first $300 consultation — and more.</p>
+        
+        <div className="comparison-grid-landing">
+          {/* Consultant Column */}
+          <div className="comparison-col comparison-col-consultant">
+            <div className="comparison-col-header consultant">
+              <DollarSign size={24} />
+              <h3>Immigration Consultant</h3>
+            </div>
+            <ul className="comparison-list">
+              <li className="comparison-item negative">
+                <span className="comparison-icon negative">✗</span>
+                <span>$2,000–$5,000+ in fees</span>
+              </li>
+              <li className="comparison-item negative">
+                <span className="comparison-icon negative">✗</span>
+                <span>2–4 week wait for first meeting</span>
+              </li>
+              <li className="comparison-item negative">
+                <span className="comparison-icon negative">✗</span>
+                <span>Manual document review</span>
+              </li>
+              <li className="comparison-item negative">
+                <span className="comparison-icon negative">✗</span>
+                <span>One person's opinion on your NOC</span>
+              </li>
+              <li className="comparison-item negative">
+                <span className="comparison-icon negative">✗</span>
+                <span>You still gather all documents yourself</span>
+              </li>
+              <li className="comparison-item negative">
+                <span className="comparison-icon negative">✗</span>
+                <span>No CRS optimization simulation</span>
+              </li>
+            </ul>
           </div>
-          <div className="feature-card" style={{ borderLeft: '4px solid #F59E0B' }}>
-            <div className="feature-icon"><AlertTriangle size={32} color="#F59E0B" /></div>
-            <h3>Job Titles Are Misleading</h3>
-            <p>"Project Manager" at your company could be NOC 10019, 20012, or 13100 depending on what you actually do. IRCC officers match your duties, not your title. Guessing is risky.</p>
-          </div>
-          <div className="feature-card" style={{ borderLeft: '4px solid #10B981' }}>
-            <div className="feature-icon"><CheckCircle2 size={32} color="#10B981" /></div>
-            <h3>Duty-Based Matching Is the Only Way</h3>
-            <p>Our AI does exactly what an IRCC officer does: reads your actual duties and compares them line-by-line against the official NOC 2021 database. No guessing, no gut feeling.</p>
+
+          {/* Mentor Visa Column */}
+          <div className="comparison-col comparison-col-mentor">
+            <div className="comparison-col-header mentor">
+              <ShieldCheck size={24} />
+              <h3>Mentor Visa</h3>
+              <span className="comparison-badge">From $0</span>
+            </div>
+            <ul className="comparison-list">
+              <li className="comparison-item positive">
+                <span className="comparison-icon positive">✓</span>
+                <span>Free to start, $49–$99 for full toolkit</span>
+              </li>
+              <li className="comparison-item positive">
+                <span className="comparison-icon positive">✓</span>
+                <span>Results in 30 seconds</span>
+              </li>
+              <li className="comparison-item positive">
+                <span className="comparison-icon positive">✓</span>
+                <span>AI-powered letter auditing</span>
+              </li>
+              <li className="comparison-item positive">
+                <span className="comparison-icon positive">✓</span>
+                <span>Cross-references all 516 NOC codes</span>
+              </li>
+              <li className="comparison-item positive">
+                <span className="comparison-icon positive">✓</span>
+                <span>Guided document tracker with expiry alerts</span>
+              </li>
+              <li className="comparison-item positive">
+                <span className="comparison-icon positive">✓</span>
+                <span>CRS point simulator with "what-if" scenarios</span>
+              </li>
+            </ul>
           </div>
         </div>
+
+        <p className="comparison-disclaimer">
+          We don't replace your consultant. We make sure you don't need one for 90% of the work.
+        </p>
       </section>
 
-      {/* How It Works */}
+      {/* ═══════════════════════════════════════════ */}
+      {/* HOW IT WORKS — Benefit-driven 4 steps       */}
+      {/* ═══════════════════════════════════════════ */}
       <section id="how-it-works" className="section section-dark">
-        <h2 className="section-title">How It Works</h2>
-        <p className="section-subtitle">Three steps. Under 60 seconds. No immigration knowledge needed.</p>
+        <h2 className="section-title">Your PR Journey in 4 Steps</h2>
+        <p className="section-subtitle">From "Am I eligible?" to "My application is ready." — everything in one place.</p>
         <div className="steps-grid">
-          <div className="step-card">
+          <div className="step-card" onClick={() => onNavigate('get-started')} style={{ cursor: 'pointer' }}>
             <div className="step-number">1</div>
-            <div className="step-icon"><FileText size={32} color="var(--primary-color)" /></div>
-            <h3>Upload or Paste Your Duties</h3>
-            <p>Upload your employment letter (PDF, Word, or photo). Or just paste your job title and duties directly — whatever is faster.</p>
-          </div>
-          <div className="step-card">
-            <div className="step-number">2</div>
-            <div className="step-icon"><BrainCircuit size={32} color="var(--primary-color)" /></div>
-            <h3>AI Matches Your Duties to NOC</h3>
-            <p>Our AI compares your duties against the official duties of all 516 NOC 2021 unit groups and finds the strongest match — with a confidence score.</p>
-          </div>
-          <div className="step-card">
-            <div className="step-number">3</div>
-            <div className="step-icon"><ListChecks size={32} color="var(--primary-color)" /></div>
-            <h3>Get Your NOC Code + TEER</h3>
-            <p>See your matched NOC code, TEER category, CEC eligibility, and alternative matches. Know exactly which code to claim on your application.</p>
-          </div>
-        </div>
-      </section>
-
-      {/* What You Get */}
-      <section className="section">
-        <h2 className="section-title">What You Get</h2>
-        <p className="section-subtitle">Everything you need to confidently choose your NOC code.</p>
-        <div className="features-grid">
-          <div className="feature-card">
-            <div className="feature-icon"><Target size={28} color="var(--primary-color)" /></div>
-            <h3>Best-Match NOC Code</h3>
-            <p>Your primary NOC match with a percentage score showing exactly how well your duties align with the official NOC description.</p>
-          </div>
-          <div className="feature-card">
-            <div className="feature-icon"><PieChart size={28} color="var(--primary-color)" /></div>
-            <h3>TEER Category + CEC Check</h3>
-            <p>Instantly know your TEER level and whether your occupation qualifies for the Canadian Experience Class — no manual lookup needed.</p>
-          </div>
-          <div className="feature-card">
-            <div className="feature-icon"><RefreshCw size={28} color="var(--primary-color)" /></div>
-            <h3>Alternative Matches</h3>
-            <p>See other NOC codes that also match your duties. Click any alternative to re-evaluate your duties strictly against that target code.</p>
-          </div>
-          <div className="feature-card">
-            <div className="feature-icon"><FileDigit size={28} color="var(--primary-color)" /></div>
-            <h3>Duty-by-Duty Breakdown</h3>
-            <p>See exactly which of your duties match which official NOC duties — the same comparison an IRCC officer would do.</p>
-          </div>
-          <div className="feature-card">
-            <div className="feature-icon"><FileText size={28} color="var(--primary-color)" /></div>
-            <h3>Works With Any Format</h3>
-            <p>Upload a PDF, Word doc, or photo of your letter. Or skip the upload entirely and just type your duties. We handle it all.</p>
-          </div>
-          <div className="feature-card">
-            <div className="feature-icon"><Zap size={28} color="var(--primary-color)" /></div>
-            <h3>Results in Seconds</h3>
-            <p>No waiting days for a consultant. Get your NOC match immediately. Re-evaluate against different codes as many times as you need.</p>
-          </div>
-        </div>
-      </section>
-
-      {/* Pricing */}
-      <section className="section section-dark">
-        <h2 className="section-title">Simple, One-Time Pricing</h2>
-        <p className="section-subtitle">No subscriptions. No hidden fees. Pay only for what you need.</p>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '24px', maxWidth: '960px', margin: '0 auto' }}>
-
-          {/* Letter Builder */}
-          <div className="feature-card" style={{ textAlign: 'center', padding: '32px 24px', position: 'relative', display: 'flex', flexDirection: 'column' }}>
-            <div style={{ marginBottom: '16px', display: 'flex', justifyContent: 'center' }}><Pickaxe size={48} color="var(--primary-color)" /></div>
-            <h3 style={{ fontSize: '1.1rem', fontWeight: 700, marginBottom: '4px' }}>Employment Letter Builder</h3>
-            <div style={{ fontSize: '2rem', fontWeight: 800, color: 'var(--text-color)', margin: '12px 0 4px' }}>
-              $14.90 <span style={{ fontSize: '0.85rem', color: 'var(--text-muted)', fontWeight: 400 }}>CAD</span>
-            </div>
-            <p style={{ color: 'var(--text-muted)', marginBottom: '20px', fontSize: '0.88rem' }}>
-              One-time purchase. One full letter build.
-            </p>
-            <ul style={{ listStyleType: 'none', padding: 0, margin: '0 0 24px 0', display: 'grid', gap: '10px', textAlign: 'left', fontSize: '0.88rem' }}>
-              <li style={{ display: 'flex', alignItems: 'center', gap: '8px' }}><CheckCircle2 size={16} color="#10b981"/> Step-by-step guided builder</li>
-              <li style={{ display: 'flex', alignItems: 'center', gap: '8px' }}><CheckCircle2 size={16} color="#10b981"/> AI duty alignment coaching</li>
-              <li style={{ display: 'flex', alignItems: 'center', gap: '8px' }}><CheckCircle2 size={16} color="#10b981"/> IRCC R10-compliant output</li>
-              <li style={{ display: 'flex', alignItems: 'center', gap: '8px' }}><CheckCircle2 size={16} color="#10b981"/> NOC-targeted duty matching</li>
-            </ul>
-            <div style={{ marginTop: 'auto' }}>
-              <button className="btn btn-primary" onClick={() => onNavigate('build-employment-letter')} style={{ width: '100%' }}>
-                Build My Letter
-              </button>
-            </div>
-          </div>
-
-          {/* ITA Strategy — Featured */}
-          <div className="feature-card" style={{ textAlign: 'center', border: '2px solid var(--primary-color)', boxShadow: '0 20px 40px rgba(37, 99, 235, 0.12)', padding: '32px 24px', position: 'relative', display: 'flex', flexDirection: 'column' }}>
-            <div style={{ position: 'absolute', top: '-12px', left: '50%', transform: 'translateX(-50%)', background: 'var(--primary-color)', color: 'white', padding: '4px 16px', borderRadius: '20px', fontSize: '0.75rem', fontWeight: 700, letterSpacing: '0.5px' }}>MOST POPULAR</div>
-            <div style={{ marginBottom: '16px', display: 'flex', justifyContent: 'center' }}><LineChart size={48} color="var(--primary-color)" /></div>
-            <h3 style={{ fontSize: '1.1rem', fontWeight: 700, marginBottom: '4px' }}>AI PR Strategy Report</h3>
-            <div style={{ fontSize: '2rem', fontWeight: 800, color: 'var(--text-color)', margin: '12px 0 4px' }}>
-              $19.90 <span style={{ fontSize: '0.85rem', color: 'var(--text-muted)', fontWeight: 400 }}>CAD</span>
-            </div>
-            <p style={{ color: 'var(--text-muted)', marginBottom: '20px', fontSize: '0.88rem' }}>
-              One-time purchase. One personalized strategy.
-            </p>
-            <ul style={{ listStyleType: 'none', padding: 0, margin: '0 0 24px 0', display: 'grid', gap: '10px', textAlign: 'left', fontSize: '0.88rem' }}>
-              <li style={{ display: 'flex', alignItems: 'center', gap: '8px' }}><CheckCircle2 size={16} color="#10b981"/> Exact CRS score calculation</li>
-              <li style={{ display: 'flex', alignItems: 'center', gap: '8px' }}><CheckCircle2 size={16} color="#10b981"/> Historical draw comparison</li>
-              <li style={{ display: 'flex', alignItems: 'center', gap: '8px' }}><CheckCircle2 size={16} color="#10b981"/> Point maximization strategies</li>
-              <li style={{ display: 'flex', alignItems: 'center', gap: '8px' }}><CheckCircle2 size={16} color="#10b981"/> Personalized PR roadmap</li>
-            </ul>
-            <div style={{ marginTop: 'auto' }}>
-              <button className="btn btn-primary" onClick={() => onNavigate('crs-calculator')} style={{ width: '100%' }}>
-                Get My Strategy
-              </button>
-            </div>
-          </div>
-
-          {/* Letter Auditor */}
-          <div className="feature-card" style={{ textAlign: 'center', padding: '32px 24px', position: 'relative', display: 'flex', flexDirection: 'column' }}>
-            <div style={{ marginBottom: '16px', display: 'flex', justifyContent: 'center' }}><Search size={48} color="var(--primary-color)" /></div>
-            <h3 style={{ fontSize: '1.1rem', fontWeight: 700, marginBottom: '4px' }}>Employment Letter Auditor</h3>
-            <div style={{ fontSize: '2rem', fontWeight: 800, color: 'var(--text-color)', margin: '12px 0 4px' }}>
-              $24.90 <span style={{ fontSize: '0.85rem', color: 'var(--text-muted)', fontWeight: 400 }}>CAD</span>
-            </div>
-            <p style={{ color: 'var(--text-muted)', marginBottom: '20px', fontSize: '0.88rem' }}>
-              One-time purchase. One full letter audit.
-            </p>
-            <ul style={{ listStyleType: 'none', padding: 0, margin: '0 0 24px 0', display: 'grid', gap: '10px', textAlign: 'left', fontSize: '0.88rem' }}>
-              <li style={{ display: 'flex', alignItems: 'center', gap: '8px' }}><CheckCircle2 size={16} color="#10b981"/> Upload existing letters (PDF/Word)</li>
-              <li style={{ display: 'flex', alignItems: 'center', gap: '8px' }}><CheckCircle2 size={16} color="#10b981"/> Automatic duty extraction</li>
-              <li style={{ display: 'flex', alignItems: 'center', gap: '8px' }}><CheckCircle2 size={16} color="#10b981"/> NOC confidence scoring</li>
-              <li style={{ display: 'flex', alignItems: 'center', gap: '8px' }}><CheckCircle2 size={16} color="#10b981"/> Re-write suggestions for gaps</li>
-            </ul>
-            <div style={{ marginTop: 'auto' }}>
-              <button className="btn btn-primary" onClick={() => onNavigate('audit-employment-letter')} style={{ width: '100%' }}>
-                Audit My Letter
-              </button>
-            </div>
-          </div>
-
-        </div>
-      </section>
-      {/* Testimonials */}
-      <Testimonials />
-
-      {/* Free Tools */}
-      <section className="section">
-        <h2 className="section-title">Free Tools &amp; Resources</h2>
-        <p className="section-subtitle">Use these tools at no cost — no payment required.</p>
-        <div className="steps-grid">
-          <div className="step-card" onClick={() => onNavigate('find-my-noc')} style={{ cursor: 'pointer' }}>
-            <div className="step-icon">🎯</div>
-            <h3>NOC Finder <span style={{ fontSize: '0.7rem', background: '#059669', color: 'white', padding: '2px 8px', borderRadius: '4px', marginLeft: '6px', verticalAlign: 'middle' }}>FREE</span></h3>
-            <p>AI matches your job duties to the correct NOC 2021 code. Analyzes all 516 unit groups in seconds.</p>
+            <div className="step-icon"><CheckCircle2 size={32} color="var(--primary-color)" /></div>
+            <h3>Am I Even Eligible?</h3>
+            <p>Answer 5 questions. Know in 2 minutes if you qualify for FSWP, CEC, or FSTP — and which one gives you the best shot.</p>
           </div>
           <div className="step-card" onClick={() => onNavigate('crs-calculator')} style={{ cursor: 'pointer' }}>
-            <div className="step-icon">🧮</div>
-            <h3>CRS Calculator <span style={{ fontSize: '0.7rem', background: '#059669', color: 'white', padding: '2px 8px', borderRadius: '4px', marginLeft: '6px', verticalAlign: 'middle' }}>FREE</span></h3>
-            <p>Calculate your exact Comprehensive Ranking System score based on the official IRCC formula. Instant results.</p>
+            <div className="step-number">2</div>
+            <div className="step-icon"><LineChart size={32} color="var(--primary-color)" /></div>
+            <h3>What's My Real Score?</h3>
+            <p>Get your exact CRS score, see how far you are from the latest cutoff, and discover which improvements gain you the most points.</p>
           </div>
-          <div className="step-card" onClick={() => onNavigate('cec-checklist')} style={{ cursor: 'pointer' }}>
-            <div className="step-icon">✅</div>
-            <h3>CEC Checklist <span style={{ fontSize: '0.7rem', background: '#059669', color: 'white', padding: '2px 8px', borderRadius: '4px', marginLeft: '6px', verticalAlign: 'middle' }}>FREE</span></h3>
-            <p>Interactive checklist to track every document and requirement for your Canadian Experience Class application.</p>
+          <div className="step-card" onClick={() => onNavigate('find-my-noc')} style={{ cursor: 'pointer' }}>
+            <div className="step-number">3</div>
+            <div className="step-icon"><Search size={32} color="var(--primary-color)" /></div>
+            <h3>Is My NOC Code Right?</h3>
+            <p>Upload your employment letter. Our AI matches your duties against all 516 NOC codes — the same check an IRCC officer does.</p>
           </div>
-          <div className="step-card" onClick={() => onNavigate('express-entry-cec-guide')} style={{ cursor: 'pointer' }}>
-            <div className="step-icon">📘</div>
-            <h3>CEC Guide <span style={{ fontSize: '0.7rem', background: '#059669', color: 'white', padding: '2px 8px', borderRadius: '4px', marginLeft: '6px', verticalAlign: 'middle' }}>FREE</span></h3>
-            <p>Complete step-by-step guide to the Canadian Experience Class program — eligibility, timeline, and tips.</p>
-          </div>
-          <div className="step-card" onClick={() => onNavigate('glossary')} style={{ cursor: 'pointer' }}>
-            <div className="step-icon">📖</div>
-            <h3>Immigration Glossary <span style={{ fontSize: '0.7rem', background: '#059669', color: 'white', padding: '2px 8px', borderRadius: '4px', marginLeft: '6px', verticalAlign: 'middle' }}>FREE</span></h3>
-            <p>70+ Express Entry and immigration terms explained in plain language. Searchable and always up to date.</p>
-          </div>
-          <div className="step-card" onClick={() => onNavigate('noc-codes')} style={{ cursor: 'pointer' }}>
-            <div className="step-icon">📂</div>
-            <h3>NOC Directory <span style={{ fontSize: '0.7rem', background: '#059669', color: 'white', padding: '2px 8px', borderRadius: '4px', marginLeft: '6px', verticalAlign: 'middle' }}>FREE</span></h3>
-            <p>Browse all 516 NOC 2021 codes with official duties, TEER categories, and Express Entry eligibility status.</p>
+          <div className="step-card" onClick={() => onNavigate('documents')} style={{ cursor: 'pointer' }}>
+            <div className="step-number">4</div>
+            <div className="step-icon"><FileText size={32} color="var(--primary-color)" /></div>
+            <h3>Are My Documents Ready?</h3>
+            <p>Track every document, catch expiry dates, and avoid the 12 most common mistakes that get applications refused.</p>
           </div>
         </div>
       </section>
 
-      {/* FAQ */}
+      {/* ═══════════════════════════════════════════ */}
+      {/* PRICING — Simplified, 1 benefit per plan     */}
+      {/* ═══════════════════════════════════════════ */}
+      <section className="section" style={{ background: 'var(--bg-color)' }}>
+        <div className="pricing-header" style={{ marginBottom: '2rem' }}>
+          <h2 className="section-title">Simple, One-Time Pricing</h2>
+          <p className="pricing-subtitle">No subscriptions. No hidden fees. Start free, upgrade when you're ready.</p>
+        </div>
+        
+        <div className="pricing-grid" style={{ maxWidth: '1100px', margin: '0 auto' }}>
+          {/* Free */}
+          <div className="pricing-card">
+            <div className="pricing-card-header">
+              <h3>Free</h3>
+              <div className="pricing-price">$0</div>
+              <p className="pricing-desc">Everything you need to start</p>
+            </div>
+            <ul className="pricing-features">
+              <li className="pricing-feature"><CheckCircle2 size={16} className="feature-check" /><span>Eligibility Assessment</span></li>
+              <li className="pricing-feature"><CheckCircle2 size={16} className="feature-check" /><span>CRS Calculator — unlimited</span></li>
+              <li className="pricing-feature"><CheckCircle2 size={16} className="feature-check" /><span>NOC Finder — unlimited</span></li>
+              <li className="pricing-feature"><CheckCircle2 size={16} className="feature-check" /><span>12 Mistakes Guide</span></li>
+            </ul>
+            <div className="pricing-card-footer">
+              <button className="pricing-btn free" onClick={() => onNavigate('get-started')}>Start Free</button>
+            </div>
+          </div>
+
+          {/* Optimize */}
+          <div className="pricing-card featured">
+            <div className="pricing-popular-badge">⭐ BEST VALUE</div>
+            <div className="pricing-card-header">
+              <h3>Optimize</h3>
+              <div className="pricing-price">$49 <span>CAD</span></div>
+              <p className="pricing-desc">Audit your employment letters and track expirations.</p>
+            </div>
+            <ul className="pricing-features">
+              <li className="pricing-feature"><CheckCircle2 size={16} className="feature-check" /><span>Everything in Explore</span></li>
+              <li className="pricing-feature highlight"><CheckCircle2 size={16} className="feature-check" /><span>20 Question Credits - Express Entry AI Assistant</span></li>
+              <li className="pricing-feature highlight"><CheckCircle2 size={16} className="feature-check" /><span>Unlimited Employment Letter Audits</span></li>
+              <li className="pricing-feature highlight"><CheckCircle2 size={16} className="feature-check" /><span>Unlimited CRS Point Simulator (What-If Scenarios)</span></li>
+              <li className="pricing-feature highlight"><CheckCircle2 size={16} className="feature-check" /><span>Personalized Document Checklist</span></li>
+              <li className="pricing-feature highlight"><CheckCircle2 size={16} className="feature-check" /><span>Document Expiry Tracking</span></li>
+            </ul>
+            <div className="pricing-card-footer">
+              <button className="pricing-btn primary" onClick={() => onNavigate('pricing')}>Get Optimize — $49</button>
+            </div>
+          </div>
+
+          {/* Execute */}
+          <div className="pricing-card">
+            <div className="pricing-card-header">
+              <h3>Execute</h3>
+              <div className="pricing-price">$99 <span>CAD</span></div>
+              <p className="pricing-desc">Your complete AI toolkit for absolute peace of mind.</p>
+            </div>
+            <ul className="pricing-features">
+              <li className="pricing-feature"><CheckCircle2 size={16} className="feature-check" /><span>Everything in Optimize</span></li>
+              <li className="pricing-feature highlight"><CheckCircle2 size={16} className="feature-check" /><span>Unlimited Express Entry AI Assistant</span></li>
+              <li className="pricing-feature highlight"><CheckCircle2 size={16} className="feature-check" /><span>Priority Early Access to Features</span></li>
+            </ul>
+            <div className="pricing-card-footer">
+              <button className="pricing-btn secondary" onClick={() => onNavigate('pricing')}>Get Execute — $99</button>
+            </div>
+          </div>
+        </div>
+        
+        <div style={{ textAlign: 'center', marginTop: '2rem' }}>
+          <button className="btn btn-outline" onClick={() => onNavigate('pricing')} style={{ padding: '10px 24px' }}>
+            Compare Full Features →
+          </button>
+        </div>
+      </section>
+
+      {/* ═══════════════════════════════════════════ */}
+      {/* SOCIAL PROOF — Testimonials                  */}
+      {/* ═══════════════════════════════════════════ */}
+      <Testimonials />
+
+      {/* ═══════════════════════════════════════════ */}
+      {/* FAQ — 3 platform-wide questions              */}
+      {/* ═══════════════════════════════════════════ */}
       <section className="section section-dark">
         <h2 className="section-title">Common Questions</h2>
         <div className="faq-list">
           <details className="faq-item">
-            <summary>What happens if I choose the wrong NOC code?</summary>
-            <p>If the duties on your employment letter don't match the NOC code you claim, IRCC can refuse your application. You may lose your filing fee ($1,365 CAD for a single applicant) and have to re-apply, which can set you back months.</p>
-          </details>
-          <details className="faq-item">
-            <summary>Why can't I just use my job title to find my NOC?</summary>
-            <p>Job titles vary wildly between companies. "Project Coordinator" at one company might involve completely different duties than at another. IRCC officers match based on your actual duties, not your title. That's why duty-based matching is the only reliable approach.</p>
-          </details>
-          <details className="faq-item">
-            <summary>How does the AI match my NOC code?</summary>
-            <p>Our AI reads the duties from your employment letter (or pasted text) and compares them against the official duties of all 516 NOC 2021 unit groups. It returns the best match with a confidence score and shows you exactly which of your duties align with which official NOC duties.</p>
-          </details>
-          <details className="faq-item">
-            <summary>What TEER categories qualify for Express Entry CEC?</summary>
-            <p>The Canadian Experience Class (CEC) requires work experience in TEER 0, 1, 2, or 3 occupations. TEER 4 and 5 are generally not eligible for CEC. Our tool automatically identifies your TEER category and tells you if you're eligible.</p>
-          </details>
-          <details className="faq-item">
             <summary>Is this a replacement for an immigration consultant?</summary>
-            <p>No. This tool is purpose-built for one thing: finding your correct NOC code based on your duties. For complex immigration cases, consult a licensed RCIC. But for straightforward NOC matching, this gives you the same answer in seconds instead of waiting days for a consultation.</p>
+            <p>No — and that's the point. We cover everything a consultant does in the first $300 consultation: eligibility checks, CRS calculation, NOC matching, and document preparation. For complex legal cases, we always recommend a licensed RCIC. But for straightforward Express Entry applications, most people don't need one.</p>
           </details>
           <details className="faq-item">
-            <summary>Can I try before I buy?</summary>
-            <p>The NOC Finder tool is completely free for signed-in users. For the Employment Letter Auditor, you'll see a preview of your results before purchasing. The full audit — including compliance checks, duty coverage, and PFL risk assessment — is unlocked with a one-time $24.90 CAD payment.</p>
+            <summary>What do I get for free vs. paid?</summary>
+            <p>The Eligibility Check, CRS Calculator, NOC Finder, and 12 Mistakes Guide are completely free — no payment required. The Optimize plan ($49 CAD) adds 20 AI Assistant question credits, unlimited employment letter audits, a personalized document checklist with expiry tracking, and the CRS point simulator. The Execute plan ($99 CAD) includes everything plus unlimited Express Entry AI Assistant access and priority early access to new features.</p>
+          </details>
+          <details className="faq-item">
+            <summary>How accurate is the AI NOC matching?</summary>
+            <p>Our AI cross-references your job duties against the official duties of all 516 NOC 2021 unit groups — the exact same comparison an IRCC officer performs. It returns a confidence score and duty-by-duty alignment breakdown so you can verify every match yourself. For straightforward roles, it matches what a consultant would tell you — in seconds instead of days.</p>
           </details>
         </div>
       </section>
 
-      {/* CTA Section */}
+      {/* ═══════════════════════════════════════════ */}
+      {/* FINAL CTA — Urgency-driven                   */}
+      {/* ═══════════════════════════════════════════ */}
       <section className="section cta-section">
         <h2 className="cta-title">
-          Stop Guessing Your NOC Code.
+          Every Week You Wait,<br />the CRS Cutoff Could Change.
         </h2>
         <p className="cta-subtitle">
-          One wrong code can cost you your PR application. 
-          Find the right one in 30 seconds.
+          Find your NOC code now — it takes 2 minutes and it's completely free. You might be closer to PR than you think.
         </p>
-        <button className="btn btn-primary btn-lg" onClick={() => onNavigate('find-my-noc')}>
-          Find My NOC Code Now
+        <button className="btn btn-primary btn-lg" id="footer-cta-primary" onClick={() => onNavigate('find-my-noc')}>
+          Find My NOC Code — Free
         </button>
       </section>
 
@@ -379,12 +370,12 @@ export const LandingPage: FC<LandingPageProps> = ({ onNavigate }) => {
             <span>Mentor Visa</span>
           </div>
           <div className="landing-footer-links">
-            <button onClick={() => onNavigate('audit-employment-letter')}>Audit Employment Letter</button>
+            <button onClick={() => onNavigate('get-started')}>Check Eligibility</button>
             <button onClick={() => onNavigate('find-my-noc')}>Find My NOC</button>
             <button onClick={() => onNavigate('crs-calculator')}>CRS Calculator</button>
-            <button onClick={() => onNavigate('cec-checklist')}>CEC Application Checklist</button>
-            <button onClick={() => onNavigate('build-employment-letter')}>Employment Letter Builder</button>
-            <button onClick={() => onNavigate('glossary')}>Immigration Glossary</button>
+            <button onClick={() => onNavigate('documents')}>12 Mistakes</button>
+            <button onClick={() => onNavigate('pricing')}>Pricing</button>
+            <button onClick={() => onNavigate('draw-results')}>Draw Results</button>
             <button onClick={() => onNavigate('noc-codes')}>NOC Directory</button>
           </div>
           <p className="landing-footer-disclaimer">
@@ -398,6 +389,13 @@ export const LandingPage: FC<LandingPageProps> = ({ onNavigate }) => {
           </div>
         </div>
       </footer>
+
+      {/* Mobile Sticky CTA */}
+      <div className="sticky-mobile-cta">
+        <button className="btn btn-primary" onClick={() => onNavigate('find-my-noc')} style={{ width: '100%', padding: '14px', fontSize: '0.95rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}>
+          <Search size={18} /> Find My NOC Code — Free
+        </button>
+      </div>
     </div>
   );
 };

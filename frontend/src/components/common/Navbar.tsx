@@ -3,38 +3,44 @@ import { SignInButton, SignUpButton, useAuth, UserButton } from '@clerk/clerk-re
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useSmartNav } from '../../hooks/useSmartNav';
 import { fetchUserCredits } from '../../services/api';
-import { ChevronDown, FileText, Pickaxe, CheckSquare, LineChart, Map, BookOpen } from 'lucide-react';
+import { ChevronDown, FileText, Pickaxe, CheckSquare, LineChart, Map, BookOpen, Zap, MessageCircle } from 'lucide-react';
 
-const DropdownMenu = ({ title, items, basePath }: { title: string, items: any[], basePath?: string }) => {
+const DropdownMenu = ({ title, items, basePath, columns = 1 }: { title: string, items: any[], basePath?: string, columns?: number }) => {
   const [open, setOpen] = useState(false);
   const location = useLocation();
   const isActive = items.some(i => location.pathname === i.path) || (basePath && location.pathname.startsWith(basePath));
   
   return (
     <div 
+      className="dropdown-container"
       style={{ position: 'relative' }} 
       onMouseEnter={() => setOpen(true)} 
       onMouseLeave={() => setOpen(false)}
     >
-      <div className={`nav-link ${isActive ? 'active' : ''}`} style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px' }}>
+      <div className={`nav-link ${isActive ? 'active' : ''}`}>
         {title}
         <ChevronDown size={14} style={{ transform: open ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s' }} />
       </div>
-      {open && (
-        <div style={{ position: 'absolute', top: 'calc(100% + 5px)', left: '0', background: 'white', padding: '8px 0', borderRadius: '12px', boxShadow: '0 20px 40px rgba(0,0,0,0.08)', minWidth: '240px', zIndex: 100, border: '1px solid rgba(0,0,0,0.05)', display: 'flex', flexDirection: 'column' }}>
-          {items.map(i => (
-            <Link key={i.path} to={i.path} style={{ padding: '10px 16px', display: 'flex', alignItems: 'center', gap: '10px', textDecoration: 'none', transition: 'background 0.1s' }} onMouseOver={e => e.currentTarget.style.background = '#f8fafc'} onMouseOut={e => e.currentTarget.style.background = 'transparent'}>
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: '32px', height: '32px', borderRadius: '8px', background: 'var(--primary-light)', color: 'var(--primary-color)' }}>
-                {i.icon}
-              </div>
-              <div>
-                <div style={{ fontWeight: 600, fontSize: '0.9rem', color: 'var(--text-color)' }}>{i.label}</div>
-                {i.subtext && <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>{i.subtext}</div>}
-              </div>
-            </Link>
-          ))}
-        </div>
-      )}
+      <div 
+        className="dropdown-content" 
+        style={{ 
+          gridTemplateColumns: `repeat(${columns}, 1fr)`,
+          gap: '8px',
+          minWidth: columns > 1 ? '580px' : '300px'
+        }}
+      >
+        {items.map(i => (
+          <Link key={i.path} to={i.path} className="dropdown-item">
+            <div className="dropdown-icon-box">
+              {i.icon}
+            </div>
+            <div>
+              <div className="dropdown-item-title">{i.label}</div>
+              {i.subtext && <div className="dropdown-item-subtext">{i.subtext}</div>}
+            </div>
+          </Link>
+        ))}
+      </div>
     </div>
   );
 };
@@ -44,6 +50,7 @@ export const Navbar: FC = () => {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const { scrolled, hidden } = useSmartNav();
   const navigate = useNavigate();
+  const location = useLocation();
 
   // Credit balance
   const [credits, setCredits] = useState<{ noc: number; audit: number; builder: number; ita: number } | null>(null);
@@ -97,38 +104,66 @@ export const Navbar: FC = () => {
         {/* Desktop Nav Links */}
         <div className="nav-links-desktop">
           <DropdownMenu 
-            title="Premium Tools" 
+            title="Get Started" 
             items={[
-              { path: '/find-my-noc', label: 'Find My NOC', subtext: 'AI-powered duty matching', icon: <FileText size={16} /> },
-              { path: '/audit-employment-letter', label: 'Audit Employment Letter', subtext: 'Verify IRCC compliance', icon: <CheckSquare size={16} /> },
-              { path: '/build-employment-letter', label: 'Build Employment Letter', subtext: 'Generate custom drafts', icon: <Pickaxe size={16} /> },
-              { path: '/crs-calculator', label: 'Build PR Strategy', subtext: 'Calculate your CRS score', icon: <LineChart size={16} /> },
+              { path: '/get-started', label: 'Check Eligibility', subtext: 'FSWP, CEC & FSTP assessment', icon: <CheckSquare size={16} /> },
+              { path: '/crs-calculator', label: 'Calculate CRS Score', subtext: 'Score & maximize your points', icon: <LineChart size={16} /> },
+              { path: '/ai-profile-assistant', label: 'Express Entry AI Assistant', subtext: 'AI help for your IRCC application', icon: <MessageCircle size={16} /> },
             ]}
           />
           <DropdownMenu 
-            title="Resources" 
+            title="Tools" 
             items={[
-              { path: '/draw-results', label: 'Draw Results', subtext: 'Live Express Entry trackers', icon: <LineChart size={16} /> },
+              { path: '/find-my-noc', label: 'Find My NOC', subtext: 'AI-powered duty matching', icon: <FileText size={16} /> },
+              { path: '/audit-employment-letter', label: 'Audit Employment Letter', subtext: 'Verify IRCC compliance', icon: <CheckSquare size={16} /> },
+              { path: '/documents', label: '12 Mistakes Checklist', subtext: 'Error prevention guide', icon: <FileText size={16} /> },
+            ]}
+          />
+          <DropdownMenu 
+            title="Learn" 
+            columns={2}
+            items={[
+              { path: '/draw-results', label: 'Draw Results', subtext: 'Live Express Entry tracker', icon: <LineChart size={16} /> },
               { path: '/express-entry-cec-guide', label: 'CEC Guide', subtext: 'Requirements & process', icon: <BookOpen size={16} /> },
               { path: '/cec-checklist', label: 'CEC Checklist', subtext: 'Document checklist generator', icon: <CheckSquare size={16} /> },
               { path: '/noc-codes', label: 'NOC Directory', subtext: 'Browse the 2021 Matrix', icon: <Map size={16} /> },
+              { path: '/gckey-setup-guide', label: 'GCKey Setup Guide', subtext: 'Create your IRCC account', icon: <FileText size={16} /> },
             ]}
             basePath="/noc-codes"
           />
+
+          <Link 
+            to="/pricing" 
+            className={`nav-link ${location.pathname === '/pricing' ? 'active' : ''}`}
+            style={{ textDecoration: 'none' }}
+          >
+            Pricing
+          </Link>
           
           <div className="nav-auth">
             {!isSignedIn ? (
               <>
-                <SignInButton mode="modal" forceRedirectUrl={window.location.href} signUpForceRedirectUrl={window.location.href}>
-                  <button className="btn btn-ghost" style={{ padding: '8px 16px', fontSize: '0.9rem' }}>Login</button>
+                <button 
+                  className="btn btn-ghost" 
+                  style={{ padding: '8px 16px', fontSize: '0.9rem' }}
+                  onClick={() => navigate('/get-started')}
+                >
+                  Start Free →
+                </button>
+                <SignInButton mode="modal">
+                  <button className="btn btn-outline" style={{ padding: '8px 16px', fontSize: '0.9rem' }}>Login</button>
                 </SignInButton>
-                <SignUpButton mode="modal" forceRedirectUrl={window.location.href} signInForceRedirectUrl={window.location.href}>
-                  <button className="btn btn-primary" style={{ padding: '8px 16px', fontSize: '0.9rem' }}>Sign Up</button>
-                </SignUpButton>
               </>
             ) : (
               <>
                 {creditBadgeElement}
+                <button 
+                  className="btn btn-outline" 
+                  onClick={() => navigate('/my-profile')} 
+                  style={{ padding: '8px 16px', fontSize: '0.9rem' }}
+                >
+                  My Profile
+                </button>
                 <button 
                   className="btn btn-outline" 
                   onClick={() => navigate('/dashboard')} 
@@ -155,26 +190,41 @@ export const Navbar: FC = () => {
       {/* Mobile Menu */}
       {mobileMenuOpen && (
         <div className="mobile-menu">
-          <button className="mobile-menu-link" onClick={() => { navigate('/find-my-noc'); setMobileMenuOpen(false); }}>🎯 Find My NOC</button>
-          <button className="mobile-menu-link" onClick={() => { navigate('/crs-calculator'); setMobileMenuOpen(false); }}>📊 Build PR Strategy</button>
-          <button className="mobile-menu-link" onClick={() => { navigate('/build-employment-letter'); setMobileMenuOpen(false); }}>🔨 Build Employment Letter</button>
-          <button className="mobile-menu-link" onClick={() => { navigate('/audit-employment-letter'); setMobileMenuOpen(false); }}>📄 Audit Employment Letter</button>
-          <button className="mobile-menu-link" onClick={() => { navigate('/draw-results'); setMobileMenuOpen(false); }}>📈 Draw Results</button>
-          <button className="mobile-menu-link" onClick={() => { navigate('/express-entry-cec-guide'); setMobileMenuOpen(false); }}>📘 Express Entry CEC Guide</button>
-          <button className="mobile-menu-link" onClick={() => { navigate('/cec-checklist'); setMobileMenuOpen(false); }}>✅ CEC Checklist</button>
+          <div style={{ fontSize: '0.7rem', textTransform: 'uppercase', letterSpacing: '1px', color: 'var(--text-muted)', fontWeight: 700, padding: '0 8px 8px', marginTop: '4px' }}>Get Started</div>
+          <button className="mobile-menu-link" onClick={() => { navigate('/get-started'); setMobileMenuOpen(false); }}>🚀 Check Eligibility</button>
+          <button className="mobile-menu-link" onClick={() => { navigate('/crs-calculator'); setMobileMenuOpen(false); }}>📊 Calculate CRS Score</button>
+          <button className="mobile-menu-link" onClick={() => { navigate('/ai-profile-assistant'); setMobileMenuOpen(false); }}>🤖 Express Entry AI Assistant</button>
+          <button className="mobile-menu-link" onClick={() => { navigate('/pricing'); setMobileMenuOpen(false); }}>💎 Pricing</button>
           
-          <div style={{ borderTop: '1px solid var(--border-color)', paddingTop: '12px', marginTop: '4px', display: 'flex', gap: '12px' }}>
+          <div style={{ borderTop: '1px solid var(--border-color)', fontSize: '0.7rem', textTransform: 'uppercase', letterSpacing: '1px', color: 'var(--text-muted)', fontWeight: 700, padding: '12px 8px 8px', marginTop: '8px' }}>Tools</div>
+          <button className="mobile-menu-link" onClick={() => { navigate('/find-my-noc'); setMobileMenuOpen(false); }}>🎯 Find My NOC</button>
+          <button className="mobile-menu-link" onClick={() => { navigate('/audit-employment-letter'); setMobileMenuOpen(false); }}>📄 Audit Employment Letter</button>
+          <button className="mobile-menu-link" onClick={() => { navigate('/documents'); setMobileMenuOpen(false); }}>⚠️ 12 Mistakes Checklist</button>
+
+          <div style={{ borderTop: '1px solid var(--border-color)', fontSize: '0.7rem', textTransform: 'uppercase', letterSpacing: '1px', color: 'var(--text-muted)', fontWeight: 700, padding: '12px 8px 8px', marginTop: '8px' }}>Learn</div>
+          <button className="mobile-menu-link" onClick={() => { navigate('/draw-results'); setMobileMenuOpen(false); }}>📈 Draw Results</button>
+          <button className="mobile-menu-link" onClick={() => { navigate('/express-entry-cec-guide'); setMobileMenuOpen(false); }}>📘 CEC Guide</button>
+          <button className="mobile-menu-link" onClick={() => { navigate('/gckey-setup-guide'); setMobileMenuOpen(false); }}>🔑 GCKey Setup Guide</button>
+          
+          <div style={{ borderTop: '1px solid var(--border-color)', paddingTop: '12px', marginTop: '8px', display: 'flex', gap: '12px' }}>
             {!isSignedIn ? (
               <>
-                <SignInButton mode="modal" forceRedirectUrl={window.location.href} signUpForceRedirectUrl={window.location.href}>
+                <SignInButton mode="modal">
                   <button className="btn btn-ghost" style={{ flex: 1, fontSize: '0.9rem' }}>Login</button>
                 </SignInButton>
-                <SignUpButton mode="modal" forceRedirectUrl={window.location.href} signInForceRedirectUrl={window.location.href}>
+                <SignUpButton mode="modal">
                   <button className="btn btn-primary" style={{ flex: 1, fontSize: '0.9rem' }}>Sign Up</button>
                 </SignUpButton>
               </>
             ) : (
               <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', width: '100%' }}>
+                <button 
+                  className="mobile-menu-link" 
+                  onClick={() => { navigate('/my-profile'); setMobileMenuOpen(false); }}
+                  style={{ fontWeight: 600 }}
+                >
+                  👤 My Profile
+                </button>
                 <button 
                   className="mobile-menu-link" 
                   onClick={() => { navigate('/dashboard'); setMobileMenuOpen(false); }}

@@ -3,6 +3,30 @@ import { useUser, SignInButton, useAuth } from '@clerk/clerk-react';
 import { usePDF } from 'react-to-pdf';
 import type { AnalysisResponse, KeyRisk } from '../types';
 import { reevaluateDocument, fetchUserCredits, createCheckoutSession, consumeCreditToUnlock } from '../services/api';
+import { CheckCircle2, X } from 'lucide-react';
+import '../components/common/PaywallGate.css';
+import './PricingPage.css';
+
+function Feature({ 
+  children, 
+  included = false, 
+  highlight = false 
+}: { 
+  children: React.ReactNode; 
+  included?: boolean;
+  highlight?: boolean;
+}) {
+  return (
+    <li className={`pricing-feature ${highlight ? 'highlight' : ''}`}>
+      {included ? (
+        <CheckCircle2 size={16} className="feature-check" />
+      ) : (
+        <X size={16} className="feature-x" />
+      )}
+      <span>{children}</span>
+    </li>
+  );
+}
 
 interface DashboardProps {
   data: AnalysisResponse;
@@ -21,6 +45,7 @@ export const Dashboard: FC<DashboardProps> = ({ data, onReset, onUpdate }) => {
   
   // Monetization State
   const [credits, setCredits] = useState<number>(0);
+  const [userTier, setUserTier] = useState<string>('free');
   const [isBuying, setIsBuying] = useState(false);
   const [isUnlocking, setIsUnlocking] = useState(false);
   const [isPremiumUnlocked, setIsPremiumUnlocked] = useState<boolean>(
@@ -42,6 +67,7 @@ export const Dashboard: FC<DashboardProps> = ({ data, onReset, onUpdate }) => {
            if (tk) {
                const c = await fetchUserCredits(tk);
                setCredits(c.audit_letter_credits || 0);
+               setUserTier(c.subscription_tier || 'free');
            }
        }
     };
@@ -53,8 +79,8 @@ export const Dashboard: FC<DashboardProps> = ({ data, onReset, onUpdate }) => {
     try {
         const tk = await getToken();
         if (!tk) return;
-        const url = await createCheckoutSession('auditor', tk, '/results');
-        window.location.href = url;
+        const result = await createCheckoutSession('auditor', tk, '/results');
+        if (result?.session_url) window.location.href = result.session_url;
     } catch (e: any) {
         alert("Failed to initiate checkout: " + (e.message || "Unknown error"));
         setIsBuying(false);
@@ -350,7 +376,7 @@ export const Dashboard: FC<DashboardProps> = ({ data, onReset, onUpdate }) => {
               </>
             ) : (
               <div onClickCapture={() => sessionStorage.setItem('pendingPdfDownload', 'noc')}>
-                <SignInButton mode="modal" forceRedirectUrl={window.location.href} signUpForceRedirectUrl={window.location.href}>
+                <SignInButton mode="modal">
                   <button className="btn" style={{ background: '#4285F4', borderColor: '#4285F4', color: 'white' }}>
                     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" style={{ marginRight: '8px', verticalAlign: 'middle', display: 'inline' }}>
                        <path fill="white" fillRule="evenodd" clipRule="evenodd" d="M23.04 12.2614C23.04 11.4459 22.9668 10.662 22.8339 9.91016H12V14.3575H18.1891C17.9224 15.7949 17.1114 17.006 15.8943 17.8202V20.7135H19.6105C21.7855 18.7118 23.04 15.7618 23.04 12.2614Z" />
@@ -690,54 +716,116 @@ export const Dashboard: FC<DashboardProps> = ({ data, onReset, onUpdate }) => {
               {/* Paywall Overlay */}
               {!isPremiumUnlocked && (
                 <div style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, zIndex: 10, pointerEvents: 'none' }}>
-                  <div style={{ position: 'sticky', top: '20vh', display: 'flex', justifyContent: 'center', pointerEvents: 'auto', padding: '0 20px' }}>
-                    <div id="paywall-overlay" style={{ 
-                      maxWidth: '480px', 
-                      width: '100%',
-                      background: 'rgba(255, 255, 255, 0.6)', 
-                      borderRadius: '16px',
-                      backdropFilter: 'blur(8px)'
-                    }}>
-                      <div className="feature-card" style={{ 
-                        textAlign: 'center', 
-                        border: '2px solid var(--primary-color)', 
-                        boxShadow: '0 20px 40px rgba(37, 99, 235, 0.1)',
-                        padding: '40px 32px'
-                      }}>
-                        <div style={{ fontSize: '2.5rem', fontWeight: 800, color: 'var(--text-main)', marginBottom: '8px' }}>
-                          $24.90 <span style={{ fontSize: '1rem', color: 'var(--text-muted)', fontWeight: 400 }}>CAD</span>
+                  <div style={{ position: 'sticky', top: '15vh', display: 'flex', justifyContent: 'center', pointerEvents: 'auto', padding: '0 20px' }}>
+                    
+                    {/* If they HAVE credits, just show a simple unified CTA instead of a pricing grid to reduce friction */}
+                    {!isSignedIn ? (
+                      <div id="paywall-overlay" className="pricing-card" style={{ background: '#ffffff', maxWidth: '400px', margin: '0 auto' }}>
+                        <div className="pricing-card-header">
+                          <div style={{ fontSize: '2.5rem', marginBottom: '0.75rem' }}>🔒</div>
+                          <h3>Unlock Full Audit</h3>
+                          <p className="pricing-desc">Sign in to continue reviewing your employment letter audit.</p>
                         </div>
-                        <p style={{ color: 'var(--text-muted)', marginBottom: '24px', fontSize: '1rem' }}>
-                          One-time purchase. Detailed IRCC Assessment.
-                        </p>
-                        
-                        <ul style={{ listStyleType: 'none', padding: 0, margin: '0 0 32px 0', display: 'grid', gap: '12px', textAlign: 'left' }}>
-                          <li style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>✅ Wording improvements to strengthen letter</li>
-                          <li style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>✅ Identification of unclear or weak duties</li>
-                          <li style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>✅ Detailed officer-style reasoning</li>
-                          <li style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>✅ Risk indicators for refusal or requests</li>
-                        </ul>
-                        
-                        {!isSignedIn ? (
-                          <SignInButton mode="modal" forceRedirectUrl={window.location.href} signUpForceRedirectUrl={window.location.href}>
-                            <button className="btn btn-primary btn-lg" style={{ width: '100%' }}>
+                        <div className="pricing-card-footer">
+                          <SignInButton mode="modal">
+                            <button className="pricing-btn primary" style={{ width: '100%' }}>
                               Sign In to Unlock Full Audit
                             </button>
                           </SignInButton>
-                        ) : credits > 0 ? (
-                          <button className="btn btn-primary btn-lg" onClick={handleUnlock} disabled={isUnlocking} style={{ width: '100%' }}>
-                            {isUnlocking ? 'Unlocking...' : `Unlock Full Audit (1 Credit \u2014 ${credits} remaining)`}
-                          </button>
-                        ) : (
-                          <button className="btn btn-payment btn-lg" onClick={handleCheckout} disabled={isBuying} style={{ width: '100%' }}>
-                            {isBuying ? 'Redirecting to Stripe...' : '💳 Unlock Full Audit'}
-                          </button>
-                        )}
-                        <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginTop: '16px' }}>
-                          Instant results. Fix your letter before you submit.
-                        </p>
+                        </div>
                       </div>
-                    </div>
+                    ) : credits > 0 ? (
+                      <div id="paywall-overlay" className="pricing-card" style={{ background: '#ffffff', maxWidth: '400px', margin: '0 auto' }}>
+                        <div className="pricing-card-header">
+                          <div style={{ fontSize: '2.5rem', marginBottom: '0.75rem' }}>✅</div>
+                          <h3>Unlock Full Audit</h3>
+                          <p className="pricing-desc">You have {credits} {credits === 1 ? 'credit' : 'credits'} remaining.</p>
+                        </div>
+                        <div className="pricing-card-footer">
+                          <button className="pricing-btn primary" onClick={handleUnlock} disabled={isUnlocking} style={{ width: '100%' }}>
+                            {isUnlocking ? 'Unlocking...' : `Spend 1 Credit to Unlock`}
+                          </button>
+                          <p style={{ marginTop: '1rem', fontSize: '0.85rem', color: '#64748b', textAlign: 'center' }}>💚 3-Day Money-Back Guarantee</p>
+                        </div>
+                      </div>
+                    ) : (
+                      /* Side-by-side Pricing Cards for Purchasing */
+                      <div className="pricing-grid-2" style={{ marginTop: '1rem', width: '100%', margin: '0 auto' }}>
+                        
+                        {/* Card 1: Single Audit */}
+                        <div className="pricing-card" style={{ background: '#ffffff' }}>
+                          <div className="pricing-card-header">
+                            <h3>Employment Letter Audit Pass</h3>
+                            <div className="pricing-price">$24.90 <span>CAD</span></div>
+                            <p className="pricing-desc">Unlock this specific letter audit.</p>
+                          </div>
+                          <ul className="pricing-features">
+                            <Feature included>Wording improvements to strengthen letter</Feature>
+                            <Feature included>Identification of unclear or weak duties</Feature>
+                            <Feature included>Detailed officer-style reasoning</Feature>
+                            <Feature included>Risk indicators for refusal or requests</Feature>
+                            <Feature highlight>1 Letter Only</Feature>
+                          </ul>
+                          <div className="pricing-card-footer">
+                            <button 
+                              className="pricing-btn secondary" 
+                              disabled={isBuying}
+                              onClick={handleCheckout}
+                            >
+                              {isBuying ? 'Redirecting...' : 'Get Employment Letter Audit Pass — $24.90'}
+                            </button>
+                          </div>
+                        </div>
+
+                        {/* Card 2: Optimize / Complete */}
+                        <div className="pricing-card featured animate-reveal delay-1">
+                          <div className="pricing-popular-badge">⭐ BEST VALUE</div>
+                          <div className="pricing-card-header">
+                            <h3>{userTier === 'starter' ? 'Execute' : 'Optimize'}</h3>
+                            <div className="pricing-price">${userTier === 'starter' ? '99' : '49'} <span>CAD</span></div>
+                            <p className="pricing-desc">Everything you need to perfect your profile.</p>
+                          </div>
+                          <ul className="pricing-features">
+                            {userTier === 'starter' ? (
+                              <>
+                                <Feature included>Everything in Optimize</Feature>
+                                <Feature included>Unlimited Express Entry AI Assistant</Feature>
+                                <Feature included>Priority Early Access to Features</Feature>
+                              </>
+                            ) : (
+                              <>
+                                <Feature included>20 Question Credits - Express Entry AI Assistant</Feature>
+                                <Feature included>Unlimited Employment Letter Audits</Feature>
+                                <Feature included>Unlimited CRS Point Simulator (What-If Scenarios)</Feature>
+                                <Feature included>Personalized Document Checklist</Feature>
+                                <Feature included>Document Expiry Tracking</Feature>
+                              </>
+                            )}
+                          </ul>
+                          <div className="pricing-card-footer">
+                            <button 
+                              className="pricing-btn primary" 
+                              disabled={isBuying}
+                              onClick={async () => {
+                                setIsBuying(true);
+                                try {
+                                  const tk = await getToken();
+                                  if (!tk) return;
+                                  const result = await createCheckoutSession(userTier === 'starter' ? 'complete' : 'starter', tk, '/results');
+                                  if (result?.session_url) window.location.href = result.session_url;
+                                } catch (e: any) {
+                                  alert('Failed to start checkout: ' + (e.message || 'Unknown error'));
+                                  setIsBuying(false);
+                                }
+                              }}
+                            >
+                              {isBuying ? 'Redirecting...' : `Get ${userTier === 'starter' ? 'Execute Access — $99' : 'Optimize — $49'} CAD`}
+                            </button>
+                          </div>
+                        </div>
+
+                      </div>
+                    )}
                   </div>
                 </div>
               )}
@@ -894,7 +982,7 @@ export const Dashboard: FC<DashboardProps> = ({ data, onReset, onUpdate }) => {
                 <div style={{ fontSize: '0.9rem', color: '#6b7280' }}>Sign in to save your analysis and track your progress.</div>
               </div>
               <div>
-                <SignInButton mode="modal" forceRedirectUrl={window.location.href} signUpForceRedirectUrl={window.location.href}>
+                <SignInButton mode="modal">
                   <button className="btn" style={{ background: '#4285F4', borderColor: '#4285F4', color: 'white', padding: '8px 20px', fontSize: '0.95rem', fontWeight: 500 }}>
                     Sign in
                   </button>

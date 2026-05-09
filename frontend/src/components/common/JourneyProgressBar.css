@@ -1,0 +1,163 @@
+/* ── Journey Progress Bar ── */
+
+.journey-bar {
+  margin-bottom: 2rem;
+}
+
+.journey-bar-inner {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0;
+  padding: 0.75rem 1rem;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 14px;
+}
+
+.journey-bar-step-wrapper {
+  display: flex;
+  align-items: center;
+  flex: 1;
+}
+
+.journey-bar-step-wrapper:first-child {
+  flex: 0 0 auto;
+}
+
+.journey-bar-connector {
+  flex: 1;
+  height: 2px;
+  background: rgba(255, 255, 255, 0.1);
+  margin: 0 4px;
+  transition: background 0.3s;
+}
+
+.journey-bar-connector.active {
+  background: rgba(99, 102, 241, 0.4);
+}
+
+.journey-bar-step {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 6px 10px;
+  background: none;
+  border: 2px solid transparent;
+  border-radius: 10px;
+  cursor: pointer;
+  transition: all 0.2s;
+  flex-shrink: 0;
+}
+
+.journey-bar-step:hover {
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.journey-bar-step.current {
+  background: rgba(99, 102, 241, 0.1);
+  border-color: rgba(99, 102, 241, 0.3);
+}
+
+.journey-bar-step.complete {
+  opacity: 1;
+}
+
+.journey-bar-step.future {
+  opacity: 0.4;
+}
+
+.journey-bar-icon {
+  font-size: 1.1rem;
+  line-height: 1;
+}
+
+.journey-bar-step.complete .journey-bar-icon {
+  color: #10b981;
+  font-weight: 700;
+  font-size: 0.9rem;
+}
+
+.journey-bar-label {
+  font-size: 0.7rem;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.5);
+  white-space: nowrap;
+}
+
+.journey-bar-step.current .journey-bar-label {
+  color: #818cf8;
+}
+
+.journey-bar-step.complete .journey-bar-label {
+  color: #34d399;
+}
+
+/* ── Next Step Nudge ── */
+
+.journey-nudge {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  padding: 0.5rem 1rem;
+  margin-top: 0.5rem;
+  background: rgba(16, 185, 129, 0.06);
+  border: 1px solid rgba(16, 185, 129, 0.15);
+  border-radius: 10px;
+  animation: nudgeFadeIn 0.4s ease-out;
+}
+
+.journey-nudge-text {
+  font-size: 0.8rem;
+  color: #34d399;
+  font-weight: 500;
+}
+
+.journey-nudge-btn {
+  background: rgba(16, 185, 129, 0.12);
+  border: 1px solid rgba(16, 185, 129, 0.25);
+  border-radius: 8px;
+  padding: 4px 12px;
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: #34d399;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.journey-nudge-btn:hover {
+  background: rgba(16, 185, 129, 0.2);
+  transform: translateX(2px);
+}
+
+@keyframes nudgeFadeIn {
+  from { opacity: 0; transform: translateY(-4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* ── Responsive ── */
+
+@media (max-width: 640px) {
+  .journey-bar-inner {
+    padding: 0.5rem;
+  }
+
+  .journey-bar-label {
+    font-size: 0.6rem;
+  }
+
+  .journey-bar-step {
+    padding: 4px 6px;
+  }
+
+  .journey-bar-icon {
+    font-size: 0.95rem;
+  }
+
+  .journey-nudge {
+    flex-direction: column;
+    gap: 0.25rem;
+  }
+}

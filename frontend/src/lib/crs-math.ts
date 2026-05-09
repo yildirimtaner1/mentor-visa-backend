@@ -132,6 +132,204 @@ export const getLangOptions = (testName: string, skill: 'Listening' | 'Reading' 
     if (skill === 'Reading') return [ {v: '10-12', l: '549-699'}, {v: '9', l: '524-548'}, {v: '8', l: '499-523'}, {v: '7', l: '453-498'}, {v: '6', l: '406-452'}, {v: '5', l: '375-405'}, {v: '4', l: '342-374'}, {v: '< 4', l: '0-341'} ];
     if (skill === 'Writing' || skill === 'Speaking') return [ {v: '10-12', l: '16-20'}, {v: '9', l: '14-15'}, {v: '8', l: '12-13'}, {v: '7', l: '10-11'}, {v: '6', l: '7-9'}, {v: '5', l: '6'}, {v: '4', l: '4-5'}, {v: '< 4', l: '0-3'} ];
   }
-  // Default to CLB level
+// Default to CLB level
   return [ {v: '10-12', l: 'CLB 10-12'}, {v: '9', l: 'CLB 9'}, {v: '8', l: 'CLB 8'}, {v: '7', l: 'CLB 7'}, {v: '6', l: 'CLB 6'}, {v: '5', l: 'CLB 5'}, {v: '4', l: 'CLB 4'}, {v: '< 4', l: 'CLB < 4'} ];
 };
+
+
+// ======================================
+// 2. Full CRS Score Calculator (pure function)
+//    Single source of truth for all CRS calculations.
+//    Used by both CRSCalculatorPage and the Point Maximization Simulator.
+// ======================================
+
+export interface CRSInputs {
+  age: number;
+  education: string;            // 'none','secondary','one-year','two-year','bachelors','two-or-more','masters','doctoral'
+  hasSpouseForMath: boolean;     // true if married/CL + spouse not PR + spouse accompanying
+
+  // Primary language (CLB levels, 0 if not set)
+  clbReading: number;
+  clbWriting: number;
+  clbListening: number;
+  clbSpeaking: number;
+
+  // Secondary language (CLB levels, 0 if none)
+  clb2Reading: number;
+  clb2Writing: number;
+  clb2Listening: number;
+  clb2Speaking: number;
+
+  // Work experience (years as numbers)
+  canadianWorkYears: number;
+  foreignWorkYears: number;
+
+  // Spouse factors (ignored if hasSpouseForMath = false)
+  spouseEducation: string;
+  spClbReading: number;
+  spClbWriting: number;
+  spClbListening: number;
+  spClbSpeaking: number;
+  spouseCanadianWorkYears: number;
+
+  // Additional factors
+  provincialNomination: boolean;
+  hasCanadianEducation: boolean;
+  canadianEducationType: string; // 'one-two', 'three-plus', or ''
+  siblingInCanada: boolean;
+  certOfQualification: boolean;
+
+  // Language identity (for French bonus detection)
+  primaryLangIsFrench: boolean;
+  secondaryLangIsFrench: boolean;
+  primaryLangIsEnglish: boolean;
+  secondaryLangIsEnglish: boolean;
+}
+
+export interface CRSResult {
+  total: number;
+  core: number;
+  spouse: number;
+  transferability: number;
+  additional: number;
+  breakdown: {
+    core: { age: number; education: number; officialLanguages: number; firstOfficialLanguage: number; secondOfficialLanguage: number; canadianWorkExperience: number; subtotal: number };
+    spouse: { education: number; firstOfficialLanguages: number; canadianWorkExperience: number; subtotal: number };
+    transferability: { education: { languageAndEducation: number; canadianWorkAndEducation: number; subtotal: number }; foreignWork: { languageAndForeignWork: number; canadianAndForeignWork: number; subtotal: number }; certificateOfQualification: number; subtotal: number };
+    additional: { provincialNomination: number; studyInCanada: number; siblingInCanada: number; frenchLanguageSkills: number; subtotal: number };
+  };
+}
+
+/**
+ * Calculate the full CRS score from raw numeric inputs.
+ * This is a PURE function — no side effects, no state reads.
+ * Identical math to the official IRCC CRS calculator.
+ */
+export function calculateCRSScore(i: CRSInputs): CRSResult {
+  // ── A. Core/Human Capital ──
+  const agePoints = getAgePoints(i.age, i.hasSpouseForMath);
+  const eduPoints = getEducationPoints(i.education, i.hasSpouseForMath);
+
+  const firstLangPoints =
+    getLanguageAbilityPoints(i.clbReading, i.hasSpouseForMath) +
+    getLanguageAbilityPoints(i.clbWriting, i.hasSpouseForMath) +
+    getLanguageAbilityPoints(i.clbListening, i.hasSpouseForMath) +
+    getLanguageAbilityPoints(i.clbSpeaking, i.hasSpouseForMath);
+
+  const rawSecondLang =
+    getSecondLanguagePoints(i.clb2Reading) +
+    getSecondLanguagePoints(i.clb2Writing) +
+    getSecondLanguagePoints(i.clb2Listening) +
+    getSecondLanguagePoints(i.clb2Speaking);
+  const secondLangPoints = Math.min(rawSecondLang, i.hasSpouseForMath ? 22 : 24);
+  const officialLanguagesPoints = firstLangPoints + secondLangPoints;
+
+  const canWorkPoints = getCanadianWorkPoints(i.canadianWorkYears, i.hasSpouseForMath);
+  const coreTotal = agePoints + eduPoints + officialLanguagesPoints + canWorkPoints;
+
+  // ── B. Spouse Factors ──
+  let spouseTotal = 0;
+  let spEduPoints = 0;
+  let spLangPoints = 0;
+  let spWorkPoints = 0;
+  if (i.hasSpouseForMath) {
+    spEduPoints = getSpouseEducationPoints(i.spouseEducation);
+    spLangPoints =
+      getSpouseLanguagePoints(i.spClbReading) +
+      getSpouseLanguagePoints(i.spClbWriting) +
+      getSpouseLanguagePoints(i.spClbListening) +
+      getSpouseLanguagePoints(i.spClbSpeaking);
+    spWorkPoints = getSpouseCanadianWorkPoints(i.spouseCanadianWorkYears);
+    spouseTotal = spEduPoints + spLangPoints + spWorkPoints;
+  }
+
+  // ── C. Skill Transferability ──
+  const minCLB = Math.min(i.clbReading, i.clbWriting, i.clbListening, i.clbSpeaking);
+  const isCLB7 = minCLB >= 7;
+  const isCLB9 = minCLB >= 9;
+
+  let eduLevel = 0;
+  if (['one-year', 'two-year', 'bachelors'].includes(i.education)) eduLevel = 1;
+  if (['two-or-more', 'masters', 'doctoral'].includes(i.education)) eduLevel = 2;
+
+  let transEduLang = 0;
+  if (eduLevel === 1) { if (isCLB9) transEduLang = 25; else if (isCLB7) transEduLang = 13; }
+  else if (eduLevel === 2) { if (isCLB9) transEduLang = 50; else if (isCLB7) transEduLang = 25; }
+
+  let transEduCanWork = 0;
+  if (eduLevel === 1) { if (i.canadianWorkYears >= 2) transEduCanWork = 25; else if (i.canadianWorkYears === 1) transEduCanWork = 13; }
+  else if (eduLevel === 2) { if (i.canadianWorkYears >= 2) transEduCanWork = 50; else if (i.canadianWorkYears === 1) transEduCanWork = 25; }
+
+  const transferabilityEdu = Math.min(transEduLang + transEduCanWork, 50);
+
+  let transForLang = 0;
+  if (i.foreignWorkYears === 1 || i.foreignWorkYears === 2) { if (isCLB9) transForLang = 25; else if (isCLB7) transForLang = 13; }
+  else if (i.foreignWorkYears >= 3) { if (isCLB9) transForLang = 50; else if (isCLB7) transForLang = 25; }
+
+  let transForCanWork = 0;
+  if (i.foreignWorkYears === 1 || i.foreignWorkYears === 2) { if (i.canadianWorkYears >= 2) transForCanWork = 25; else if (i.canadianWorkYears === 1) transForCanWork = 13; }
+  else if (i.foreignWorkYears >= 3) { if (i.canadianWorkYears >= 2) transForCanWork = 50; else if (i.canadianWorkYears === 1) transForCanWork = 25; }
+
+  const transferabilityForeign = Math.min(transForLang + transForCanWork, 50);
+
+  let transCert = 0;
+  if (i.certOfQualification) {
+    if (isCLB7) transCert = 50;
+    else if (minCLB >= 5) transCert = 25;
+  }
+
+  const transferability = Math.min(transferabilityEdu + transferabilityForeign + transCert, 100);
+
+  // ── D. Additional Points ──
+  let additional = 0;
+
+  const provNomPoints = i.provincialNomination ? 600 : 0;
+  additional += provNomPoints;
+
+  const studyCanPoints = i.hasCanadianEducation
+    ? (i.canadianEducationType === 'three-plus' ? 30 : (i.canadianEducationType === 'one-two' ? 15 : 0))
+    : 0;
+  additional += studyCanPoints;
+
+  // French bonus (IRCC rules: NCLC 7+ all abilities = 25 pts; + English CLB 5+ = 50 pts)
+  let hasStrongFrench = false;
+  let hasEng4 = false;
+
+  if (i.primaryLangIsFrench) {
+    if (minCLB >= 7) hasStrongFrench = true;
+    if (i.secondaryLangIsEnglish && i.clb2Reading >= 4 && i.clb2Writing >= 4 && i.clb2Listening >= 4 && i.clb2Speaking >= 4) {
+      hasEng4 = true;
+    }
+  } else if (i.secondaryLangIsFrench) {
+    if (i.clb2Reading >= 7 && i.clb2Writing >= 7 && i.clb2Listening >= 7 && i.clb2Speaking >= 7) {
+      hasStrongFrench = true;
+    }
+    if (i.primaryLangIsEnglish && minCLB >= 5) hasEng4 = true;
+  }
+
+  let frenchBonusPoints = 0;
+  if (hasStrongFrench) {
+    frenchBonusPoints = hasEng4 ? 50 : 25;
+    additional += frenchBonusPoints;
+  }
+
+  const siblingPoints = i.siblingInCanada ? 15 : 0;
+  additional += siblingPoints;
+
+  // ── Assemble result ──
+  const breakdown = {
+    core: { age: agePoints, education: eduPoints, officialLanguages: officialLanguagesPoints, firstOfficialLanguage: firstLangPoints, secondOfficialLanguage: secondLangPoints, canadianWorkExperience: canWorkPoints, subtotal: coreTotal },
+    spouse: { education: spEduPoints, firstOfficialLanguages: spLangPoints, canadianWorkExperience: spWorkPoints, subtotal: spouseTotal },
+    transferability: { education: { languageAndEducation: transEduLang, canadianWorkAndEducation: transEduCanWork, subtotal: transferabilityEdu }, foreignWork: { languageAndForeignWork: transForLang, canadianAndForeignWork: transForCanWork, subtotal: transferabilityForeign }, certificateOfQualification: transCert, subtotal: transferability },
+    additional: { provincialNomination: provNomPoints, studyInCanada: studyCanPoints, siblingInCanada: siblingPoints, frenchLanguageSkills: frenchBonusPoints, subtotal: additional },
+  };
+
+  return {
+    core: coreTotal,
+    spouse: spouseTotal,
+    transferability,
+    additional,
+    total: coreTotal + spouseTotal + transferability + additional,
+    breakdown,
+  };
+}

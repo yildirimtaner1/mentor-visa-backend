@@ -1,17 +1,23 @@
 import { type FC, useState, useMemo, useEffect, useRef } from 'react';
 import { useAuth, SignInButton } from '@clerk/clerk-react';
 import { saveCRSEvaluation, generateITAStrategy, createCheckoutSession, fetchUserCredits } from '../services/api';
+import './common/PaywallGate.css';
 import { SEO } from './common/SEO';
 import { DynamicLoader } from './common/DynamicLoader';
+import { CRSWarRoom } from './CRSWarRoom';
+import { useJourneyStore } from '../stores/journeyStore';
 import {
   getAgePoints, getEducationPoints, getLanguageAbilityPoints,
   getSpouseLanguagePoints, getSecondLanguagePoints, getSpouseEducationPoints,
-  getSpouseCanadianWorkPoints, getCanadianWorkPoints, extractCLB, getLangOptions
+  getSpouseCanadianWorkPoints, getCanadianWorkPoints, extractCLB, getLangOptions,
+  calculateCRSScore, type CRSInputs
 } from '../lib/crs-math';
 
 interface CRSCalculatorPageProps {
   onNavigate: (page: string) => void;
 }
+
+import { ScoreVsCutoff } from './ScoreVsCutoff';
 
 const crsSchema = JSON.stringify({
   "@context": "https://schema.org",
@@ -28,24 +34,25 @@ const OptionCard = ({ selected, onClick, title, description }: { selected: boole
   <div
     onClick={onClick}
     style={{
-      cursor: 'pointer', padding: '14px 16px', borderRadius: '10px',
-      border: `1.5px solid ${selected ? 'var(--primary-color)' : 'var(--border-color)'}`,
-      background: selected ? 'rgba(37, 99, 235, 0.04)' : 'var(--surface-color)',
-      transition: 'all 0.2s ease', display: 'flex', alignItems: 'center', gap: '10px',
-      transform: selected ? 'scale(1.02)' : 'scale(1)',
-      boxShadow: selected ? '0 0 12px rgba(37, 99, 235, 0.1)' : 'none',
+      cursor: 'pointer', padding: '14px 18px', borderRadius: '12px',
+      border: `2px solid ${selected ? 'var(--primary-color)' : '#cbd5e1'}`,
+      background: selected ? 'rgba(30, 58, 138, 0.05)' : '#ffffff',
+      transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)', display: 'flex', alignItems: 'center', gap: '14px',
+      transform: selected ? 'translateY(-1px)' : 'none',
+      boxShadow: selected ? '0 4px 12px rgba(30, 58, 138, 0.08)' : '0 1px 2px rgba(0, 0, 0, 0.02)',
+      flex: 1
     }}
   >
     <div style={{
-      width: '18px', height: '18px', borderRadius: '50%', flexShrink: 0,
-      border: `2px solid ${selected ? 'var(--primary-color)' : '#D1D5DB'}`,
+      width: '20px', height: '20px', borderRadius: '50%', flexShrink: 0,
+      border: `2px solid ${selected ? 'var(--primary-color)' : '#94a3b8'}`,
       background: selected ? 'var(--primary-color)' : 'transparent',
       display: 'flex', alignItems: 'center', justifyContent: 'center',
-    }}>
-      {selected && <div style={{ width: '6px', height: '6px', borderRadius: '50%', background: 'white' }} />}
-    </div>
+      transition: 'all 0.2s',
+      boxShadow: selected ? 'inset 0 0 0 3px white' : 'none'
+    }} />
     <div>
-      <span style={{ fontWeight: 600, fontSize: '0.95rem', color: selected ? 'var(--primary-color)' : '#374151' }}>{title}</span>
+      <span style={{ fontWeight: selected ? 700 : 500, fontSize: '0.95rem', color: selected ? 'var(--primary-color)' : 'var(--text-muted)' }}>{title}</span>
       {description && <p style={{ fontSize: '0.82rem', color: 'var(--text-muted)', margin: '2px 0 0', lineHeight: 1.4 }}>{description}</p>}
     </div>
   </div>
@@ -56,12 +63,29 @@ export const CRSCalculatorPage: FC<CRSCalculatorPageProps> = ({ onNavigate: _onN
   const hasSavedRef = useRef(false);
   const [isSaving, setIsSaving] = useState(false);
   const [savedEvalId, setSavedEvalId] = useState<number | null>(null);
+  const [isSyncing, setIsSyncing] = useState(false);
+  const [credits, setCredits] = useState<any>(null);
+
+  // Fetch credits on mount if signed in
+  useEffect(() => {
+    if (isSignedIn) {
+      fetchUserCredits().then(res => {
+        if (res && typeof res.ita_strategy_credits === 'number') {
+          setCredits(res);
+        }
+      }).catch(err => console.error("Failed to fetch credits:", err));
+    }
+  }, [isSignedIn]);
+
+  // If score doesn't exist but profile is somewhat complete, run a silent calculation
+  const { tier, setCRS, setProfileSilent, profile, profileUpdatedAt } = useJourneyStore();
 
   // ITA Strategy state
   const [strategyReport, setStrategyReport] = useState<any>(null);
   const [isGeneratingStrategy, setIsGeneratingStrategy] = useState(false);
   const [strategyError, setStrategyError] = useState<string | null>(null);
   const [itaCredits, setItaCredits] = useState(0);
+  const [userTier, setUserTier] = useState<string>('free');
 
   // ── Session persistence: restore saved CRS inputs after Clerk sign-in ──
   const CRS_STORAGE_KEY = 'crsCalculatorData';
@@ -69,6 +93,101 @@ export const CRSCalculatorPage: FC<CRSCalculatorPageProps> = ({ onNavigate: _onN
     try { const s = sessionStorage.getItem(CRS_STORAGE_KEY); return s ? JSON.parse(s) : {}; } catch { return {}; }
   };
   const saved = useRef(getSaved());
+
+  // ── Invalidate stale session cache if profile was updated more recently ──
+  if (Object.keys(saved.current).length > 0 && profileUpdatedAt) {
+    const cacheTime = saved.current._savedAt;
+    if (!cacheTime || new Date(profileUpdatedAt) > new Date(cacheTime)) {
+      sessionStorage.removeItem(CRS_STORAGE_KEY);
+      saved.current = {};  // Force re-read from journey store
+    }
+  }
+
+  // ── Pre-fill from journey store if no session data ──
+  const journeyFallback = useRef<any>({});
+  if (Object.keys(saved.current).length === 0 && profile.age) {
+    // Map profile education keys → CRS Calculator <option> values.
+    // Accepts both Eligibility Wizard keys (underscore) and CRS write-back keys (hyphen).
+    const eduMap: Record<string, string> = {
+      // Eligibility Wizard keys
+      'secondary': 'secondary',
+      'one_year_post_secondary': 'one-year',
+      'two_year_post_secondary': 'two-year',
+      'three_year_post_secondary': 'bachelors',
+      'two_credentials': 'two-or-more',
+      'masters': 'masters',
+      'doctoral': 'doctoral',
+      // CRS Calculator keys (pass-through)
+      'none': 'none',
+      'one-year': 'one-year',
+      'two-year': 'two-year',
+      'bachelors': 'bachelors',
+      'two-or-more': 'two-or-more',
+    };
+    const maritalMap: Record<string, string> = {
+      'single': 'Never Married / Single',
+      'married': 'Married',
+      'common_law': 'Common-Law',
+      'divorced': 'Divorced / Separated',
+      'widowed': 'Widowed',
+    };
+    // Map profile language test keys → exact CRS form <option> values
+    const langTestMap: Record<string, string> = {
+      'ielts_general': 'IELTS General Training (English)',
+      'celpip': 'CELPIP-General (English)',
+      'pte_core': 'PTE Core (English)',
+      'tef': 'TEF Canada (French)',
+      'tcf': 'TCF Canada (French)',
+    };
+
+    const pLang = profile.primaryLanguage;
+    const sLang = profile.secondaryLanguage;
+    const canExp = profile.canadianExperienceYears ?? 0;
+    const totalExp = profile.totalSkilledExperienceYears ?? 0;
+    const foreignExp = Math.max(0, totalExp - canExp);
+
+    // Map years to CRS option strings
+    const mapWorkYears = (y: number): string => {
+      if (y <= 0) return 'None or less than a year';
+      if (y === 1) return '1 year';
+      if (y === 2) return '2 years';
+      if (y === 3) return '3 years';
+      if (y === 4) return '4 years';
+      return '5 years or more';
+    };
+
+    // Convert CLB number to the CRS form dropdown value
+    // Dropdown values: '10-12', '9', '8', '7', '6', '5', '4', '< 4'
+    const clbToDropdownValue = (clb: number | undefined): string => {
+      if (clb == null || clb <= 0) return '';
+      if (clb < 4) return '< 4';
+      if (clb >= 10) return '10-12';
+      return String(clb); // 4-9 map directly
+    };
+
+    journeyFallback.current = {
+      age: profile.age,
+      maritalStatus: maritalMap[profile.maritalStatus || ''] || '',
+      education: eduMap[profile.educationLevel || ''] || '',
+      hasCanadianEducation: profile.educationInCanada ? 'Yes' : profile.educationInCanada === false ? 'No' : '',
+      lang1Test: pLang ? (langTestMap[pLang.test] || '') : '',
+      lang1R: pLang ? clbToDropdownValue(pLang.reading) : '',
+      lang1W: pLang ? clbToDropdownValue(pLang.writing) : '',
+      lang1L: pLang ? clbToDropdownValue(pLang.listening) : '',
+      lang1S: pLang ? clbToDropdownValue(pLang.speaking) : '',
+      lang2Test: sLang ? (langTestMap[sLang.test] || 'None / Not Applicable') : 'None / Not Applicable',
+      lang2R: sLang ? clbToDropdownValue(sLang.reading) : '',
+      lang2W: sLang ? clbToDropdownValue(sLang.writing) : '',
+      lang2L: sLang ? clbToDropdownValue(sLang.listening) : '',
+      lang2S: sLang ? clbToDropdownValue(sLang.speaking) : '',
+      canadianWork: mapWorkYears(canExp),
+      foreignWork: mapWorkYears(foreignExp),
+      provincialNom: profile.hasProvincialNomination ? 'Yes' : profile.hasProvincialNomination === false ? 'No' : '',
+      siblingInCanada: profile.hasRelativeInCanada ? 'Yes' : profile.hasRelativeInCanada === false ? 'No' : '',
+    };
+    // Merge into saved so downstream state initializers use it
+    saved.current = journeyFallback.current;
+  }
 
   // Phase 1: Personal
   const [age, setAge] = useState<number | ''>(saved.current.age ?? '');
@@ -117,8 +236,8 @@ export const CRSCalculatorPage: FC<CRSCalculatorPageProps> = ({ onNavigate: _onN
   const [spS, setSpS] = useState(saved.current.spS ?? '');
   const [spouseCanadianWork, setSpouseCanadianWork] = useState(saved.current.spouseCanadianWork ?? '');
   
-  // Score Derivation (unchanged logic)
-  const score = useMemo(() => {
+  // Score Derivation — delegates to the single-source-of-truth calculateCRSScore()
+  const crsInputs: CRSInputs = useMemo(() => {
     const parseYears = (str: string) => {
       if (!str || str === 'None or less than a year') return 0;
       if (str.startsWith('1')) return 1;
@@ -128,129 +247,33 @@ export const CRSCalculatorPage: FC<CRSCalculatorPageProps> = ({ onNavigate: _onN
       if (str.startsWith('5')) return 5;
       return 0;
     };
-    const caWorkNum = parseYears(canadianWork);
-    const forWorkNum = parseYears(foreignWork);
-    const spWorkNum = parseYears(spouseCanadianWork);
-    
-    const spClbR = extractCLB(spR);
-    const spClbW = extractCLB(spW);
-    const spClbL = extractCLB(spL);
-    const spClbS = extractCLB(spS);
-    
-    const clb2R = extractCLB(lang2R);
-    const clb2W = extractCLB(lang2W);
-    const clb2L = extractCLB(lang2L);
-    const clb2S = extractCLB(lang2S);
-
-    const activeAge = age === '' ? 28 : (age as number); 
-    const agePoints = getAgePoints(activeAge, hasSpouseForMath);
-    const eduPoints = getEducationPoints(education, hasSpouseForMath);
-    
-    const firstLangPoints = getLanguageAbilityPoints(clbReading, hasSpouseForMath) + getLanguageAbilityPoints(clbWriting, hasSpouseForMath) + getLanguageAbilityPoints(clbListening, hasSpouseForMath) + getLanguageAbilityPoints(clbSpeaking, hasSpouseForMath);
-    const rawSecondLang = getSecondLanguagePoints(clb2R) + getSecondLanguagePoints(clb2W) + getSecondLanguagePoints(clb2L) + getSecondLanguagePoints(clb2S);
-    const secondLangPoints = Math.min(rawSecondLang, hasSpouseForMath ? 22 : 24);
-    const officialLanguagesPoints = firstLangPoints + secondLangPoints;
-    
-    const canWorkPoints = getCanadianWorkPoints(caWorkNum, hasSpouseForMath);
-    const coreTotal = agePoints + eduPoints + officialLanguagesPoints + canWorkPoints;
-
-    let spouseTotal = 0;
-    let spEduPoints = 0;
-    let spLangPoints = 0;
-    let spWorkPoints = 0;
-    if (hasSpouseForMath) {
-      spEduPoints = getSpouseEducationPoints(spouseEducation);
-      spLangPoints = getSpouseLanguagePoints(spClbR) + getSpouseLanguagePoints(spClbW) + getSpouseLanguagePoints(spClbL) + getSpouseLanguagePoints(spClbS);
-      spWorkPoints = getSpouseCanadianWorkPoints(spWorkNum);
-      spouseTotal = spEduPoints + spLangPoints + spWorkPoints;
-    }
-
-    const minCLB = Math.min(clbReading, clbWriting, clbListening, clbSpeaking);
-    const isCLB7 = minCLB >= 7;
-    const isCLB9 = minCLB >= 9;
-    
-    let eduLevel = 0;
-    if (['one-year', 'two-year', 'bachelors'].includes(education)) eduLevel = 1;
-    if (['two-or-more', 'masters', 'doctoral'].includes(education)) eduLevel = 2;
-
-    let transEduLang = 0;
-    if (eduLevel === 1) { if (isCLB9) transEduLang = 25; else if (isCLB7) transEduLang = 13; }
-    else if (eduLevel === 2) { if (isCLB9) transEduLang = 50; else if (isCLB7) transEduLang = 25; }
-
-    let transEduCanWork = 0;
-    if (eduLevel === 1) { if (caWorkNum >= 2) transEduCanWork = 25; else if (caWorkNum === 1) transEduCanWork = 13; }
-    else if (eduLevel === 2) { if (caWorkNum >= 2) transEduCanWork = 50; else if (caWorkNum === 1) transEduCanWork = 25; }
-    
-    const transferabilityEdu = Math.min(transEduLang + transEduCanWork, 50);
-
-    let transForLang = 0;
-    if (forWorkNum === 1 || forWorkNum === 2) { if (isCLB9) transForLang = 25; else if (isCLB7) transForLang = 13; }
-    else if (forWorkNum >= 3) { if (isCLB9) transForLang = 50; else if (isCLB7) transForLang = 25; }
-
-    let transForCanWork = 0;
-    if (forWorkNum === 1 || forWorkNum === 2) { if (caWorkNum >= 2) transForCanWork = 25; else if (caWorkNum === 1) transForCanWork = 13; }
-    else if (forWorkNum >= 3) { if (caWorkNum >= 2) transForCanWork = 50; else if (caWorkNum === 1) transForCanWork = 25; }
-
-    const transferabilityForeign = Math.min(transForLang + transForCanWork, 50);
-    
-    let transCert = 0;
-    if (certOfQualification === 'Yes') {
-      if (isCLB7) transCert = 50;
-      else if (minCLB >= 5) transCert = 25;
-    }
-
-    const transferability = Math.min(transferabilityEdu + transferabilityForeign + transCert, 100);
-
-    let additional = 0;
-    if (provincialNom === 'Yes') additional += 600;
-    if (hasCanadianEducation === 'Yes' && canadianEducation === 'one-two') additional += 15;
-    if (hasCanadianEducation === 'Yes' && canadianEducation === 'three-plus') additional += 30;
-    
-    let isFrenchFirst = lang1Test.includes('French');
-    let isFrenchSecond = lang2Test.includes('French');
-    let isEngFirst = lang1Test.includes('English');
-    let isEngSecond = lang2Test.includes('English');
-    
-    let hasStrongFrench = false;
-    let hasEng4 = false;
-
-    if (isFrenchFirst) {
-      if (minCLB >= 7) hasStrongFrench = true;
-      if (isEngSecond && clb2R >= 4 && clb2W >= 4 && clb2L >= 4 && clb2S >= 4) {
-        hasEng4 = true;
-      }
-    } else if (isFrenchSecond) {
-      if (clb2R >= 7 && clb2W >= 7 && clb2L >= 7 && clb2S >= 7) {
-        hasStrongFrench = true;
-      }
-      if (isEngFirst && minCLB >= 5) hasEng4 = true;
-    }
-
-    let frenchBonusPoints = 0;
-    if (hasStrongFrench) {
-      frenchBonusPoints = hasEng4 ? 50 : 25;
-      additional += frenchBonusPoints;
-    }
-
-    const siblingPoints = siblingInCanada === 'Yes' ? 15 : 0;
-    additional += siblingPoints;
-    
-    const provNomPoints = provincialNom === 'Yes' ? 600 : 0;
-    const studyCanPoints = (hasCanadianEducation === 'Yes' && canadianEducation === 'one-two') ? 15 : (hasCanadianEducation === 'Yes' && canadianEducation === 'three-plus') ? 30 : 0;
-
-    const breakdown = {
-      core: { age: agePoints, education: eduPoints, officialLanguages: officialLanguagesPoints, firstOfficialLanguage: firstLangPoints, secondOfficialLanguage: secondLangPoints, canadianWorkExperience: canWorkPoints, subtotal: coreTotal },
-      spouse: { education: spEduPoints, firstOfficialLanguages: spLangPoints, canadianWorkExperience: spWorkPoints, subtotal: spouseTotal },
-      transferability: { education: { languageAndEducation: transEduLang, canadianWorkAndEducation: transEduCanWork, subtotal: transferabilityEdu }, foreignWork: { languageAndForeignWork: transForLang, canadianAndForeignWork: transForCanWork, subtotal: transferabilityForeign }, certificateOfQualification: transCert, subtotal: transferability },
-      additional: { provincialNomination: provNomPoints, studyInCanada: studyCanPoints, siblingInCanada: siblingPoints, frenchLanguageSkills: frenchBonusPoints, subtotal: additional }
-    };
 
     return {
-      core: coreTotal, spouse: spouseTotal, transferability, additional,
-      total: coreTotal + spouseTotal + transferability + additional,
-      breakdown
+      age: age === '' ? 28 : (age as number),
+      education,
+      hasSpouseForMath,
+      clbReading, clbWriting, clbListening, clbSpeaking,
+      clb2Reading: extractCLB(lang2R), clb2Writing: extractCLB(lang2W),
+      clb2Listening: extractCLB(lang2L), clb2Speaking: extractCLB(lang2S),
+      canadianWorkYears: parseYears(canadianWork),
+      foreignWorkYears: parseYears(foreignWork),
+      spouseEducation,
+      spClbReading: extractCLB(spR), spClbWriting: extractCLB(spW),
+      spClbListening: extractCLB(spL), spClbSpeaking: extractCLB(spS),
+      spouseCanadianWorkYears: parseYears(spouseCanadianWork),
+      provincialNomination: provincialNom === 'Yes',
+      hasCanadianEducation: hasCanadianEducation === 'Yes',
+      canadianEducationType: canadianEducation,
+      siblingInCanada: siblingInCanada === 'Yes',
+      certOfQualification: certOfQualification === 'Yes',
+      primaryLangIsFrench: lang1Test.includes('French'),
+      secondaryLangIsFrench: lang2Test.includes('French'),
+      primaryLangIsEnglish: lang1Test.includes('English'),
+      secondaryLangIsEnglish: lang2Test.includes('English'),
     };
   }, [age, education, canadianWork, foreignWork, hasSpouseForMath, clbReading, clbWriting, clbListening, clbSpeaking, spouseEducation, spR, spW, spL, spS, spouseCanadianWork, provincialNom, canadianEducation, hasCanadianEducation, lang1Test, lang2Test, lang2R, lang2W, lang2L, lang2S, siblingInCanada, certOfQualification]);
+
+  const score = useMemo(() => calculateCRSScore(crsInputs), [crsInputs]);
 
   // Phase Definitions
   const phases = [
@@ -269,6 +292,7 @@ export const CRSCalculatorPage: FC<CRSCalculatorPageProps> = ({ onNavigate: _onN
   // ── Persist all CRS inputs to sessionStorage on every change ──
   useEffect(() => {
     sessionStorage.setItem(CRS_STORAGE_KEY, JSON.stringify({
+      _savedAt: new Date().toISOString(),
       age, maritalStatus, spouseIsPR, spouseAccompanying,
       education, hasCanadianEducation, canadianEducation,
       lang1Test, lang1R, lang1W, lang1L, lang1S,
@@ -342,6 +366,102 @@ export const CRSCalculatorPage: FC<CRSCalculatorPageProps> = ({ onNavigate: _onN
     }
   }, [isResults]);
 
+  // Write CRS score to journey store whenever user reaches results
+  useEffect(() => {
+    if (isResults && score.total > 0) {
+      setCRS({
+        score: score.total,
+        calculatedAt: new Date().toISOString(),
+        inputs: crsInputs,
+      });
+    }
+  }, [isResults, score.total, setCRS]);
+
+  // Store CRSInputs so the simulator (War Room) can read them
+  useEffect(() => {
+    if (isResults && score.total > 0) {
+      try { sessionStorage.setItem('crsSimulatorInputs', JSON.stringify(crsInputs)); } catch {}
+    }
+  }, [isResults, score.total, crsInputs]);
+
+  // ── Bug 2 fix: Write full profile data to journey store on results ──
+  useEffect(() => {
+    if (!isResults || score.total <= 0) return;
+
+    // Map CRS calculator test name → journey store test key
+    const testKeyMap: Record<string, string> = {
+      'IELTS General Training (English)': 'ielts_general',
+      'CELPIP-General (English)': 'celpip',
+      'PTE Core (English)': 'pte_core',
+      'TEF Canada (French)': 'tef',
+      'TCF Canada (French)': 'tcf',
+    };
+    // Map CRS calculator education label → journey store education key
+    const eduKeyMap: Record<string, string> = {
+      'none': 'none',
+      'secondary': 'secondary',
+      'one-year': 'one-year',
+      'two-year': 'two-year',
+      'bachelors': 'bachelors',
+      'two-or-more': 'two-or-more',
+      'masters': 'masters',
+      'doctoral': 'doctoral',
+    };
+    const maritalMap: Record<string, string> = {
+      'Never Married / Single': 'single',
+      'Married': 'married',
+      'Common-Law': 'common_law',
+      'Divorced / Separated': 'divorced',
+      'Widowed': 'widowed',
+    };
+    const parseYearsForProfile = (str: string): number => {
+      if (!str || str === 'None or less than a year') return 0;
+      const m = str.match(/\d+/);
+      return m ? parseInt(m[0], 10) : 0;
+    };
+
+    const primaryTest = testKeyMap[lang1Test] || '';
+    const secondaryTest = testKeyMap[lang2Test] || '';
+    const caYears = parseYearsForProfile(canadianWork);
+    const forYears = parseYearsForProfile(foreignWork);
+
+    setProfileSilent({
+      age: typeof age === 'number' ? age : null,
+      maritalStatus: maritalMap[maritalStatus] || null,
+      spouseAccompanying: spouseAccompanying === 'Yes',
+      educationLevel: eduKeyMap[education] || null,
+      educationInCanada: hasCanadianEducation === 'Yes' ? true : hasCanadianEducation === 'No' ? false : null,
+      primaryLanguage: primaryTest ? {
+        test: primaryTest,
+        speaking: clbSpeaking,
+        listening: clbListening,
+        reading: clbReading,
+        writing: clbWriting,
+      } : null,
+      secondaryLanguage: (secondaryTest && lang2Test !== 'None / Not Applicable') ? {
+        test: secondaryTest,
+        speaking: extractCLB(lang2S),
+        listening: extractCLB(lang2L),
+        reading: extractCLB(lang2R),
+        writing: extractCLB(lang2W),
+      } : null,
+      canadianExperienceYears: caYears,
+      totalSkilledExperienceYears: caYears + forYears,
+      hasProvincialNomination: provincialNom === 'Yes',
+      hasJobOffer: false, // IRCC removed job offer points March 2025
+      hasRelativeInCanada: siblingInCanada === 'Yes',
+      spouseEducationLevel: hasSpouseForMath ? (eduKeyMap[spouseEducation] || null) : null,
+      spouseLanguage: (hasSpouseForMath && spLangTest !== 'None / Not Applicable') ? {
+        test: testKeyMap[spLangTest] || '',
+        speaking: extractCLB(spS),
+        listening: extractCLB(spL),
+        reading: extractCLB(spR),
+        writing: extractCLB(spW),
+      } : null,
+      spouseCanadianExperienceYears: hasSpouseForMath ? parseYearsForProfile(spouseCanadianWork) : 0,
+    });
+  }, [isResults, score.total]);
+
   useEffect(() => {
     if (isSignedIn && isResults && !hasSavedRef.current) {
       const saveToDb = async () => {
@@ -374,6 +494,7 @@ export const CRSCalculatorPage: FC<CRSCalculatorPageProps> = ({ onNavigate: _onN
             // Fetch ITA strategy credits
             const credits = await fetchUserCredits(token);
             setItaCredits(credits.ita_strategy_credits || 0);
+            setUserTier(credits.subscription_tier || 'free');
           }
         } catch (e) {
           console.error('Failed to save CRS score:', e);
@@ -433,6 +554,9 @@ export const CRSCalculatorPage: FC<CRSCalculatorPageProps> = ({ onNavigate: _onN
         canonical="/crs-calculator"
         schema={crsSchema}
       />
+
+      <div style={{ maxWidth: '900px', margin: '0 auto', padding: '0 1rem' }}>
+      </div>
 
       <section className="page-hero">
         <div className="page-hero-content">
@@ -830,7 +954,7 @@ export const CRSCalculatorPage: FC<CRSCalculatorPageProps> = ({ onNavigate: _onN
                   </div>
                 </div>
 
-                <SignInButton mode="modal" forceRedirectUrl={window.location.href} signUpForceRedirectUrl={window.location.href}>
+                <SignInButton mode="modal">
                   <button className="btn btn-primary btn-lg" style={{ width: '100%', maxWidth: '380px', fontSize: '1.05rem', padding: '16px 24px', boxShadow: '0 8px 20px rgba(37, 99, 235, 0.25)' }}>
                     Unlock My Score & Improvement Plan
                   </button>
@@ -866,7 +990,21 @@ export const CRSCalculatorPage: FC<CRSCalculatorPageProps> = ({ onNavigate: _onN
                   </div>
                 </div>
 
-                <h3 style={{ fontSize: '1.15rem', fontWeight: 700, marginBottom: '16px' }}>Score Breakdown</h3>
+                <div style={{ marginBottom: '40px' }}>
+                  <ScoreVsCutoff userScore={score.total} onOpenWarRoom={() => {
+                    const el = document.getElementById('war-room-paywall');
+                    if (el) {
+                      el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                    } else {
+                      window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' });
+                    }
+                  }} />
+                </div>
+
+                <div style={{ marginBottom: '16px' }}>
+                  <h3 style={{ fontSize: '1.15rem', fontWeight: 700, margin: 0, marginBottom: '4px' }}>Score Breakdown</h3>
+                  <p style={{ fontSize: '0.85rem', color: '#64748b', margin: 0 }}>This breakdown mirrors the official IRCC scoring grid.</p>
+                </div>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', marginBottom: '32px' }}>
                   {breakdownBars.map(sec => (
                     <div key={sec.label} style={{ padding: '16px 20px', background: '#FAFAFA', borderRadius: '12px', border: '1px solid var(--border-color)' }}>
@@ -958,104 +1096,9 @@ export const CRSCalculatorPage: FC<CRSCalculatorPageProps> = ({ onNavigate: _onN
                   <button className="btn btn-outline" onClick={handleBack}>← Back</button>
                 </div>
 
-                {/* ═══════ ITA STRATEGY CTA ═══════ */}
-                {savedEvalId && !strategyReport && (
-                  <div style={{ marginTop: '64px', borderTop: '1px solid var(--border-color)', paddingTop: '64px' }}>
-                    <div style={{ textAlign: 'center', marginBottom: '40px' }}>
-                      <h2 style={{ fontSize: '2.2rem', fontWeight: 800, color: 'var(--text-main)', marginBottom: '12px' }}>
-                        {score.total >= 530 ? "Maximize Your Edge" : `You are ${Math.max(0, 530 - score.total)} points below the cutoff`}
-                      </h2>
-                      <p style={{ color: 'var(--text-muted)', fontSize: '1.1rem', maxWidth: '600px', margin: '0 auto' }}>
-                        {score.total >= 530 ? "Your score is competitive. Get a structured plan to ensure you receive an ITA." : "Get a personalized AI-powered strategy to close the gap and secure your PR."}
-                      </p>
-                    </div>
 
-                    <div style={{ maxWidth: '480px', margin: '0 auto' }}>
-                      <div className="feature-card" style={{ 
-                        textAlign: 'center', 
-                        border: '2px solid var(--primary-color)', 
-                        boxShadow: '0 20px 40px rgba(37, 99, 235, 0.1)',
-                        padding: '40px 32px'
-                      }}>
-                        <div style={{ fontSize: '2.5rem', fontWeight: 800, color: 'var(--text-main)', marginBottom: '8px' }}>
-                          $19.90 <span style={{ fontSize: '1rem', color: 'var(--text-muted)', fontWeight: 400 }}>CAD</span>
-                        </div>
-                        <p style={{ color: 'var(--text-muted)', marginBottom: '24px', fontSize: '1rem' }}>
-                          One-time purchase. Instant, personalized strategy.
-                        </p>
-                        
-                        <ul style={{ listStyleType: 'none', padding: 0, margin: '0 0 32px 0', display: 'grid', gap: '12px', textAlign: 'left' }}>
-                          <li style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>✅ Ranked point-maximizing actions</li>
-                          <li style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>✅ Exact language score targets needed</li>
-                          <li style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>✅ Provincial Nominee (PNP) pathway matches</li>
-                          <li style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>✅ Timeline & cost estimates for your plan</li>
-                        </ul>
-
-                        {strategyError && (
-                          <div style={{ padding: '10px 16px', background: 'rgba(220, 38, 38, 0.1)', border: '1px solid rgba(220, 38, 38, 0.2)', borderRadius: '8px', color: '#DC2626', fontSize: '0.85rem', marginBottom: '16px' }}>
-                            {strategyError}
-                          </div>
-                        )}
-
-                        {isGeneratingStrategy ? (
-                          <div style={{ margin: '20px 0' }}>
-                            <DynamicLoader tool="ita_strategy" />
-                          </div>
-                        ) : itaCredits > 0 ? (
-                          <button 
-                            className="btn btn-primary btn-lg" 
-                            style={{ width: '100%' }}
-                            onClick={async () => {
-                              setIsGeneratingStrategy(true);
-                              setStrategyError(null);
-                              try {
-                                const token = await getToken();
-                                if (token && savedEvalId) {
-                                  const result = await generateITAStrategy(savedEvalId, token);
-                                  if (result.success) {
-                                    setStrategyReport(result.strategy);
-                                    setItaCredits(result.remaining_credits);
-                                  }
-                                }
-                              } catch (e: any) {
-                                setStrategyError(e.message || 'Failed to generate strategy.');
-                              } finally {
-                                setIsGeneratingStrategy(false);
-                              }
-                            }}
-                          >
-                            Unlock My ITA Strategy (1 Credit \u2014 {itaCredits} remaining)
-                          </button>
-                        ) : (
-                          <button 
-                            className="btn btn-payment btn-lg" 
-                            style={{ width: '100%' }}
-                            onClick={async () => {
-                              try {
-                                const token = await getToken();
-                                if (token) {
-                                  const url = await createCheckoutSession('ita_strategy', token, '/crs-calculator');
-                                  window.location.href = url;
-                                }
-                              } catch (e: any) {
-                                setStrategyError(e.message || 'Failed to start checkout.');
-                              }
-                            }}
-                          >
-                            💳 Unlock My ITA Strategy
-                          </button>
-                        )}
-                        
-                        <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginTop: '16px' }}>
-                          Specific to your profile. See exactly what you need to do next.
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-                )}
-
-                {/* ═══════ ITA STRATEGY REPORT ═══════ */}
-                {strategyReport && (
+                {/* ═══════ ITA STRATEGY REPORT (hidden — redesign pending) ═══════ */}
+                {false && strategyReport && (
                   <div style={{ marginTop: '40px' }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
                       <h3 style={{ fontSize: '1.4rem', fontWeight: 800 }}>🎯 Your Personalized ITA Strategy</h3>
@@ -1189,6 +1232,14 @@ export const CRSCalculatorPage: FC<CRSCalculatorPageProps> = ({ onNavigate: _onN
                     </div>
                   </div>
                 )}
+                {/* ══════ CRS War Room ══════ */}
+                <CRSWarRoom 
+                  userScore={score.total} 
+                  tier={tier} 
+                  hasWarRoomAccess={tier !== 'free' || (credits?.ita_strategy_credits > 0)}
+                  crsInputs={crsInputs} 
+                  unlockCTA={undefined} 
+                />
               </div>
             )}
           </div>

@@ -120,21 +120,21 @@ export async function fetchUserCredits(token: string) {
   return response.json();
 }
 
-export async function createCheckoutSession(passType: 'finder' | 'auditor' | 'letter_builder' | 'ita_strategy', token: string, returnPath: string = '/dashboard') {
+export async function createCheckoutSession(passType: 'finder' | 'auditor' | 'letter_builder' | 'ita_strategy' | 'war_room' | 'starter' | 'complete', token: string, returnPath: string = '/dashboard') {
+  const returnUrl = window.location.origin + returnPath;
   const response = await fetch(`${API_BASE_URL}/api/v1/create-checkout-session`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
       'Authorization': `Bearer ${token}`
     },
-    body: JSON.stringify({ pass_type: passType, return_path: returnPath })
+    body: JSON.stringify({ pass_type: passType, return_path: returnPath, return_url: returnUrl })
   });
   if (!response.ok) {
     const err = await response.json().catch(() => ({}));
     throw new Error(err.detail || "Failed to create checkout session");
   }
-  const data = await response.json();
-  return data.session_url;
+  return response.json();
 }
 
 export async function consumeCreditToUnlock(fileId: string, passType: 'finder' | 'auditor', token: string) {
@@ -257,6 +257,81 @@ export async function getITAStrategy(evaluationId: number, token: string) {
   if (!response.ok) {
     const err = await response.json().catch(() => ({}));
     throw new Error(err.detail || 'Failed to fetch ITA strategy.');
+  }
+  return response.json();
+}
+
+// ── Profile Builder Agent API ──
+
+export interface ChatMessagePayload {
+  role: string;
+  content: string;
+  image_data?: string;  // Base64 data URL for screenshots
+}
+
+export interface ConversationSummary {
+  conversation_id: string;
+  title: string;
+  updated_at: string | null;
+}
+
+/**
+ * Stream a chat response from the Profile Builder agent.
+ * Returns the raw Response so the caller can read the SSE stream.
+ */
+export async function chatProfileBuilder(
+  messages: ChatMessagePayload[],
+  conversationId: string | null,
+  token: string | null
+): Promise<Response> {
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json',
+  };
+  if (token) {
+    headers['Authorization'] = `Bearer ${token}`;
+  }
+
+  const response = await fetch(`${API_BASE_URL}/api/v1/profile-builder/chat`, {
+    method: 'POST',
+    headers,
+    body: JSON.stringify({
+      messages,
+      conversation_id: conversationId,
+    }),
+  });
+
+  if (!response.ok) {
+    const err = await response.json().catch(() => ({}));
+    throw new Error(err.detail || 'Failed to connect to Profile Builder.');
+  }
+
+  return response;
+}
+
+/** List the user's past Profile Builder conversations. */
+export async function getProfileBuilderConversations(token: string): Promise<ConversationSummary[]> {
+  const response = await fetch(`${API_BASE_URL}/api/v1/profile-builder/conversations`, {
+    headers: { 'Authorization': `Bearer ${token}` },
+  });
+  if (!response.ok) {
+    const err = await response.json().catch(() => ({}));
+    throw new Error(err.detail || 'Failed to load conversations.');
+  }
+  const data = await response.json();
+  return data.conversations;
+}
+
+/** Load a specific conversation's full message history. */
+export async function getProfileBuilderConversation(
+  conversationId: string,
+  token: string
+): Promise<{ conversation_id: string; title: string; messages: ChatMessagePayload[]; created_at: string | null; updated_at: string | null }> {
+  const response = await fetch(`${API_BASE_URL}/api/v1/profile-builder/conversations/${conversationId}`, {
+    headers: { 'Authorization': `Bearer ${token}` },
+  });
+  if (!response.ok) {
+    const err = await response.json().catch(() => ({}));
+    throw new Error(err.detail || 'Failed to load conversation.');
   }
   return response.json();
 }
