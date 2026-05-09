@@ -64,10 +64,12 @@ export const AuditorPage: FC = () => {
         try {
           const token = await getToken() || '';
           
-          // Always use 'auto' for a fresh, unbiased audit
+          // Use the NOC code from navigation state (e.g. from NOC Finder cross-sell),
+          // or fall back to 'auto' for a fresh, unbiased audit
+          const targetNoc = location.state.targetNoc || 'auto';
           const res = await reevaluateDocument(
             location.state.fileId, 
-            'auto', 
+            targetNoc, 
             token
           );
           
