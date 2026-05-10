@@ -511,20 +511,24 @@ def semantic_search_nocs(user_text: str, top_k: int = 20) -> dict:
     
     # 2. Calculate cosine similarity
     scores = []
-    for noc_code, vector_list in NOC_EMBEDDINGS.items():
+    for idx_key, vector_list in NOC_EMBEDDINGS.items():
         noc_vector = np.array(vector_list)
         # Cosine similarity for normalized vectors is just the dot product
         similarity = np.dot(user_vector, noc_vector)
-        scores.append((similarity, noc_code))
+        scores.append((similarity, idx_key))
         
     # 3. Sort and get top_k
     scores.sort(reverse=True)
-    top_noc_codes = [noc_code for _, noc_code in scores[:top_k]]
+    top_idx_keys = [idx_key for _, idx_key in scores[:top_k]]
     
     # 4. Build a subset of NOC_INDEX
-    # NOC_INDEX keys are '0', '1', etc. We need to match by the "code" field.
-    noc_by_code = {data["code"]: data for data in NOC_INDEX.values() if "code" in data}
-    top_nocs_dict = {code: noc_by_code[code] for code in top_noc_codes if code in noc_by_code}
+    # Both NOC_INDEX and NOC_EMBEDDINGS use sequential index keys ('0', '1', '2'...).
+    # We look up the actual NOC data from NOC_INDEX using these index keys.
+    top_nocs_dict = {}
+    for idx_key in top_idx_keys:
+        entry = NOC_INDEX.get(idx_key)
+        if entry and "code" in entry:
+            top_nocs_dict[entry["code"]] = entry
     
     return top_nocs_dict
 
