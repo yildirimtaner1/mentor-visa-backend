@@ -569,6 +569,49 @@ def find_noc_with_openai(system_prompt: str, user_content: str, page_images: lis
     return json.loads(completion.choices[0].message.content)
 
 
+def audit_document_with_openai(system_prompt: str, user_content: str, page_images: list[tuple[bytes, str]] = None) -> dict:
+    import base64
+    from openai import OpenAI
+    
+    api_key = os.getenv("OPENAI_API_KEY")
+    if not api_key:
+        raise ValueError("OPENAI_API_KEY is not set. Please configure it to use GPT-4o-mini.")
+        
+    openai_client = OpenAI(api_key=api_key)
+    
+    from models import AnalysisResponse
+    import json
+    
+    messages = [
+        {"role": "system", "content": system_prompt}
+    ]
+    
+    user_message_content = []
+    if user_content:
+        user_message_content.append({"type": "text", "text": user_content})
+        
+    if page_images:
+        for img_bytes, mime_type in page_images:
+            base64_img = base64.b64encode(img_bytes).decode('utf-8')
+            user_message_content.append({
+                "type": "image_url",
+                "image_url": {
+                    "url": f"data:{mime_type};base64,{base64_img}",
+                    "detail": "auto"
+                }
+            })
+            
+    messages.append({"role": "user", "content": user_message_content})
+    
+    print(f"Calling OpenAI gpt-4o-mini for Auditor...")
+    completion = openai_client.beta.chat.completions.parse(
+        model="gpt-4o-mini",
+        messages=messages,
+        response_format=AnalysisResponse,
+        temperature=0.0
+    )
+    
+    return json.loads(completion.choices[0].message.content)
 
 # ── Letter Builder Functions ──
 
