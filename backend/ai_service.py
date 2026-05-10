@@ -107,6 +107,7 @@ If two or more NOC codes score within 5 percentage points of each other, select 
 - In `noc_analysis.confidence`, rate how confident you are in this selection (0-100). Low match_score + high confidence = sure it's the right NOC but the letter is weak.
 - In `noc_analysis.alternative_nocs`, list secondary matches >= 50%.
   **IMPORTANT: Score each alternative NOC as if you were doing a deep, dedicated evaluation against that specific NOC. Do NOT give rough estimates.**
+  **CRITICAL: You may ONLY list alternative NOCs whose codes appear in the provided database. NEVER invent or recall NOC codes from memory.**
 """
 
     if target_noc:
@@ -136,8 +137,10 @@ You must think like an IRCC officer whose role is to VERIFY, NOT TRUST.
 Do NOT assume the applicant qualifies. The burden of proof is on the applicant.
 
 You have been given:
-1. A structured database of ALL 516 NOC 2021 unit groups, each with their official code, title, lead statement, and main duties.
+1. A PRE-FILTERED subset of the NOC 2021 database containing the most relevant unit groups for this document. Each entry has an official code, title, lead statement, and main duties.
 2. A document uploaded by the user - either as extracted text or as an image.
+
+**CRITICAL RULE: You may ONLY reference NOC codes and titles that appear in the provided database below. Do NOT invent, guess, or recall NOC codes from memory. If a NOC code is not in the database provided, you MUST NOT use it anywhere in your response — not as the primary match, not as an alternative, and not in any narrative text.**
 
 ---
 
@@ -309,7 +312,7 @@ Analyze the company address, letterhead, and geographic references:
 
 ---
 
-=== NOC 2021 DATABASE (All 516 Unit Groups with Codes, Titles, and Duties) ===
+=== NOC 2021 DATABASE (Pre-filtered subset — ONLY use codes listed here) ===
 {noc_reference}
 
 ---
@@ -410,7 +413,8 @@ and explain in `why_this_noc` that alignment is weak.
 - `why_this_noc`: 1-2 sentence explanation of selection + any key concerns
 - `key_matches`: Duties classified as "strong" (up to 5, short strings)
 - `key_gaps`: Duties classified as "missing" (up to 3, short strings)
-- `alternatives`: Up to 2 alternative NOCs with their computed confidence scores
+- `alternatives`: Up to 2 alternative NOCs with their computed confidence scores.
+  **CRITICAL: You may ONLY suggest alternative NOCs whose codes appear in the provided database. NEVER invent or recall NOC codes from memory.**
 """
 
     return f"""You are a Canadian immigration NOC (National Occupational Classification) expert specializing in NOC 2021.
@@ -475,7 +479,7 @@ VALIDATION RESULT:
 
 Your goal is to provide a FAST, RELIABLE, and TRUSTWORTHY NOC suggestion — not a full audit.
 
-=== NOC 2021 DATABASE ===
+=== NOC 2021 DATABASE (Pre-filtered subset — ONLY use codes listed here) ===
 {noc_reference}
 
 Output your analysis strictly conforming to the requested JSON schema.
