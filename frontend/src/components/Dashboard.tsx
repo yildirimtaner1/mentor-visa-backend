@@ -2,7 +2,7 @@ import { type FC, useEffect, useState, useRef } from 'react';
 import { useUser, SignInButton, useAuth } from '@clerk/clerk-react';
 import { usePDF } from 'react-to-pdf';
 import type { AnalysisResponse, KeyRisk } from '../types';
-import { reevaluateDocument, fetchUserCredits, createCheckoutSession, consumeCreditToUnlock } from '../services/api';
+import { reevaluateDocument, fetchUserCredits, createCheckoutSession, consumeCreditToUnlock, saveEvaluation } from '../services/api';
 import { CheckCircle2, X } from 'lucide-react';
 import '../components/common/PaywallGate.css';
 import './PricingPage.css';
@@ -186,9 +186,7 @@ export const Dashboard: FC<DashboardProps> = ({ data, onReset, onUpdate }) => {
       // Auto-save the evaluation to their profile silently
       getToken().then((token) => {
          if (token) {
-            import('../services/api').then(({ saveEvaluation }) => {
-               saveEvaluation(data, token).catch(console.error);
-            });
+           saveEvaluation(data, token).catch(console.error);
          }
       });
     }
@@ -733,7 +731,7 @@ export const Dashboard: FC<DashboardProps> = ({ data, onReset, onUpdate }) => {
 
                         </ul>
                         <div className="pricing-card-footer">
-                          <SignInButton mode="modal" forceRedirectUrl={window.location.pathname} signUpForceRedirectUrl={window.location.pathname}>
+                          <SignInButton mode="modal" forceRedirectUrl="/results">
                             <button className="pricing-btn primary" style={{ width: '100%' }}>
                               Create Free Account to Continue
                             </button>
