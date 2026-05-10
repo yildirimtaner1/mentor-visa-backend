@@ -730,7 +730,7 @@ export const Dashboard: FC<DashboardProps> = ({ data, onReset, onUpdate }) => {
                           <Feature included>Identification of unclear or weak duties</Feature>
                           <Feature included>Detailed officer-style reasoning</Feature>
                           <Feature included>Risk indicators for refusal or requests</Feature>
-                          <Feature highlight>1 Letter Only</Feature>
+
                         </ul>
                         <div className="pricing-card-footer">
                           <SignInButton mode="modal" forceRedirectUrl={window.location.pathname} signUpForceRedirectUrl={window.location.pathname}>
