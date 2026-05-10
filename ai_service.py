@@ -486,6 +486,44 @@ Output your analysis strictly conforming to the requested JSON schema.
 """
 
 
+def ocr_from_page_images(page_images: list[tuple[bytes, str]], max_pages: int = 2) -> str:
+    """Use GPT-4o-mini vision to OCR text from scanned PDF page images.
+    
+    This is a lightweight fallback for scanned PDFs where pdfminer returns no text.
+    We only OCR the first few pages to keep costs low — just enough for the RAG search.
+    """
+    import base64
+    from openai import OpenAI
+    
+    api_key = os.getenv("OPENAI_API_KEY")
+    if not api_key or not page_images:
+        return ""
+    
+    openai_client = OpenAI(api_key=api_key)
+    
+    content = [{"type": "text", "text": "Extract ALL text visible in this document image. Return ONLY the raw text, no commentary."}]
+    for img_bytes, mime_type in page_images[:max_pages]:
+        b64 = base64.b64encode(img_bytes).decode('utf-8')
+        content.append({
+            "type": "image_url",
+            "image_url": {"url": f"data:{mime_type};base64,{b64}", "detail": "auto"}
+        })
+    
+    try:
+        resp = openai_client.chat.completions.create(
+            model="gpt-4o-mini",
+            messages=[{"role": "user", "content": content}],
+            temperature=0.0,
+            max_tokens=2000
+        )
+        extracted = resp.choices[0].message.content or ""
+        print(f"[OCR] Extracted {len(extracted)} chars from {min(len(page_images), max_pages)} page image(s)")
+        return extracted
+    except Exception as e:
+        print(f"[OCR] Failed: {e}")
+        return ""
+
+
 def semantic_search_nocs(user_text: str, top_k: int = 20) -> dict:
     """Embed the user's text and find the top_k closest NOC codes."""
     import numpy as np

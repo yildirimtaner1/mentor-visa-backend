@@ -199,12 +199,19 @@ async def analyze_document_endpoint(
         user_content = ""
         
         if is_image:
-            user_content = f"The user uploaded an image of their employment letter. Extract the job title and duties."
             mime_type = ai_service.IMAGE_MIME_TYPES.get(ext, 'image/jpeg')
             page_images.append((doc_bytes, mime_type))
+            # OCR the image so RAG gets real text
+            user_content = ai_service.ocr_from_page_images(page_images)
+            if not user_content.strip():
+                user_content = "The user uploaded an image of their employment letter. Extract the job title and duties."
         elif ext == '.pdf':
             page_images = ai_service.pdf_pages_to_images(doc_bytes)
             extracted_text = ai_service.extract_text_from_pdf(doc_bytes)
+            # Scanned PDF fallback: OCR page images if pdfminer returned nothing
+            if len(extracted_text.strip()) < 50 and page_images:
+                print("[Scanned PDF] Text extraction returned <50 chars, running OCR...")
+                extracted_text = ai_service.ocr_from_page_images(page_images)
             user_content = f"=== EXTRACTED PDF TEXT ===\n{extracted_text}"
         else:
             if ext in ('.docx', '.doc'):
@@ -576,12 +583,17 @@ def reevaluate_document(
                 user_content = f"Job Title: {original_title}\n\nDuties and Responsibilities:\n{original_duties}"
                 print(f"Re-evaluating text-only input: title='{original_title}', duties length={len(original_duties)}")
             elif is_image:
-                user_content = "The user uploaded an image of their employment letter. Extract the job title and duties."
                 mime_type = ai_service.IMAGE_MIME_TYPES.get(ext, 'image/jpeg')
                 page_images.append((doc_bytes, mime_type))
+                user_content = ai_service.ocr_from_page_images(page_images)
+                if not user_content.strip():
+                    user_content = "The user uploaded an image of their employment letter. Extract the job title and duties."
             elif ext == '.pdf':
                 page_images = ai_service.pdf_pages_to_images(doc_bytes)
                 extracted_text = ai_service.extract_text_from_pdf(doc_bytes)
+                if len(extracted_text.strip()) < 50 and page_images:
+                    print("[Scanned PDF] Text extraction returned <50 chars, running OCR...")
+                    extracted_text = ai_service.ocr_from_page_images(page_images)
                 user_content = f"=== EXTRACTED PDF TEXT ===\n{extracted_text}"
             else:
                 if ext in ('.docx', '.doc'):
@@ -646,12 +658,17 @@ def reevaluate_document(
             user_content = ""
             
             if is_image:
-                user_content = "The user uploaded an image of their employment letter. Extract the job title and duties."
                 mime_type = ai_service.IMAGE_MIME_TYPES.get(ext, 'image/jpeg')
                 page_images.append((doc_bytes, mime_type))
+                user_content = ai_service.ocr_from_page_images(page_images)
+                if not user_content.strip():
+                    user_content = "The user uploaded an image of their employment letter. Extract the job title and duties."
             elif ext == '.pdf':
                 page_images = ai_service.pdf_pages_to_images(doc_bytes)
                 extracted_text = ai_service.extract_text_from_pdf(doc_bytes)
+                if len(extracted_text.strip()) < 50 and page_images:
+                    print("[Scanned PDF] Text extraction returned <50 chars, running OCR...")
+                    extracted_text = ai_service.ocr_from_page_images(page_images)
                 user_content = f"=== EXTRACTED PDF TEXT ===\n{extracted_text}"
             else:
                 if ext in ('.docx', '.doc'):
@@ -777,12 +794,17 @@ async def noc_finder_endpoint(
             is_image = ext in IMAGE_EXTENSIONS
             
             if is_image:
-                user_content = f"The user uploaded an image of their employment letter. Extract the job title and duties."
                 mime_type = ai_service.IMAGE_MIME_TYPES.get(ext, 'image/jpeg')
                 page_images.append((doc_bytes, mime_type))
+                user_content = ai_service.ocr_from_page_images(page_images)
+                if not user_content.strip():
+                    user_content = "The user uploaded an image of their employment letter. Extract the job title and duties."
             elif ext == '.pdf':
                 page_images = ai_service.pdf_pages_to_images(doc_bytes)
                 extracted_text = ai_service.extract_text_from_pdf(doc_bytes)
+                if len(extracted_text.strip()) < 50 and page_images:
+                    print("[Scanned PDF] Text extraction returned <50 chars, running OCR...")
+                    extracted_text = ai_service.ocr_from_page_images(page_images)
                 user_content = f"=== EXTRACTED PDF TEXT ===\n{extracted_text}"
             else:
                 if ext in ('.docx', '.doc'):
