@@ -722,14 +722,20 @@ export const Dashboard: FC<DashboardProps> = ({ data, onReset, onUpdate }) => {
                     {!isSignedIn ? (
                       <div id="paywall-overlay" className="pricing-card" style={{ background: '#ffffff', maxWidth: '400px', margin: '0 auto' }}>
                         <div className="pricing-card-header">
-                          <div style={{ fontSize: '2.5rem', marginBottom: '0.75rem' }}>🔒</div>
-                          <h3>Unlock Full Audit</h3>
-                          <p className="pricing-desc">Sign in to continue reviewing your employment letter audit.</p>
+                          <h3>Employment Letter Audit</h3>
+                          <p className="pricing-desc">Create a free account to save your preliminary results and continue to the full audit.</p>
                         </div>
+                        <ul className="pricing-features">
+                          <Feature included>Wording improvements to strengthen letter</Feature>
+                          <Feature included>Identification of unclear or weak duties</Feature>
+                          <Feature included>Detailed officer-style reasoning</Feature>
+                          <Feature included>Risk indicators for refusal or requests</Feature>
+                          <Feature highlight>1 Letter Only</Feature>
+                        </ul>
                         <div className="pricing-card-footer">
-                          <SignInButton mode="modal" fallbackRedirectUrl="/dashboard">
+                          <SignInButton mode="modal" forceRedirectUrl={window.location.pathname} signUpForceRedirectUrl={window.location.pathname}>
                             <button className="pricing-btn primary" style={{ width: '100%' }}>
-                              Sign In to Unlock Full Audit
+                              Create Free Account to Continue
                             </button>
                           </SignInButton>
                         </div>
