@@ -518,7 +518,10 @@ def semantic_search_nocs(user_text: str, top_k: int = 20) -> dict:
     top_noc_codes = [noc_code for _, noc_code in scores[:top_k]]
     
     # 4. Build a subset of NOC_INDEX
-    top_nocs_dict = {code: NOC_INDEX[code] for code in top_noc_codes if code in NOC_INDEX}
+    # NOC_INDEX keys are '0', '1', etc. We need to match by the "code" field.
+    noc_by_code = {data["code"]: data for data in NOC_INDEX.values() if "code" in data}
+    top_nocs_dict = {code: noc_by_code[code] for code in top_noc_codes if code in noc_by_code}
+    
     return top_nocs_dict
 
 def find_noc_with_openai(system_prompt: str, user_content: str, page_images: list[tuple[bytes, str]] = None) -> dict:
