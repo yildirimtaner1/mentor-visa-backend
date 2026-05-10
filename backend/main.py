@@ -558,6 +558,13 @@ def reevaluate_document(
                     user_content = f"=== EXTRACTED TEXT ===\n{doc_bytes.decode('utf-8', errors='replace')}"
             
             top_nocs = ai_service.semantic_search_nocs(user_content, top_k=20)
+            
+            # Auditor Fix: Always include the target_noc in the reference sheet so the AI can evaluate against it!
+            if req.target_noc:
+                target_data = next((data for data in ai_service.NOC_INDEX.values() if data.get("code") == req.target_noc), None)
+                if target_data:
+                    top_nocs[req.target_noc] = target_data
+                    
             noc_reference = _json.dumps(top_nocs, ensure_ascii=False)
             system_prompt = ai_service.build_noc_finder_prompt(noc_reference, req.target_noc)
             
@@ -728,6 +735,13 @@ async def noc_finder_endpoint(
             user_content = f"Job Title: {job_title}\nMain Duties: {duties_description}"
 
         top_nocs = ai_service.semantic_search_nocs(user_content, top_k=20)
+        
+        # Auditor Fix: Always include the target_noc in the reference sheet so the AI can evaluate against it!
+        if target_noc:
+            target_data = next((data for data in ai_service.NOC_INDEX.values() if data.get("code") == target_noc), None)
+            if target_data:
+                top_nocs[target_noc] = target_data
+                
         noc_reference = _json.dumps(top_nocs, ensure_ascii=False)
         
         system_prompt = ai_service.build_noc_finder_prompt(noc_reference, target_noc)
