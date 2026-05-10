@@ -221,7 +221,7 @@ async def analyze_document_endpoint(
             if target_data:
                 top_nocs[target_noc] = target_data
                 
-        noc_reference = _json.dumps(top_nocs, ensure_ascii=False)
+        noc_reference = json.dumps(top_nocs, ensure_ascii=False)
         system_prompt = ai_service.build_noc_finder_prompt(noc_reference, target_noc)
         
         try:
@@ -597,7 +597,7 @@ def reevaluate_document(
                 if target_data:
                     top_nocs[req.target_noc] = target_data
                     
-            noc_reference = _json.dumps(top_nocs, ensure_ascii=False)
+            noc_reference = json.dumps(top_nocs, ensure_ascii=False)
             system_prompt = ai_service.build_noc_finder_prompt(noc_reference, req.target_noc)
             
             try:
@@ -774,7 +774,7 @@ async def noc_finder_endpoint(
             if target_data:
                 top_nocs[target_noc] = target_data
                 
-        noc_reference = _json.dumps(top_nocs, ensure_ascii=False)
+        noc_reference = json.dumps(top_nocs, ensure_ascii=False)
         
         system_prompt = ai_service.build_noc_finder_prompt(noc_reference, target_noc)
 
