@@ -7,6 +7,7 @@ import { DynamicLoader } from './common/DynamicLoader';
 import { Dashboard } from './Dashboard';
 import { useAuth } from '@clerk/clerk-react';
 import { useLocation } from 'react-router-dom';
+import ReactGA from 'react-ga4';
 
 const ACCEPTED_TYPES = [
   'application/pdf',
@@ -153,6 +154,7 @@ export const AuditorPage: FC = () => {
     try {
       const res = await uploadDocument(selectedFile);
       setResult(res);
+      ReactGA.event("tool_engagement", { tool_name: "Employment Letter Auditor" });
       sessionStorage.setItem('mentorVisaAnalysisResult', JSON.stringify(res));
 
       if (isSignedIn) {

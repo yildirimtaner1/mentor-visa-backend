@@ -5,6 +5,7 @@ import { findNOCCode, reevaluateDocument } from '../services/api';
 import { SEO } from './common/SEO';
 import { DynamicLoader } from './common/DynamicLoader';
 import { useJourneyStore } from '../stores/journeyStore';
+import ReactGA from 'react-ga4';
 
 interface AlternativeNOC {
   code: string;
@@ -222,6 +223,7 @@ export const NOCFinderPage: FC<NOCFinderPageProps> = ({ onNavigate }) => {
       if (rawData.document_valid && rawData.recommended_noc) {
         const mapped = mapApiResponse(rawData);
         setResult(mapped);
+        ReactGA.event("tool_engagement", { tool_name: "NOC Finder" });
         sessionStorage.setItem('nocFinderResult', JSON.stringify(mapped));
         // Write to journey store so progress bar updates
         setNoc({

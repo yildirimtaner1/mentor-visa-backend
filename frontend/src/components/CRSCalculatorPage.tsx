@@ -16,6 +16,7 @@ interface CRSCalculatorPageProps {
 }
 
 import { ScoreVsCutoff } from './ScoreVsCutoff';
+import ReactGA from 'react-ga4';
 
 const crsSchema = JSON.stringify({
   "@context": "https://schema.org",
@@ -429,6 +430,7 @@ export const CRSCalculatorPage: FC<CRSCalculatorPageProps> = ({ onNavigate: _onN
         calculatedAt: new Date().toISOString(),
         inputs: crsInputs,
       });
+      ReactGA.event("tool_engagement", { tool_name: "CRS Calculator" });
     }
   }, [isResults, score.total, setCRS]);
 

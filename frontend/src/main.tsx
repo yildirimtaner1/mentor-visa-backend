@@ -8,9 +8,16 @@ import './index.css'
 import App from './App.tsx'
 
 const PUBLISHABLE_KEY = import.meta.env.VITE_CLERK_PUBLISHABLE_KEY
+const GA_MEASUREMENT_ID = import.meta.env.VITE_GA_MEASUREMENT_ID
 
 if (!PUBLISHABLE_KEY) {
   throw new Error("Missing Publishable Key")
+}
+
+import ReactGA from "react-ga4";
+
+if (GA_MEASUREMENT_ID) {
+  ReactGA.initialize(GA_MEASUREMENT_ID);
 }
 
 createRoot(document.getElementById('root')!).render(

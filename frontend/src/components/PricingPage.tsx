@@ -11,7 +11,8 @@ import { SEO } from './common/SEO';
 import { useJourneyStore } from '../stores/journeyStore';
 import { createCheckoutSession } from '../services/api';
 import { CheckCircle2, X } from 'lucide-react';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import ReactGA from 'react-ga4';
 import './PricingPage.css';
 
 export function PricingPage() {
@@ -20,8 +21,31 @@ export function PricingPage() {
   const { tier } = useJourneyStore();
   const [isLoading, setIsLoading] = useState<string | null>(null);
 
+  useEffect(() => {
+    ReactGA.event("view_item_list", {
+      item_list_id: "pricing_tiers",
+      item_list_name: "Pricing Tiers",
+      items: [
+        { item_id: "free", item_name: "Explore", price: 0 },
+        { item_id: "starter", item_name: "Optimize", price: 49 },
+        { item_id: "complete", item_name: "Execute", price: 99 }
+      ]
+    });
+  }, []);
+
   const handleUpgrade = async (passType: 'starter' | 'complete') => {
     if (!isSignedIn) return;
+    
+    ReactGA.event("begin_checkout", {
+      currency: "CAD",
+      value: passType === 'complete' ? 99 : 49,
+      items: [{
+        item_id: passType,
+        item_name: passType === 'complete' ? "Execute" : "Optimize",
+        price: passType === 'complete' ? 99 : 49
+      }]
+    });
+
     setIsLoading(passType);
     try {
       const token = await getToken();

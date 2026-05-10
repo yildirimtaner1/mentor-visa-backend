@@ -27,6 +27,7 @@ import ProfileBuilderPage from './components/ProfileBuilderPage';
 import { useAuth, UserButton } from '@clerk/clerk-react';
 import { saveEvaluation, cancelPaymentEvent } from './services/api';
 import { useJourneySync } from './hooks/useJourneySync';
+import { usePageTracking } from './hooks/usePageTracking';
 import { Navbar } from './components/common/Navbar';
 import { Routes, Route, useNavigate } from 'react-router-dom';
 import './components/LandingPage.css';
@@ -144,15 +145,22 @@ const AppLayout = ({ children }: { children: React.ReactNode }) => {
   );
 };
 
+import ReactGA from 'react-ga4';
+
 function App() {
   const { isSignedIn, getToken } = useAuth();
   const navigate = useNavigate();
+  
+  // Initialize GA4 page tracking
+  usePageTracking();
   
   // Initialize journey sync — fetches from backend on sign-in, debounced sync on changes
   useJourneySync();
   
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
+    
+    // Handle payment cancel
     if (params.get('payment_canceled') === 'true') {
       const sessionId = params.get('session_id');
       if (sessionId) {
@@ -163,6 +171,22 @@ function App() {
       url.searchParams.delete('payment_canceled');
       url.searchParams.delete('session_id');
       window.history.replaceState({}, '', url);
+    }
+    
+    // Handle payment success globally for GA4 tracking
+    if (params.get('payment_success') === 'true') {
+      // Fire GA4 purchase event
+      ReactGA.event("purchase", {
+        currency: "CAD",
+        transaction_id: params.get('session_id') || `tx_${Date.now()}`,
+        value: 49, // Placeholder, actual value would depend on tier, but 49 is a safe baseline
+        items: [{
+          item_id: "mentor_visa_purchase",
+          item_name: "Mentor Visa Purchase",
+        }]
+      });
+      // We don't remove payment_success from URL here because individual components (like Dashboard) 
+      // rely on it to unlock features. They will clean it up.
     }
   }, []);
   
