@@ -117,8 +117,8 @@ class NOCFinderResponseSchema(BaseModel):
     rejection_reason: str = Field(description="Clear explanation of why input is invalid. Empty string if valid.")
 
     # Extracted metadata
-    role_name: str = Field(default="Unknown Role", description="Job title/role name found in the input (e.g. 'Software Engineer')")
-    company_name: str = Field(default="Unknown Company", description="Company name found in the input (e.g. 'Google'). 'Unknown Company' if not found or typed manually.")
+    role_name: str = Field(description="Job title/role name found in the input (e.g. 'Software Engineer')")
+    company_name: str = Field(description="Company name found in the input (e.g. 'Google'). 'Unknown Company' if not found or typed manually.")
 
     # Result classification
     result_type: Literal["STRONG_MATCH", "MODERATE_MATCH", "NO_MATCH"] = Field(
@@ -145,10 +145,8 @@ class NOCFinderResponseSchema(BaseModel):
 
     # CTA
     important_note: str = Field(
-        default="This is a best-match estimate. Your application may still be refused if your employment letter does not clearly demonstrate these duties.",
         description="Disclaimer note about the suggestion"
     )
     next_step: str = Field(
-        default="Run a full Employment Letter Audit to confirm eligibility and reduce refusal risk.",
         description="CTA directing user to the paid auditor"
     )
