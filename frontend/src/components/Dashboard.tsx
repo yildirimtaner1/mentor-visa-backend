@@ -1,5 +1,5 @@
 import { type FC, useEffect, useState, useRef } from 'react';
-import { useUser, SignInButton, useAuth } from '@clerk/clerk-react';
+import { useUser, SignInButton, SignUpButton, useAuth } from '@clerk/clerk-react';
 import { usePDF } from 'react-to-pdf';
 import type { AnalysisResponse, KeyRisk } from '../types';
 import { reevaluateDocument, fetchUserCredits, createCheckoutSession, consumeCreditToUnlock, saveEvaluation } from '../services/api';
@@ -731,11 +731,11 @@ export const Dashboard: FC<DashboardProps> = ({ data, onReset, onUpdate }) => {
 
                         </ul>
                         <div className="pricing-card-footer">
-                          <SignInButton mode="modal" forceRedirectUrl="/audit-employment-letter">
+                          <SignUpButton mode="modal" forceRedirectUrl="/audit-employment-letter" signInForceRedirectUrl="/audit-employment-letter">
                             <button className="pricing-btn primary" style={{ width: '100%' }}>
                               Create Free Account to Continue
                             </button>
-                          </SignInButton>
+                          </SignUpButton>
                         </div>
                       </div>
                     ) : credits > 0 ? (
