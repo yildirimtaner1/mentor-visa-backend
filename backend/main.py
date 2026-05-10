@@ -642,11 +642,37 @@ def reevaluate_document(
             return result_json
         else:
             # Default: Auditor re-evaluation
-            result_json = ai_service.analyze_document_with_ai(
-                uploaded_doc_bytes=doc_bytes,
-                file_extension=ext,
-                is_image=is_image,
-                target_noc=req.target_noc
+            page_images = []
+            user_content = ""
+            
+            if is_image:
+                user_content = "The user uploaded an image of their employment letter. Extract the job title and duties."
+                mime_type = ai_service.IMAGE_MIME_TYPES.get(ext, 'image/jpeg')
+                page_images.append((doc_bytes, mime_type))
+            elif ext == '.pdf':
+                page_images = ai_service.pdf_pages_to_images(doc_bytes)
+                extracted_text = ai_service.extract_text_from_pdf(doc_bytes)
+                user_content = f"=== EXTRACTED PDF TEXT ===\n{extracted_text}"
+            else:
+                if ext in ('.docx', '.doc'):
+                    user_content = f"=== EXTRACTED WORD TEXT ===\n{ai_service.extract_text_from_docx(doc_bytes)}"
+                else:
+                    user_content = f"=== EXTRACTED TEXT ===\n{doc_bytes.decode('utf-8', errors='replace')}"
+            
+            top_nocs = ai_service.semantic_search_nocs(user_content, top_k=20)
+            
+            if req.target_noc:
+                target_data = next((data for data in ai_service.NOC_INDEX.values() if data.get("code") == req.target_noc), None)
+                if target_data:
+                    top_nocs[req.target_noc] = target_data
+                    
+            noc_reference = json.dumps(top_nocs, ensure_ascii=False)
+            system_prompt = ai_service._build_prompt_text(noc_reference, req.target_noc)
+            
+            result_json = ai_service.audit_document_with_openai(
+                system_prompt=system_prompt,
+                user_content=user_content,
+                page_images=page_images if page_images else None
             )
             
             # Generate a unique file_id for this reevaluation so it doesn't collide
