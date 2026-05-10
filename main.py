@@ -610,11 +610,11 @@ def reevaluate_document(
                     top_nocs[req.target_noc] = target_data
                     
             noc_reference = json.dumps(top_nocs, ensure_ascii=False)
-            system_prompt = ai_service._build_prompt_text(noc_reference, req.target_noc)
+            system_prompt = ai_service.build_noc_finder_prompt(noc_reference, req.target_noc)
             
             try:
                 import openai
-                result_json = ai_service.audit_document_with_openai(
+                result_json = ai_service.find_noc_with_openai(
                     system_prompt=system_prompt,
                     user_content=f"=== USER INPUT ===\n{user_content}",
                     page_images=page_images if page_images else None
