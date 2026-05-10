@@ -2,15 +2,24 @@ import os
 import json
 import io
 import datetime
+import base64
+import numpy as np
 import fitz  # PyMuPDF
 from docx import Document as DocxDocument
 from google import genai
 from google.genai import types
 from models import AnalysisResponse
 from dotenv import load_dotenv
+from openai import OpenAI
 
 load_dotenv()
-client = genai.Client()
+
+# --- Gemini client (used by Letter Builder + ITA Strategy) ---
+gemini_client = genai.Client()
+
+# --- OpenAI client (used by NOC Finder + Auditor + OCR) ---
+_openai_api_key = os.getenv("OPENAI_API_KEY", "")
+openai_client = OpenAI(api_key=_openai_api_key) if _openai_api_key else None
 
 # Load the NOC index once at startup
 _noc_index_path = os.path.join(os.path.dirname(__file__), "noc_index.json")
@@ -18,13 +27,26 @@ with open(_noc_index_path, "r", encoding="utf-8") as f:
     NOC_INDEX = json.load(f)
 print(f"Loaded NOC index: {len(NOC_INDEX)} unit groups")
 
-# Load NOC embeddings for RAG
+# Pre-build fast lookup: NOC code -> title (used by sanitizer)
+NOC_LOOKUP = {}
+for _entry in NOC_INDEX.values():
+    _code = _entry.get("code", "")
+    if _code:
+        NOC_LOOKUP[_code] = _entry.get("title", "")
+print(f"Built NOC_LOOKUP: {len(NOC_LOOKUP)} codes")
+
+# Load NOC embeddings for RAG and pre-compute numpy matrix
 NOC_EMBEDDINGS = {}
+_NOC_EMB_MATRIX = None  # Pre-computed numpy matrix for fast similarity
+_NOC_EMB_KEYS = []      # Ordered list of index keys matching matrix rows
 _embeddings_path = os.path.join(os.path.dirname(__file__), "noc_embeddings.json")
 if os.path.exists(_embeddings_path):
     with open(_embeddings_path, "r", encoding="utf-8") as f:
         NOC_EMBEDDINGS = json.load(f)
-    print(f"Loaded NOC embeddings: {len(NOC_EMBEDDINGS)} vectors")
+    # Pre-compute numpy matrix: one np.array call instead of 516 per request
+    _NOC_EMB_KEYS = list(NOC_EMBEDDINGS.keys())
+    _NOC_EMB_MATRIX = np.array([NOC_EMBEDDINGS[k] for k in _NOC_EMB_KEYS])
+    print(f"Loaded NOC embeddings: {len(NOC_EMBEDDINGS)} vectors, matrix shape: {_NOC_EMB_MATRIX.shape}")
 else:
     print("WARNING: noc_embeddings.json not found. RAG NOC Finder will fail.")
 
@@ -492,14 +514,8 @@ def ocr_from_page_images(page_images: list[tuple[bytes, str]], max_pages: int = 
     This is a lightweight fallback for scanned PDFs where pdfminer returns no text.
     We only OCR the first few pages to keep costs low — just enough for the RAG search.
     """
-    import base64
-    from openai import OpenAI
-    
-    api_key = os.getenv("OPENAI_API_KEY")
-    if not api_key or not page_images:
+    if not openai_client or not page_images:
         return ""
-    
-    openai_client = OpenAI(api_key=api_key)
     
     content = [{"type": "text", "text": "Extract ALL text visible in this document image. Return ONLY the raw text, no commentary."}]
     for img_bytes, mime_type in page_images[:max_pages]:
@@ -524,64 +540,88 @@ def ocr_from_page_images(page_images: list[tuple[bytes, str]], max_pages: int = 
         return ""
 
 
-def semantic_search_nocs(user_text: str, top_k: int = 20) -> dict:
-    """Embed the user's text and find the top_k closest NOC codes."""
-    import numpy as np
-    from openai import OpenAI
+def extract_document_content(doc_bytes: bytes, ext: str, is_image: bool) -> tuple[str, list]:
+    """Extract text and page images from any supported document format.
     
-    api_key = os.getenv("OPENAI_API_KEY")
-    if not api_key:
-        raise ValueError("OPENAI_API_KEY is not set.")
-        
-    client = OpenAI(api_key=api_key)
+    Returns (user_content, page_images) tuple ready for RAG search and AI processing.
+    Handles scanned PDF OCR fallback automatically.
+    """
+    page_images = []
+    user_content = ""
+    
+    if is_image:
+        mime_type = IMAGE_MIME_TYPES.get(ext, 'image/jpeg')
+        page_images.append((doc_bytes, mime_type))
+        # OCR the image so RAG gets real text
+        user_content = ocr_from_page_images(page_images)
+        if not user_content.strip():
+            user_content = "The user uploaded an image of their employment letter. Extract the job title and duties."
+    elif ext == '.pdf':
+        page_images = pdf_pages_to_images(doc_bytes)
+        extracted_text = extract_text_from_pdf(doc_bytes)
+        # Scanned PDF fallback: OCR page images if pdfminer returned nothing
+        if len(extracted_text.strip()) < 50 and page_images:
+            print("[Scanned PDF] Text extraction returned <50 chars, running OCR...")
+            extracted_text = ocr_from_page_images(page_images)
+        user_content = f"=== EXTRACTED PDF TEXT ===\n{extracted_text}"
+    elif ext in ('.docx', '.doc'):
+        user_content = f"=== EXTRACTED WORD TEXT ===\n{extract_text_from_docx(doc_bytes)}"
+    else:
+        user_content = f"=== EXTRACTED TEXT ===\n{doc_bytes.decode('utf-8', errors='replace')}"
+    
+    return user_content, page_images
+
+
+def semantic_search_nocs(user_text: str, top_k: int = 30) -> dict:
+    """Embed the user's text and find the top_k closest NOC codes.
+    
+    Uses pre-computed numpy embedding matrix for fast vectorized similarity.
+    Default top_k=30 provides good coverage for alternatives with minimal cost increase.
+    """
+    if not openai_client or _NOC_EMB_MATRIX is None:
+        raise ValueError("OpenAI client or NOC embeddings not initialized.")
     
     # 1. Embed user text
-    text_to_embed = user_text[:8000] # Safe limit for embedding model
+    text_to_embed = user_text[:8000]  # Safe limit for embedding model
     if not text_to_embed.strip():
-        # Fallback if no text provided
         text_to_embed = "General professional duties"
         
-    response = client.embeddings.create(
+    response = openai_client.embeddings.create(
         model="text-embedding-3-small",
         input=[text_to_embed]
     )
     user_vector = np.array(response.data[0].embedding)
     
-    # 2. Calculate cosine similarity
-    scores = []
-    for idx_key, vector_list in NOC_EMBEDDINGS.items():
-        noc_vector = np.array(vector_list)
-        # Cosine similarity for normalized vectors is just the dot product
-        similarity = np.dot(user_vector, noc_vector)
-        scores.append((similarity, idx_key))
-        
-    # 3. Sort and get top_k
-    scores.sort(reverse=True)
-    top_idx_keys = [idx_key for _, idx_key in scores[:top_k]]
+    # 2. Vectorized cosine similarity against pre-computed matrix
+    similarities = _NOC_EMB_MATRIX @ user_vector  # (516,) dot products in one operation
     
-    # 4. Build a subset of NOC_INDEX
-    # Both NOC_INDEX and NOC_EMBEDDINGS use sequential index keys ('0', '1', '2'...).
-    # We look up the actual NOC data from NOC_INDEX using these index keys.
+    # 3. Get top_k indices using argpartition (faster than full sort for large arrays)
+    top_indices = np.argpartition(similarities, -top_k)[-top_k:]
+    top_indices = top_indices[np.argsort(similarities[top_indices])[::-1]]  # Sort the top_k
+    
+    # 4. Build a subset of NOC_INDEX using the pre-ordered key list
     top_nocs_dict = {}
-    for idx_key in top_idx_keys:
+    for idx in top_indices:
+        idx_key = _NOC_EMB_KEYS[idx]
         entry = NOC_INDEX.get(idx_key)
         if entry and "code" in entry:
             top_nocs_dict[entry["code"]] = entry
     
     return top_nocs_dict
 
-def find_noc_with_openai(system_prompt: str, user_content: str, page_images: list[tuple[bytes, str]] = None) -> dict:
-    import base64
-    from openai import OpenAI
+
+def _call_openai_structured(system_prompt: str, user_content: str, page_images: list[tuple[bytes, str]], response_format, label: str = "AI") -> dict:
+    """Unified OpenAI structured output call. Used by both NOC Finder and Auditor.
     
-    api_key = os.getenv("OPENAI_API_KEY")
-    if not api_key:
+    Args:
+        system_prompt: The system instruction prompt.
+        user_content: Extracted text content from the document.
+        page_images: Optional list of (image_bytes, mime_type) tuples for vision.
+        response_format: Pydantic model class for structured output.
+        label: Log label for debugging.
+    """
+    if not openai_client:
         raise ValueError("OPENAI_API_KEY is not set. Please configure it to use GPT-4o-mini.")
-        
-    openai_client = OpenAI(api_key=api_key)
-    
-    from models import NOCFinderResponseSchema
-    import json
     
     messages = [
         {"role": "system", "content": system_prompt}
@@ -604,11 +644,11 @@ def find_noc_with_openai(system_prompt: str, user_content: str, page_images: lis
             
     messages.append({"role": "user", "content": user_message_content})
     
-    print(f"Calling OpenAI gpt-4o-mini for NOC Finder...")
+    print(f"Calling OpenAI gpt-4o-mini for {label}...")
     completion = openai_client.beta.chat.completions.parse(
         model="gpt-4o-mini",
         messages=messages,
-        response_format=NOCFinderResponseSchema,
+        response_format=response_format,
         temperature=0.0
     )
     
@@ -616,35 +656,39 @@ def find_noc_with_openai(system_prompt: str, user_content: str, page_images: lis
     return _sanitize_noc_response(result)
 
 
+def find_noc_with_openai(system_prompt: str, user_content: str, page_images: list[tuple[bytes, str]] = None) -> dict:
+    """NOC Finder: returns NOCFinderResponseSchema."""
+    from models import NOCFinderResponseSchema
+    return _call_openai_structured(system_prompt, user_content, page_images, NOCFinderResponseSchema, "NOC Finder")
+
+
+def audit_document_with_openai(system_prompt: str, user_content: str, page_images: list[tuple[bytes, str]] = None) -> dict:
+    """Employment Auditor: returns AnalysisResponse."""
+    from models import AnalysisResponse
+    return _call_openai_structured(system_prompt, user_content, page_images, AnalysisResponse, "Auditor")
+
+
 def _sanitize_noc_response(result: dict) -> dict:
     """Post-process AI response to fix hallucinated NOC codes/titles.
     
     gpt-4o-mini sometimes invents NOC codes or pairs real codes with wrong titles.
-    This function validates every NOC code against the actual database and:
+    This function validates every NOC code against NOC_LOOKUP (pre-built at startup) and:
     - Corrects mismatched titles to the real database title
     - Removes alternative NOCs with completely fake codes
     """
-    # Build a fast lookup: code -> title
-    noc_lookup = {}
-    for entry in NOC_INDEX.values():
-        code = entry.get("code", "")
-        title = entry.get("title", "")
-        if code:
-            noc_lookup[code] = title
-    
     # --- Fix NOC Finder response format ---
     rec = result.get("recommended_noc")
     if rec and isinstance(rec, dict):
         code = rec.get("code", "")
-        if code in noc_lookup:
-            rec["title"] = noc_lookup[code]
+        if code in NOC_LOOKUP:
+            rec["title"] = NOC_LOOKUP[code]
     
     if "alternatives" in result and isinstance(result["alternatives"], list):
         cleaned = []
         for alt in result["alternatives"]:
             code = alt.get("code", "")
-            if code in noc_lookup:
-                alt["title"] = noc_lookup[code]
+            if code in NOC_LOOKUP:
+                alt["title"] = NOC_LOOKUP[code]
                 cleaned.append(alt)
             else:
                 print(f"[RAG Sanitizer] Removed hallucinated alternative NOC: {code} - {alt.get('title', '?')}")
@@ -654,67 +698,21 @@ def _sanitize_noc_response(result: dict) -> dict:
     noc_analysis = result.get("noc_analysis")
     if noc_analysis and isinstance(noc_analysis, dict):
         code = noc_analysis.get("detected_code", "")
-        if code in noc_lookup:
-            noc_analysis["detected_title"] = noc_lookup[code]
+        if code in NOC_LOOKUP:
+            noc_analysis["detected_title"] = NOC_LOOKUP[code]
         
         if "alternative_nocs" in noc_analysis and isinstance(noc_analysis["alternative_nocs"], list):
             cleaned = []
             for alt in noc_analysis["alternative_nocs"]:
                 code = alt.get("noc_code", "")
-                if code in noc_lookup:
-                    alt["noc_title"] = noc_lookup[code]
+                if code in NOC_LOOKUP:
+                    alt["noc_title"] = NOC_LOOKUP[code]
                     cleaned.append(alt)
                 else:
                     print(f"[RAG Sanitizer] Removed hallucinated alternative NOC: {code} - {alt.get('noc_title', '?')}")
             noc_analysis["alternative_nocs"] = cleaned
     
     return result
-
-
-def audit_document_with_openai(system_prompt: str, user_content: str, page_images: list[tuple[bytes, str]] = None) -> dict:
-    import base64
-    from openai import OpenAI
-    
-    api_key = os.getenv("OPENAI_API_KEY")
-    if not api_key:
-        raise ValueError("OPENAI_API_KEY is not set. Please configure it to use GPT-4o-mini.")
-        
-    openai_client = OpenAI(api_key=api_key)
-    
-    from models import AnalysisResponse
-    import json
-    
-    messages = [
-        {"role": "system", "content": system_prompt}
-    ]
-    
-    user_message_content = []
-    if user_content:
-        user_message_content.append({"type": "text", "text": user_content})
-        
-    if page_images:
-        for img_bytes, mime_type in page_images:
-            base64_img = base64.b64encode(img_bytes).decode('utf-8')
-            user_message_content.append({
-                "type": "image_url",
-                "image_url": {
-                    "url": f"data:{mime_type};base64,{base64_img}",
-                    "detail": "auto"
-                }
-            })
-            
-    messages.append({"role": "user", "content": user_message_content})
-    
-    print(f"Calling OpenAI gpt-4o-mini for Auditor...")
-    completion = openai_client.beta.chat.completions.parse(
-        model="gpt-4o-mini",
-        messages=messages,
-        response_format=AnalysisResponse,
-        temperature=0.0
-    )
-    
-    result = json.loads(completion.choices[0].message.content)
-    return _sanitize_noc_response(result)
 
 # ── Letter Builder Functions ──
 
@@ -779,7 +777,7 @@ def analyze_single_duty(user_duty: str, noc_code: str) -> dict:
     
     print(f"Analyzing duty against NOC {noc_code}: '{user_duty[:60]}...'")
     
-    response = client.models.generate_content(
+    response = gemini_client.models.generate_content(
         model='gemini-2.5-flash',
         contents=prompt,
         config=types.GenerateContentConfig(
@@ -1214,7 +1212,7 @@ RULES:
 """
 
     try:
-        response = client.models.generate_content(
+        response = gemini_client.models.generate_content(
             model="gemini-2.5-flash",
             contents=[prompt],
             config=types.GenerateContentConfig(

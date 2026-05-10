@@ -195,32 +195,9 @@ async def analyze_document_endpoint(
                 return cached
 
         # --- MIGRATION TO OPENAI RAG ---
-        page_images = []
-        user_content = ""
+        user_content, page_images = ai_service.extract_document_content(doc_bytes, ext, is_image)
         
-        if is_image:
-            mime_type = ai_service.IMAGE_MIME_TYPES.get(ext, 'image/jpeg')
-            page_images.append((doc_bytes, mime_type))
-            # OCR the image so RAG gets real text
-            user_content = ai_service.ocr_from_page_images(page_images)
-            if not user_content.strip():
-                user_content = "The user uploaded an image of their employment letter. Extract the job title and duties."
-        elif ext == '.pdf':
-            page_images = ai_service.pdf_pages_to_images(doc_bytes)
-            extracted_text = ai_service.extract_text_from_pdf(doc_bytes)
-            # Scanned PDF fallback: OCR page images if pdfminer returned nothing
-            if len(extracted_text.strip()) < 50 and page_images:
-                print("[Scanned PDF] Text extraction returned <50 chars, running OCR...")
-                extracted_text = ai_service.ocr_from_page_images(page_images)
-            user_content = f"=== EXTRACTED PDF TEXT ===\n{extracted_text}"
-        else:
-            if ext in ('.docx', '.doc'):
-                extracted_text = ai_service.extract_text_from_docx(doc_bytes)
-                user_content = f"=== EXTRACTED DOCX TEXT ===\n{extracted_text}"
-            else:
-                user_content = f"=== EXTRACTED TEXT ===\n{doc_bytes.decode('utf-8', errors='replace')}"
-        
-        top_nocs = ai_service.semantic_search_nocs(user_content, top_k=20)
+        top_nocs = ai_service.semantic_search_nocs(user_content)
         
         # Auditor Fix: Always include the target_noc in the reference sheet so the AI can evaluate against it!
         if target_noc:
@@ -582,26 +559,10 @@ def reevaluate_document(
                 original_duties = payload.get("user_input_duties", "")
                 user_content = f"Job Title: {original_title}\n\nDuties and Responsibilities:\n{original_duties}"
                 print(f"Re-evaluating text-only input: title='{original_title}', duties length={len(original_duties)}")
-            elif is_image:
-                mime_type = ai_service.IMAGE_MIME_TYPES.get(ext, 'image/jpeg')
-                page_images.append((doc_bytes, mime_type))
-                user_content = ai_service.ocr_from_page_images(page_images)
-                if not user_content.strip():
-                    user_content = "The user uploaded an image of their employment letter. Extract the job title and duties."
-            elif ext == '.pdf':
-                page_images = ai_service.pdf_pages_to_images(doc_bytes)
-                extracted_text = ai_service.extract_text_from_pdf(doc_bytes)
-                if len(extracted_text.strip()) < 50 and page_images:
-                    print("[Scanned PDF] Text extraction returned <50 chars, running OCR...")
-                    extracted_text = ai_service.ocr_from_page_images(page_images)
-                user_content = f"=== EXTRACTED PDF TEXT ===\n{extracted_text}"
             else:
-                if ext in ('.docx', '.doc'):
-                    user_content = f"=== EXTRACTED WORD TEXT ===\n{ai_service.extract_text_from_docx(doc_bytes)}"
-                else:
-                    user_content = f"=== EXTRACTED TEXT ===\n{doc_bytes.decode('utf-8', errors='replace')}"
+                user_content, page_images = ai_service.extract_document_content(doc_bytes, ext, is_image)
             
-            top_nocs = ai_service.semantic_search_nocs(user_content, top_k=20)
+            top_nocs = ai_service.semantic_search_nocs(user_content)
             
             # Auditor Fix: Always include the target_noc in the reference sheet so the AI can evaluate against it!
             if req.target_noc:
@@ -654,29 +615,9 @@ def reevaluate_document(
             return result_json
         else:
             # Default: Auditor re-evaluation
-            page_images = []
-            user_content = ""
+            user_content, page_images = ai_service.extract_document_content(doc_bytes, ext, is_image)
             
-            if is_image:
-                mime_type = ai_service.IMAGE_MIME_TYPES.get(ext, 'image/jpeg')
-                page_images.append((doc_bytes, mime_type))
-                user_content = ai_service.ocr_from_page_images(page_images)
-                if not user_content.strip():
-                    user_content = "The user uploaded an image of their employment letter. Extract the job title and duties."
-            elif ext == '.pdf':
-                page_images = ai_service.pdf_pages_to_images(doc_bytes)
-                extracted_text = ai_service.extract_text_from_pdf(doc_bytes)
-                if len(extracted_text.strip()) < 50 and page_images:
-                    print("[Scanned PDF] Text extraction returned <50 chars, running OCR...")
-                    extracted_text = ai_service.ocr_from_page_images(page_images)
-                user_content = f"=== EXTRACTED PDF TEXT ===\n{extracted_text}"
-            else:
-                if ext in ('.docx', '.doc'):
-                    user_content = f"=== EXTRACTED WORD TEXT ===\n{ai_service.extract_text_from_docx(doc_bytes)}"
-                else:
-                    user_content = f"=== EXTRACTED TEXT ===\n{doc_bytes.decode('utf-8', errors='replace')}"
-            
-            top_nocs = ai_service.semantic_search_nocs(user_content, top_k=20)
+            top_nocs = ai_service.semantic_search_nocs(user_content)
             
             if req.target_noc:
                 target_data = next((data for data in ai_service.NOC_INDEX.values() if data.get("code") == req.target_noc), None)
@@ -792,29 +733,11 @@ async def noc_finder_endpoint(
                     f.write(doc_bytes)
             
             is_image = ext in IMAGE_EXTENSIONS
-            
-            if is_image:
-                mime_type = ai_service.IMAGE_MIME_TYPES.get(ext, 'image/jpeg')
-                page_images.append((doc_bytes, mime_type))
-                user_content = ai_service.ocr_from_page_images(page_images)
-                if not user_content.strip():
-                    user_content = "The user uploaded an image of their employment letter. Extract the job title and duties."
-            elif ext == '.pdf':
-                page_images = ai_service.pdf_pages_to_images(doc_bytes)
-                extracted_text = ai_service.extract_text_from_pdf(doc_bytes)
-                if len(extracted_text.strip()) < 50 and page_images:
-                    print("[Scanned PDF] Text extraction returned <50 chars, running OCR...")
-                    extracted_text = ai_service.ocr_from_page_images(page_images)
-                user_content = f"=== EXTRACTED PDF TEXT ===\n{extracted_text}"
-            else:
-                if ext in ('.docx', '.doc'):
-                    user_content = f"=== EXTRACTED WORD TEXT ===\n{ai_service.extract_text_from_docx(doc_bytes)}"
-                else:
-                    user_content = f"=== EXTRACTED TEXT ===\n{doc_bytes.decode('utf-8', errors='replace')}"
+            user_content, page_images = ai_service.extract_document_content(doc_bytes, ext, is_image)
         else:
             user_content = f"Job Title: {job_title}\nMain Duties: {duties_description}"
 
-        top_nocs = ai_service.semantic_search_nocs(user_content, top_k=20)
+        top_nocs = ai_service.semantic_search_nocs(user_content)
         
         # Auditor Fix: Always include the target_noc in the reference sheet so the AI can evaluate against it!
         if target_noc:

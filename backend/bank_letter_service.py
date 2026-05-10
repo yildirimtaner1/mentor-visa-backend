@@ -94,7 +94,7 @@ def audit_bank_letter(doc_bytes: bytes, file_extension: str, is_image: bool) -> 
             contents.append(types.Part.from_bytes(data=img_bytes, mime_type=mime))
     
     # Call Gemini with structured output
-    response = ai_service.client.models.generate_content(
+    response = ai_service.gemini_client.models.generate_content(
         model='gemini-2.5-flash',
         contents=contents,
         config=types.GenerateContentConfig(
