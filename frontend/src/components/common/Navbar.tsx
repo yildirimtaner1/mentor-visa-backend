@@ -72,12 +72,12 @@ export const Navbar: FC = () => {
     load();
   }, [isSignedIn, getToken]);
 
-  const totalCredits = credits ? credits.noc + credits.audit + credits.builder + credits.ita : 0;
+  const totalCredits = credits ? credits.noc + credits.audit + credits.builder : 0;
 
   const creditBadgeElement = credits !== null ? (
     <div
       onClick={() => navigate('/dashboard')}
-      title={`NOC Finder: ${credits.noc} | Letter Builder: ${credits.builder} | Letter Auditor: ${credits.audit} | PR Strategy: ${credits.ita}`}
+      title={`NOC Finder: ${credits.noc} | Letter Builder: ${credits.builder} | Letter Auditor: ${credits.audit}`}
       style={{
         display: 'flex', alignItems: 'center', gap: '5px',
         background: totalCredits > 0 ? 'linear-gradient(135deg, #EEF2FF, #E0E7FF)' : '#F3F4F6',

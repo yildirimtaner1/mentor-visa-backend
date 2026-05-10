@@ -26,15 +26,6 @@ const NOC_RETARGET_MESSAGES = [
   { icon: "📊", text: "Compiling targeted results..." },
 ];
 
-const ITA_STRATEGY_MESSAGES = [
-  { icon: "🧠", text: "Analyzing your CRS profile and score..." },
-  { icon: "🔍", text: "Searching Provincial Nominee Program (PNP) pathways..." },
-  { icon: "📈", text: "Calculating optimal language test targets..." },
-  { icon: "⚖️", text: "Evaluating timeline and cost constraints..." },
-  { icon: "🎯", text: "Ranking actions by highest point impact..." },
-  { icon: "📊", text: "Compiling your personalized strategy..." },
-];
-
 const LETTER_DUTY_MESSAGES = [
   { icon: "📄", text: "Reading your duty statement..." },
   { icon: "🎯", text: "Matching against target NOC duties..." },
@@ -43,7 +34,7 @@ const LETTER_DUTY_MESSAGES = [
 ];
 
 interface DynamicLoaderProps {
-  tool: 'noc' | 'audit' | 'noc_retarget' | 'letter_duty' | 'ita_strategy';
+  tool: 'noc' | 'audit' | 'noc_retarget' | 'letter_duty';
   targetNoc?: string;
 }
 
@@ -51,16 +42,14 @@ export const DynamicLoader: FC<DynamicLoaderProps> = ({ tool, targetNoc }) => {
   const [messageIndex, setMessageIndex] = useState(0);
   const [progress, setProgress] = useState(0);
   
-  const messages = tool === 'noc' ? NOC_MESSAGES : tool === 'audit' ? AUDIT_MESSAGES : tool === 'letter_duty' ? LETTER_DUTY_MESSAGES : tool === 'ita_strategy' ? ITA_STRATEGY_MESSAGES : NOC_RETARGET_MESSAGES;
+  const messages = tool === 'noc' ? NOC_MESSAGES : tool === 'audit' ? AUDIT_MESSAGES : tool === 'letter_duty' ? LETTER_DUTY_MESSAGES : NOC_RETARGET_MESSAGES;
   const title = tool === 'noc' 
     ? 'Detecting Your NOC Code' 
     : tool === 'audit' 
       ? 'Auditing Employment Letter' 
       : tool === 'letter_duty'
         ? 'Analyzing Your Duty'
-        : tool === 'ita_strategy'
-          ? 'Building PR Strategy'
-          : `Re-evaluating Against NOC ${targetNoc || ''}`;
+        : `Re-evaluating Against NOC ${targetNoc || ''}`;
 
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect

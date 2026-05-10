@@ -12,18 +12,17 @@ export const RefundPolicyPage: FC = () => (
       <p>Thank you for using Mentor Visa. We strive to provide high-quality AI-powered analysis tools for your Canadian immigration documents.</p>
       <p>Please read this policy carefully before purchasing any credits or passes on our platform.</p>
 
-      <h2 style={{ fontSize: '1.3rem', fontWeight: 700, margin: '32px 0 12px', color: 'var(--primary-dark)' }}>1. Digital Products and No-Refund Policy</h2>
-      <p>Because Mentor Visa's products (Audit Passes and NOC Passes) are <strong>digital goods delivered instantly</strong> upon purchase, all sales are considered <strong>final and non-refundable</strong>.</p>
+      <h2 style={{ fontSize: '1.3rem', fontWeight: 700, margin: '32px 0 12px', color: 'var(--primary-dark)' }}>1. 3-Day Money-Back Guarantee</h2>
+      <p>We stand behind the quality of Mentor Visa's tools. If you purchase a subscription or an individual pass and are not satisfied with the value provided, you are eligible for a full refund within <strong>3 days (72 hours)</strong> of your original purchase.</p>
       
-      <p>Once a purchase is completed and credits are added to your account, we cannot issue a refund, even if you have not yet used the credits to unlock an evaluation. This policy aligns with industry standards for instantly accessible digital services and API-driven products.</p>
+      <p>To request a refund under this guarantee, simply email us within the 3-day window. Upon processing the refund, your premium access and credits will be revoked.</p>
 
-      <h2 style={{ fontSize: '1.3rem', fontWeight: 700, margin: '32px 0 12px', color: 'var(--primary-dark)' }}>2. Exceptions</h2>
-      <p>We may, at our sole discretion, grant a refund or account credit only under the following exceptional circumstances:</p>
+      <h2 style={{ fontSize: '1.3rem', fontWeight: 700, margin: '32px 0 12px', color: 'var(--primary-dark)' }}>2. After the 3-Day Guarantee Period</h2>
+      <p>Once the 3-day guarantee period has passed, all sales are considered <strong>final and non-refundable</strong>. We do not offer prorated refunds for partially used subscription periods or unused individual passes.</p>
+      <p>We may, at our sole discretion, grant a refund after this period only under exceptional circumstances, such as:</p>
       <ul style={{ paddingLeft: '24px', marginBottom: '16px' }}>
-        <li><strong>Technical Failure:</strong> A system error on our end prevented the delivery of the credits to your account, and our team is unable to manually resolve the issue.</li>
         <li><strong>Duplicate Billing:</strong> You were charged multiple times for the same transaction due to a payment processing error.</li>
       </ul>
-      <p>Dissatisfaction with the AI analysis results (e.g., disagreeing with a NOC matching outcome or receiving a "Non-Compliant" audit result) does <strong>not</strong> qualify as a valid reason for a refund. As stated in our Terms of Service, our AI provides estimations and informational analysis, not guaranteed outcomes.</p>
 
       <h2 style={{ fontSize: '1.3rem', fontWeight: 700, margin: '32px 0 12px', color: 'var(--primary-dark)' }}>3. Requesting an Exception</h2>
       <p>If you believe your situation qualifies for an exception under Section 2, you must contact us within <strong>48 hours</strong> of the original transaction.</p>

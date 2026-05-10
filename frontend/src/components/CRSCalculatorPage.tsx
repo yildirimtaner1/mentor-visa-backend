@@ -600,9 +600,9 @@ export const CRSCalculatorPage: FC<CRSCalculatorPageProps> = ({ onNavigate: _onN
   return (
     <div>
       <SEO 
-        title="Canada Express Entry AI Strategist 2026 | Score & Strategy Builder" 
-        description="Calculate your exact CRS score and unlock a personalized AI strategy to maximize your points for Canadian Permanent Residency."
-        keywords="CRS calculator, Express Entry points, Canada PR score, CEC eligibility, PR strategy"
+        title="Canada Express Entry CRS Calculator 2026 | Score Simulator" 
+        description="Calculate your exact CRS score and simulate scenarios to maximize your points for Canadian Permanent Residency."
+        keywords="CRS calculator, Express Entry points, Canada PR score, CEC eligibility, CRS simulator"
         canonical="/crs-calculator"
         schema={crsSchema}
       />

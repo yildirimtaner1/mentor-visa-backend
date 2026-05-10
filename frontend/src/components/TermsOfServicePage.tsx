@@ -55,8 +55,9 @@ export const TermsOfServicePage: FC = () => (
       </ul>
 
       <h2 style={{ fontSize: '1.3rem', fontWeight: 700, margin: '32px 0 12px', color: 'var(--primary-dark)' }}>6. Refund Policy</h2>
-      <p>All purchases of digital credits are <strong>final and non-refundable</strong>. Due to the instant-delivery nature of our digital products, we do not offer refunds once a purchase has been completed. By completing a purchase, you acknowledge and agree to this no-refund policy.</p>
-      <p>If you believe a charge was made in error, please contact us at <a href="mailto:info@mentorvisa.com" style={{ color: 'var(--primary-color)' }}>info@mentorvisa.com</a> within 48 hours of the transaction, and we will review your case.</p>
+      <p>We stand behind the quality of Mentor Visa's tools and offer a <strong>3-Day Money-Back Guarantee</strong>. If you are not satisfied with your purchase, you may request a full refund within 3 days (72 hours) of the transaction by contacting us.</p>
+      <p>After the 3-day guarantee period, all purchases of digital credits are considered <strong>final and non-refundable</strong>. Due to the instant-delivery nature of our digital products, we do not offer refunds after this window has closed. By completing a purchase, you acknowledge and agree to this policy.</p>
+      <p>For more details, please review our full <a href="/refund-policy" style={{ color: 'var(--primary-color)' }}>Refund Policy</a>.</p>
 
       <h2 style={{ fontSize: '1.3rem', fontWeight: 700, margin: '32px 0 12px', color: 'var(--primary-dark)' }}>7. Uploaded Content</h2>
       <ul style={{ paddingLeft: '24px', marginBottom: '16px' }}>
