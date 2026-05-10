@@ -18,6 +18,16 @@ with open(_noc_index_path, "r", encoding="utf-8") as f:
     NOC_INDEX = json.load(f)
 print(f"Loaded NOC index: {len(NOC_INDEX)} unit groups")
 
+# Load NOC embeddings for RAG
+NOC_EMBEDDINGS = {}
+_embeddings_path = os.path.join(os.path.dirname(__file__), "noc_embeddings.json")
+if os.path.exists(_embeddings_path):
+    with open(_embeddings_path, "r", encoding="utf-8") as f:
+        NOC_EMBEDDINGS = json.load(f)
+    print(f"Loaded NOC embeddings: {len(NOC_EMBEDDINGS)} vectors")
+else:
+    print("WARNING: noc_embeddings.json not found. RAG NOC Finder will fail.")
+
 # MIME type mapping for images
 IMAGE_MIME_TYPES = {
     '.jpg': 'image/jpeg',
@@ -36,16 +46,22 @@ def extract_text_from_pdf(pdf_bytes: bytes) -> str:
         text += page.get_text() + "\n"
     return text
 
-def pdf_pages_to_images(pdf_bytes: bytes) -> list[tuple[bytes, str]]:
-    """Convert each page of a PDF to a PNG image. Returns list of (image_bytes, mime_type)."""
+def pdf_pages_to_images(pdf_bytes: bytes, max_pages: int = 5) -> list[tuple[bytes, str]]:
+    """Convert each page of a PDF to a PNG image. Returns list of (image_bytes, mime_type). Limits to max_pages."""
     doc = fitz.open(stream=pdf_bytes, filetype="pdf")
     images = []
-    for page in doc:
+    
+    # Only process up to max_pages to prevent API rate limits / huge costs
+    pages_to_process = min(len(doc), max_pages)
+    
+    for i in range(pages_to_process):
+        page = doc[i]
         # Render at 2x resolution for better OCR quality
         pix = page.get_pixmap(dpi=200)
         img_bytes = pix.tobytes("png")
         images.append((img_bytes, "image/png"))
-    print(f"Converted {len(images)} PDF page(s) to images for vision processing")
+        
+    print(f"Converted {len(images)} PDF page(s) out of {len(doc)} to images for vision processing")
     return images
 
 def extract_text_from_docx(docx_bytes: bytes) -> str:
@@ -464,6 +480,90 @@ Your goal is to provide a FAST, RELIABLE, and TRUSTWORTHY NOC suggestion — not
 
 Output your analysis strictly conforming to the requested JSON schema.
 """
+
+
+def semantic_search_nocs(user_text: str, top_k: int = 20) -> dict:
+    """Embed the user's text and find the top_k closest NOC codes."""
+    import numpy as np
+    from openai import OpenAI
+    
+    api_key = os.getenv("OPENAI_API_KEY")
+    if not api_key:
+        raise ValueError("OPENAI_API_KEY is not set.")
+        
+    client = OpenAI(api_key=api_key)
+    
+    # 1. Embed user text
+    text_to_embed = user_text[:8000] # Safe limit for embedding model
+    if not text_to_embed.strip():
+        # Fallback if no text provided
+        text_to_embed = "General professional duties"
+        
+    response = client.embeddings.create(
+        model="text-embedding-3-small",
+        input=[text_to_embed]
+    )
+    user_vector = np.array(response.data[0].embedding)
+    
+    # 2. Calculate cosine similarity
+    scores = []
+    for noc_code, vector_list in NOC_EMBEDDINGS.items():
+        noc_vector = np.array(vector_list)
+        # Cosine similarity for normalized vectors is just the dot product
+        similarity = np.dot(user_vector, noc_vector)
+        scores.append((similarity, noc_code))
+        
+    # 3. Sort and get top_k
+    scores.sort(reverse=True)
+    top_noc_codes = [noc_code for _, noc_code in scores[:top_k]]
+    
+    # 4. Build a subset of NOC_INDEX
+    top_nocs_dict = {code: NOC_INDEX[code] for code in top_noc_codes if code in NOC_INDEX}
+    return top_nocs_dict
+
+def find_noc_with_openai(system_prompt: str, user_content: str, page_images: list[tuple[bytes, str]] = None) -> dict:
+    import base64
+    from openai import OpenAI
+    
+    api_key = os.getenv("OPENAI_API_KEY")
+    if not api_key:
+        raise ValueError("OPENAI_API_KEY is not set. Please configure it to use GPT-4o-mini.")
+        
+    openai_client = OpenAI(api_key=api_key)
+    
+    from models import NOCFinderResponseSchema
+    import json
+    
+    messages = [
+        {"role": "system", "content": system_prompt}
+    ]
+    
+    user_message_content = []
+    if user_content:
+        user_message_content.append({"type": "text", "text": user_content})
+        
+    if page_images:
+        for img_bytes, mime_type in page_images:
+            base64_img = base64.b64encode(img_bytes).decode('utf-8')
+            user_message_content.append({
+                "type": "image_url",
+                "image_url": {
+                    "url": f"data:{mime_type};base64,{base64_img}",
+                    "detail": "auto"
+                }
+            })
+            
+    messages.append({"role": "user", "content": user_message_content})
+    
+    print(f"Calling OpenAI gpt-4o-mini for NOC Finder...")
+    completion = openai_client.beta.chat.completions.parse(
+        model="gpt-4o-mini",
+        messages=messages,
+        response_format=NOCFinderResponseSchema,
+        temperature=0.0
+    )
+    
+    return json.loads(completion.choices[0].message.content)
 
 
 def analyze_document_with_ai(uploaded_doc_bytes: bytes, file_extension: str, is_image: bool = False, target_noc: str = None) -> dict:

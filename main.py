@@ -557,27 +557,24 @@ def reevaluate_document(
                 else:
                     user_content = f"=== EXTRACTED TEXT ===\n{doc_bytes.decode('utf-8', errors='replace')}"
             
-            noc_reference = _json.dumps(ai_service.NOC_INDEX, ensure_ascii=False)
+            top_nocs = ai_service.semantic_search_nocs(user_content, top_k=20)
+            noc_reference = _json.dumps(top_nocs, ensure_ascii=False)
             system_prompt = ai_service.build_noc_finder_prompt(noc_reference, req.target_noc)
             
-            from google.genai import types
-            contents = [system_prompt, f"=== USER INPUT ===\n{user_content}"]
-            if page_images:
-                contents.append("=== UPLOADED DOCUMENT IMAGES ===")
-                for img_bytes_chunk, mime in page_images:
-                    contents.append(types.Part.from_bytes(data=img_bytes_chunk, mime_type=mime))
-            
-            response = ai_service.client.models.generate_content(
-                model='gemini-2.5-flash',
-                contents=contents,
-                config=types.GenerateContentConfig(
-                    response_mime_type="application/json",
-                    response_schema=NOCFinderResponseSchema,
-                    temperature=0.0,
-                ),
-            )
-            
-            result_json = _json.loads(response.text)
+            try:
+                import openai
+                result_json = ai_service.find_noc_with_openai(
+                    system_prompt=system_prompt,
+                    user_content=f"=== USER INPUT ===\n{user_content}",
+                    page_images=page_images if page_images else None
+                )
+            except openai.RateLimitError:
+                raise HTTPException(status_code=429, detail="OpenAI Rate Limit Exceeded. Please try again later.")
+            except openai.APIError as e:
+                raise HTTPException(status_code=502, detail=f"OpenAI API Error: {str(e)}")
+            except Exception as e:
+                print(f"OpenAI processing error: {e}")
+                raise HTTPException(status_code=500, detail=f"AI Processing failed: {str(e)}")
             
             # Generate a unique file_id for this re-evaluation
             reeval_file_id = f"{req.file_id}_reeval_{str(uuid.uuid4())[:8]}"
@@ -730,18 +727,11 @@ async def noc_finder_endpoint(
         else:
             user_content = f"Job Title: {job_title}\nMain Duties: {duties_description}"
 
-        noc_reference = _json.dumps(ai_service.NOC_INDEX, ensure_ascii=False)
+        top_nocs = ai_service.semantic_search_nocs(user_content, top_k=20)
+        noc_reference = _json.dumps(top_nocs, ensure_ascii=False)
         
         system_prompt = ai_service.build_noc_finder_prompt(noc_reference, target_noc)
 
-        from google.genai import types
-        
-        contents = [system_prompt, f"=== USER INPUT ===\n{user_content}"]
-        if page_images:
-            contents.append("=== UPLOADED DOCUMENT IMAGES ===")
-            for img_bytes, mime in page_images:
-                contents.append(types.Part.from_bytes(data=img_bytes, mime_type=mime))
-                
         # DEV CACHE: return cached response if available
         if DEV_CACHE_MODE:
             cached = _load_cache("noc_finder")
@@ -764,17 +754,21 @@ async def noc_finder_endpoint(
                 db.commit()
                 return cached
 
-        response = ai_service.client.models.generate_content(
-            model='gemini-2.5-flash',
-            contents=contents,
-            config=types.GenerateContentConfig(
-                response_mime_type="application/json",
-                response_schema=NOCFinderResponseSchema,
-                temperature=0.0,
-            ),
-        )
-        
-        result = _json.loads(response.text)
+        try:
+            import openai
+            result = ai_service.find_noc_with_openai(
+                system_prompt=system_prompt,
+                user_content=f"=== USER INPUT ===\n{user_content}",
+                page_images=page_images if page_images else None
+            )
+        except openai.RateLimitError as e:
+            print(f"OpenAI RateLimitError details: {e.response.json() if hasattr(e, 'response') else str(e)}")
+            raise HTTPException(status_code=429, detail=f"OpenAI Rate Limit Exceeded: {str(e)}")
+        except openai.APIError as e:
+            raise HTTPException(status_code=502, detail=f"OpenAI API Error: {str(e)}")
+        except Exception as e:
+            print(f"OpenAI processing error: {e}")
+            raise HTTPException(status_code=500, detail=f"AI Processing failed: {str(e)}")
         result["stored_file_id"] = evaluation_id
         # NOC Finder is free for signed-in users
         is_signed_in = user_id and user_id != "anonymous"
