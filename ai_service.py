@@ -570,7 +570,63 @@ def find_noc_with_openai(system_prompt: str, user_content: str, page_images: lis
         temperature=0.0
     )
     
-    return json.loads(completion.choices[0].message.content)
+    result = json.loads(completion.choices[0].message.content)
+    return _sanitize_noc_response(result)
+
+
+def _sanitize_noc_response(result: dict) -> dict:
+    """Post-process AI response to fix hallucinated NOC codes/titles.
+    
+    gpt-4o-mini sometimes invents NOC codes or pairs real codes with wrong titles.
+    This function validates every NOC code against the actual database and:
+    - Corrects mismatched titles to the real database title
+    - Removes alternative NOCs with completely fake codes
+    """
+    # Build a fast lookup: code -> title
+    noc_lookup = {}
+    for entry in NOC_INDEX.values():
+        code = entry.get("code", "")
+        title = entry.get("title", "")
+        if code:
+            noc_lookup[code] = title
+    
+    # --- Fix NOC Finder response format ---
+    rec = result.get("recommended_noc")
+    if rec and isinstance(rec, dict):
+        code = rec.get("code", "")
+        if code in noc_lookup:
+            rec["title"] = noc_lookup[code]
+    
+    if "alternatives" in result and isinstance(result["alternatives"], list):
+        cleaned = []
+        for alt in result["alternatives"]:
+            code = alt.get("code", "")
+            if code in noc_lookup:
+                alt["title"] = noc_lookup[code]
+                cleaned.append(alt)
+            else:
+                print(f"[RAG Sanitizer] Removed hallucinated alternative NOC: {code} - {alt.get('title', '?')}")
+        result["alternatives"] = cleaned
+    
+    # --- Fix Auditor response format ---
+    noc_analysis = result.get("noc_analysis")
+    if noc_analysis and isinstance(noc_analysis, dict):
+        code = noc_analysis.get("detected_code", "")
+        if code in noc_lookup:
+            noc_analysis["detected_title"] = noc_lookup[code]
+        
+        if "alternative_nocs" in noc_analysis and isinstance(noc_analysis["alternative_nocs"], list):
+            cleaned = []
+            for alt in noc_analysis["alternative_nocs"]:
+                code = alt.get("noc_code", "")
+                if code in noc_lookup:
+                    alt["noc_title"] = noc_lookup[code]
+                    cleaned.append(alt)
+                else:
+                    print(f"[RAG Sanitizer] Removed hallucinated alternative NOC: {code} - {alt.get('noc_title', '?')}")
+            noc_analysis["alternative_nocs"] = cleaned
+    
+    return result
 
 
 def audit_document_with_openai(system_prompt: str, user_content: str, page_images: list[tuple[bytes, str]] = None) -> dict:
@@ -615,7 +671,8 @@ def audit_document_with_openai(system_prompt: str, user_content: str, page_image
         temperature=0.0
     )
     
-    return json.loads(completion.choices[0].message.content)
+    result = json.loads(completion.choices[0].message.content)
+    return _sanitize_noc_response(result)
 
 # ── Letter Builder Functions ──
 
