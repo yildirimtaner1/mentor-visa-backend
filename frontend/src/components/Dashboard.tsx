@@ -731,7 +731,7 @@ export const Dashboard: FC<DashboardProps> = ({ data, onReset, onUpdate }) => {
 
                         </ul>
                         <div className="pricing-card-footer">
-                          <SignUpButton mode="modal" forceRedirectUrl="/audit-employment-letter" signInForceRedirectUrl="/audit-employment-letter">
+                          <SignUpButton mode="modal" forceRedirectUrl="/audit-employment-letter" fallbackRedirectUrl="/audit-employment-letter" signInForceRedirectUrl="/audit-employment-letter" signInFallbackRedirectUrl="/audit-employment-letter">
                             <button className="pricing-btn primary" style={{ width: '100%' }}>
                               Create Free Account to Continue
                             </button>
