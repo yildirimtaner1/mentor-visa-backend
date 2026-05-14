@@ -738,6 +738,20 @@ export const Dashboard: FC<DashboardProps> = ({ data, onReset, onUpdate }) => {
                           </SignUpButton>
                         </div>
                       </div>
+                    ) : (userTier === 'starter' || userTier === 'complete') ? (
+                      <div id="paywall-overlay" className="pricing-card" style={{ background: '#ffffff', maxWidth: '400px', margin: '0 auto' }}>
+                        <div className="pricing-card-header">
+                          <div style={{ fontSize: '2.5rem', marginBottom: '0.75rem' }}>✨</div>
+                          <h3>Unlock Full Audit</h3>
+                          <p className="pricing-desc">Unlimited audits are included in your <strong>{userTier.charAt(0).toUpperCase() + userTier.slice(1)}</strong> plan.</p>
+                        </div>
+                        <div className="pricing-card-footer">
+                          <button className="pricing-btn primary" onClick={handleUnlock} disabled={isUnlocking} style={{ width: '100%' }}>
+                            {isUnlocking ? 'Unlocking...' : `Unlock Now (Included)`}
+                          </button>
+                          <p style={{ marginTop: '1rem', fontSize: '0.85rem', color: '#64748b', textAlign: 'center' }}>You have unlimited access to this tool.</p>
+                        </div>
+                      </div>
                     ) : credits > 0 ? (
                       <div id="paywall-overlay" className="pricing-card" style={{ background: '#ffffff', maxWidth: '400px', margin: '0 auto' }}>
                         <div className="pricing-card-header">

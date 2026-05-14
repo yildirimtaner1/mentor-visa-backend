@@ -53,7 +53,7 @@ export const Navbar: FC = () => {
   const location = useLocation();
 
   // Credit balance
-  const [credits, setCredits] = useState<{ noc: number; audit: number; builder: number; ita: number } | null>(null);
+  const [credits, setCredits] = useState<{ noc: number; audit: number; builder: number; ita: number; tier: string } | null>(null);
 
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect
@@ -66,30 +66,59 @@ export const Navbar: FC = () => {
         noc: c.find_noc_credits || 0, 
         audit: c.audit_letter_credits || 0,
         builder: c.letter_builder_credits || 0,
-        ita: c.ita_strategy_credits || 0
+        ita: c.ita_strategy_credits || 0,
+        tier: c.subscription_tier || 'free'
       });
     };
     load();
   }, [isSignedIn, getToken]);
 
-  const totalCredits = credits ? credits.noc + credits.audit + credits.builder : 0;
+  const isTierUnlimited = (type: 'audit' | 'builder') => {
+    if (!credits) return false;
+    if (type === 'audit') return ['starter', 'complete'].includes(credits.tier);
+    if (type === 'builder') return credits.tier === 'complete';
+    return false;
+  };
+
+  const totalCreditsDisplay = () => {
+    if (!credits) return '0 credits';
+    
+    const isAuditUnlimited = isTierUnlimited('audit');
+    const isBuilderUnlimited = isTierUnlimited('builder');
+    
+    // Calculate credits for tools NOT covered by unlimited tier
+    const otherCredits = (isAuditUnlimited ? 0 : credits.audit) + 
+                        (isBuilderUnlimited ? 0 : credits.builder) + 
+                        credits.noc + 
+                        credits.ita;
+                       
+    if (isAuditUnlimited && isBuilderUnlimited) {
+      return otherCredits > 0 ? `Unlimited + ${otherCredits} credit${otherCredits !== 1 ? 's' : ''}` : 'Unlimited Access';
+    }
+    
+    if (isAuditUnlimited || isBuilderUnlimited) {
+      return otherCredits > 0 ? `Unlimited + ${otherCredits} credit${otherCredits !== 1 ? 's' : ''}` : 'Unlimited Access';
+    }
+    
+    return `${otherCredits} credit${otherCredits !== 1 ? 's' : ''}`;
+  };
 
   const creditBadgeElement = credits !== null ? (
     <div
       onClick={() => navigate('/dashboard')}
-      title={`NOC Finder: ${credits.noc} | Letter Builder: ${credits.builder} | Letter Auditor: ${credits.audit}`}
+      title={`NOC Finder: ${credits.noc} | Letter Builder: ${isTierUnlimited('builder') ? 'Unlimited' : credits.builder} | Letter Auditor: ${isTierUnlimited('audit') ? 'Unlimited' : credits.audit}${credits.ita > 0 ? ` | ITA Strategy: ${credits.ita}` : ''}`}
       style={{
         display: 'flex', alignItems: 'center', gap: '5px',
-        background: totalCredits > 0 ? 'linear-gradient(135deg, #EEF2FF, #E0E7FF)' : '#F3F4F6',
+        background: 'linear-gradient(135deg, #EEF2FF, #E0E7FF)',
         padding: '5px 12px', borderRadius: '20px', cursor: 'pointer',
-        border: totalCredits > 0 ? '1px solid #C7D2FE' : '1px solid #E5E7EB',
+        border: '1px solid #C7D2FE',
         fontSize: '0.8rem', fontWeight: 600,
-        color: totalCredits > 0 ? '#4338CA' : '#9CA3AF',
+        color: '#4338CA',
         transition: 'all 0.2s ease',
       }}
     >
       <span style={{ fontSize: '0.9rem' }}>🎟️</span>
-      <span>{totalCredits} credit{totalCredits !== 1 ? 's' : ''}</span>
+      <span>{totalCreditsDisplay()}</span>
     </div>
   ) : null;
 
