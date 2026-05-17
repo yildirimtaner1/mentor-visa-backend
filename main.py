@@ -197,6 +197,13 @@ async def analyze_document_endpoint(
         # --- MIGRATION TO OPENAI RAG ---
         user_content, page_images = ai_service.extract_document_content(doc_bytes, ext, is_image)
         
+        # Auto-detect NOC using the NOC Finder pipeline when no target is specified.
+        # This guarantees the auditor uses the EXACT same NOC detection as the NOC Finder.
+        auto_detected = None
+        if not target_noc:
+            target_noc = ai_service.auto_detect_noc(user_content, page_images)
+            auto_detected = target_noc  # Remember this was auto-detected, not user-specified
+        
         top_nocs = ai_service.semantic_search_nocs(user_content)
         
         # Auditor Fix: Always include the target_noc in the reference sheet so the AI can evaluate against it!
@@ -212,7 +219,8 @@ async def analyze_document_endpoint(
             result_json = ai_service.audit_document_with_openai(
                 system_prompt=system_prompt,
                 user_content=user_content,
-                page_images=page_images
+                page_images=page_images,
+                auto_detected_noc=auto_detected
             )
         except Exception as e:
             raise HTTPException(status_code=500, detail=f"OpenAI analysis failed: {str(e)}")
@@ -617,20 +625,28 @@ def reevaluate_document(
             # Default: Auditor re-evaluation
             user_content, page_images = ai_service.extract_document_content(doc_bytes, ext, is_image)
             
+            # Auto-detect NOC using the NOC Finder pipeline when no target is specified.
+            effective_target = req.target_noc if (req.target_noc and req.target_noc != 'auto') else None
+            auto_detected = None
+            if not effective_target:
+                effective_target = ai_service.auto_detect_noc(user_content, page_images)
+                auto_detected = effective_target
+            
             top_nocs = ai_service.semantic_search_nocs(user_content)
             
-            if req.target_noc:
-                target_data = next((data for data in ai_service.NOC_INDEX.values() if data.get("code") == req.target_noc), None)
+            if effective_target:
+                target_data = next((data for data in ai_service.NOC_INDEX.values() if data.get("code") == effective_target), None)
                 if target_data:
-                    top_nocs[req.target_noc] = target_data
+                    top_nocs[effective_target] = target_data
                     
             noc_reference = json.dumps(top_nocs, ensure_ascii=False)
-            system_prompt = ai_service._build_prompt_text(noc_reference, req.target_noc)
+            system_prompt = ai_service._build_prompt_text(noc_reference, effective_target)
             
             result_json = ai_service.audit_document_with_openai(
                 system_prompt=system_prompt,
                 user_content=user_content,
-                page_images=page_images if page_images else None
+                page_images=page_images if page_images else None,
+                auto_detected_noc=auto_detected
             )
             
             # Generate a unique file_id for this reevaluation so it doesn't collide
