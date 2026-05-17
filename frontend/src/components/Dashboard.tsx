@@ -757,11 +757,11 @@ export const Dashboard: FC<DashboardProps> = ({ data, onReset, onUpdate }) => {
                         <div className="pricing-card-header">
                           <div style={{ fontSize: '2.5rem', marginBottom: '0.75rem' }}>✅</div>
                           <h3>Unlock Full Audit</h3>
-                          <p className="pricing-desc">You have {credits} {credits === 1 ? 'credit' : 'credits'} remaining.</p>
+                          <p className="pricing-desc">You have {credits} Audit {credits === 1 ? 'Credit' : 'Credits'} remaining.</p>
                         </div>
                         <div className="pricing-card-footer">
                           <button className="pricing-btn primary" onClick={handleUnlock} disabled={isUnlocking} style={{ width: '100%' }}>
-                            {isUnlocking ? 'Unlocking...' : `Spend 1 Credit to Unlock`}
+                            {isUnlocking ? 'Unlocking...' : `Spend 1 Audit Credit to Unlock`}
                           </button>
                           <p style={{ marginTop: '1rem', fontSize: '0.85rem', color: '#64748b', textAlign: 'center' }}>💚 3-Day Money-Back Guarantee</p>
                         </div>
