@@ -104,7 +104,9 @@ class AnalysisResponse(BaseModel):
 class RecommendedNOC(BaseModel):
     code: str = Field(description="The 5-digit NOC 2021 code (e.g. '21232')")
     title: str = Field(description="The official NOC 2021 title (e.g. 'Software developers and programmers')")
-    confidence: int = Field(description="Confidence score 0-100 for this match")
+    confidence: int = Field(description="Confidence score 0-100: must equal (duties_matched / duties_total) * 100")
+    duties_total: int = Field(description="Total number of main duties listed for this NOC in the provided database")
+    duties_matched: int = Field(description="Number of those main duties with 'strong' or 'partial' evidence in the input")
 
 class NOCFinderAlternative(BaseModel):
     code: str = Field(description="5-digit NOC 2021 code")
