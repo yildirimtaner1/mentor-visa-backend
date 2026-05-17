@@ -763,7 +763,6 @@ export const Dashboard: FC<DashboardProps> = ({ data, onReset, onUpdate }) => {
                           <button className="pricing-btn primary" onClick={handleUnlock} disabled={isUnlocking} style={{ width: '100%' }}>
                             {isUnlocking ? 'Unlocking...' : `Spend 1 Audit Credit to Unlock`}
                           </button>
-                          <p style={{ marginTop: '1rem', fontSize: '0.85rem', color: '#64748b', textAlign: 'center' }}>💚 3-Day Money-Back Guarantee</p>
                         </div>
                       </div>
                     ) : (
