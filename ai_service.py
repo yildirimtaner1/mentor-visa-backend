@@ -671,16 +671,84 @@ def semantic_search_nocs(user_text: str, top_k: int = 40) -> dict:
     if not openai_client or _NOC_EMB_MATRIX is None:
         raise ValueError("OpenAI client or NOC embeddings not initialized.")
     
-    # 1. Pre-process: strip document boilerplate that dilutes the embedding signal
-    #    (letterheads, addresses, "For Immigration Purposes", etc.)
+    # 1. Pre-process: extract DUTY-FOCUSED text for embedding.
+    #    Employment letters contain boilerplate (company name, addresses, employee bios,
+    #    "To Whom It May Concern", signatory blocks) that dilutes the embedding signal.
+    #    E.g., "Amandeep Agro Chemicals" repeated in letterhead pushes the embedding toward
+    #    agricultural NOCs even though the actual duties are retail supervision.
+    #    Strategy: extract the duty section if possible, else strip boilerplate aggressively.
     import re
     text_to_embed = user_text
     # Remove the "=== EXTRACTED ... ===" header
     text_to_embed = re.sub(r'^===.*?===\s*', '', text_to_embed)
-    # Remove common boilerplate lines (addresses, phone numbers, dates, "RE:" lines)
-    text_to_embed = re.sub(r'(?m)^.*?(PHONE|TOLL FREE|FAX|www\.|http|@).*$', '', text_to_embed)
-    text_to_embed = re.sub(r'(?m)^.*?\d{3}[- ]\d{3}[- ]\d{4}.*$', '', text_to_embed)  # phone numbers
-    text_to_embed = re.sub(r'(?m)^.*?[A-Z]\d[A-Z]\s*\d[A-Z]\d.*$', '', text_to_embed)  # postal codes
+    
+    # --- Attempt 1: Extract just the duty section from employment letters ---
+    # Look for common duty section markers in employment letters
+    duty_section = None
+    duty_markers = [
+        # Allow up to 40 chars between "duties" and "included/are/were" to handle
+        # patterns like "duties as a Supervisor included the following"
+        r'(?i)(?:duties|responsibilities|job duties|main duties|key duties|'
+        r'principal duties|role and responsibilities|scope of work|'
+        r'duties and responsibilities).{0,40}?(?:included?|are|were|as follows|'
+        r'but (?:were|are) not limited to|:)',
+    ]
+    for marker in duty_markers:
+        match = re.search(marker, text_to_embed)
+        if match:
+            # Extract from the marker to the end, then trim at common ending markers
+            section = text_to_embed[match.start():]
+            # Trim at signatory/closing markers
+            end_match = re.search(
+                r'(?i)(?:^|\n)\s*(?:if you (?:require|need|have)|sincerely|regards|'
+                r'yours truly|please (?:do not hesitate|feel free)|for verification|'
+                r'should you (?:require|need)|we wish|authorized signatory|'
+                r'managing director|human resource|HR manager)',
+                section
+            )
+            if end_match:
+                section = section[:end_match.start()]
+            duty_section = section.strip()
+            break
+    
+    # Also extract job title line if present (important context for embedding)
+    title_line = ""
+    title_match = re.search(
+        r'(?i)(?:job title|position|capacity|role|designation)\s*(?:of|as|:|-|–)?\s*(.+)',
+        text_to_embed
+    )
+    if title_match:
+        title_line = title_match.group(0).strip()[:100]
+    
+    if duty_section and len(duty_section) > 50:
+        # Use the focused duty section with the job title
+        text_to_embed = f"{title_line}\n{duty_section}" if title_line else duty_section
+        print(f"[RAG Preprocess] Extracted duty section: {len(duty_section)} chars "
+              f"(from {len(user_text)} total)")
+    else:
+        # --- Attempt 2: Aggressive boilerplate stripping ---
+        # Remove phone/email/fax lines
+        text_to_embed = re.sub(r'(?m)^.*?(PHONE|TOLL FREE|FAX|www\.|http|@).*$', '', text_to_embed)
+        text_to_embed = re.sub(r'(?m)^.*?\d{3}[- ]\d{3}[- ]\d{4}.*$', '', text_to_embed)
+        # Remove postal/zip codes (Canadian and Indian PIN codes)
+        text_to_embed = re.sub(r'(?m)^.*?[A-Z]\d[A-Z]\s*\d[A-Z]\d.*$', '', text_to_embed)
+        text_to_embed = re.sub(r'(?m)^.*?\d{6}.*$', '', text_to_embed)  # 6-digit PIN codes
+        # Remove GSTIN/tax ID lines
+        text_to_embed = re.sub(r'(?m)^.*?(?:GSTIN|GST|PAN|TIN|EIN)\s*[:#]?\s*\w+.*$', '', text_to_embed)
+        # Remove common letter boilerplate
+        text_to_embed = re.sub(r'(?im)^.*(?:to whom it may concern|this is to certify|'
+                               r'ref\.?\s*no|dated\s*:|sincerely|regards|yours truly|'
+                               r'managing director|authorized signatory|'
+                               r'if you require any|please feel free|'
+                               r'for verification purposes).*$', '', text_to_embed)
+        # Remove date lines (DD/MM/YYYY, MM.DD.YYYY, etc.)
+        text_to_embed = re.sub(r'(?m)^.*?\d{1,2}[./\-]\d{1,2}[./\-]\d{2,4}.*$', '', text_to_embed)
+        # Remove employee bio fluff (dedication, sincerity, etc.)
+        text_to_embed = re.sub(r'(?i)(?:with )?dedication,?\s*determination\s*and\s*sincerity[^.]*\.?', '', text_to_embed)
+        text_to_embed = re.sub(r'(?i)(?:we found|she was|he was) (?:her|him|them) (?:active|professional|hard)[^.]*\.?', '', text_to_embed)
+        text_to_embed = re.sub(r'(?i)(?:we are gratified|we wish)[^.]*\.?', '', text_to_embed)
+        print(f"[RAG Preprocess] No duty section found, used aggressive stripping")
+    
     text_to_embed = re.sub(r'\s+', ' ', text_to_embed).strip()
     
     text_to_embed = text_to_embed[:8000]  # Safe limit for embedding model
