@@ -1126,6 +1126,28 @@ def audit_document_with_openai(system_prompt: str, user_content: str, page_image
         
         result["noc_analysis"] = noc_analysis
     
+    # Post-process: Fix math errors from the LLM
+    # LLMs are notoriously bad at math (e.g., outputting 8 instead of 100 for 8/8 requirements).
+    # We recalculate these percentages natively to ensure 100% accuracy.
+    
+    # 1. Compliance Score (out of 8 mandatory requirements)
+    if "mandatory_requirements" in result and "compliance" in result:
+        mand_reqs = result.get("mandatory_requirements", {})
+        true_count = sum(1 for v in mand_reqs.values() if v is True)
+        result["compliance"]["score"] = int((true_count / 8.0) * 100)
+        print(f"[Auditor] Math Fix: Recalculated compliance score to {result['compliance']['score']}% ({true_count}/8)")
+        
+    # 2. Duty Coverage Percentage
+    if "noc_analysis" in result and "duties_match" in result["noc_analysis"]:
+        duties = result["noc_analysis"].get("duties_match", [])
+        if duties:
+            covered = sum(1 for d in duties if d.get("match_strength") in ["strong", "partial"])
+            new_pct = int((covered / len(duties)) * 100)
+            old_pct = result["noc_analysis"].get("duty_coverage_percentage")
+            if new_pct != old_pct:
+                print(f"[Auditor] Math Fix: Corrected duty coverage from {old_pct}% to {new_pct}% ({covered}/{len(duties)})")
+            result["noc_analysis"]["duty_coverage_percentage"] = new_pct
+
     return result
 
 
