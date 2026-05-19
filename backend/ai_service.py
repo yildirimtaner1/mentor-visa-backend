@@ -468,6 +468,26 @@ Example: A "Fire Watch Team Member" who inspects work areas for hazards and reco
 is performing SAFETY SPECIALIST duties — not firefighter duties — even though the word "fire"
 appears frequently. Always ask: "What is this person's core function?"
 
+=== FUNCTION VS. DOMAIN — MANDATORY CLASSIFICATION (DO THIS FIRST) ===
+
+BEFORE selecting any NOC, you MUST classify the applicant's PRIMARY FUNCTION into exactly
+one of these four categories based on their duties:
+
+  (A) TRADES/PRODUCTION — They physically BUILD, FABRICATE, WELD, ASSEMBLE, or INSTALL products
+  (B) INSPECTION/QC — They INSPECT, AUDIT, TEST, REVIEW CERTIFICATES, or ensure COMPLIANCE
+  (C) SUPERVISION — They MANAGE SCHEDULES, HIRE STAFF, ASSIGN WORK, or COORDINATE workers
+  (D) ENGINEERING — They DESIGN SYSTEMS, OPTIMIZE PROCESSES, or DEVELOP PROGRAMS
+
+Key verb signals:
+- "Responsible for fabrication" + "inspection and testing" + "review MTCs" → category (B), NOT (A)
+  The person is responsible for QUALITY OVERSIGHT of fabrication, not physically welding.
+- "Monitoring/witnessing welding activities" → category (B). They WATCH and VERIFY, not weld.
+- "Production planning and man-power management" → category (C) or (D), not (A).
+
+After classifying, your selected NOC MUST belong to the SAME functional category.
+If your top-ranked candidate is a trades NOC (e.g., Boilermakers) but the applicant's function
+is INSPECTION/QC, you MUST reject it and search ALL provided candidates for a QC/inspection NOC.
+
 === EMPLOYER INDUSTRY CROSS-CHECK (MANDATORY — DO THIS BEFORE FINALIZING) ===
 
 BEFORE finalizing your top NOC, verify the EMPLOYER'S INDUSTRY against the NOC's lead statement:
@@ -580,9 +600,10 @@ VALIDATION RESULT:
 - IGNORE any NOC codes written in the document by the employer. Employers frequently choose the
   wrong NOC. Your job is to independently determine the best match based on DUTIES, not to
   confirm the employer's claim.
-- Your selection MUST come from the top 5 candidates by `_duty_match_rank` unless NONE of
-  them have any relevant duties. If you pick a candidate ranked #6 or lower, you must explicitly
-  explain why all top-5 candidates were rejected.
+- Start your evaluation with the top 3 candidates by `_duty_match_rank`. If the applicant's
+  core FUNCTION (e.g., inspecting vs. building vs. supervising vs. designing) does not match
+  those candidates' duties, expand your evaluation to ALL provided candidates and briefly
+  explain why you rejected the higher-ranked options.
 - ALWAYS prefer accuracy over completeness
 - KEEP notes/explanations short and precise (1-2 sentences)
 - ENSURE consistency with IRCC-style evaluation logic
@@ -671,16 +692,93 @@ def semantic_search_nocs(user_text: str, top_k: int = 40) -> dict:
     if not openai_client or _NOC_EMB_MATRIX is None:
         raise ValueError("OpenAI client or NOC embeddings not initialized.")
     
-    # 1. Pre-process: strip document boilerplate that dilutes the embedding signal
-    #    (letterheads, addresses, "For Immigration Purposes", etc.)
+    # 1. Pre-process: extract DUTY-FOCUSED text for embedding.
+    #    Employment letters contain boilerplate (company name, addresses, employee bios,
+    #    "To Whom It May Concern", signatory blocks) that dilutes the embedding signal.
+    #    E.g., "Amandeep Agro Chemicals" repeated in letterhead pushes the embedding toward
+    #    agricultural NOCs even though the actual duties are retail supervision.
+    #    Strategy: extract the duty section if possible, else strip boilerplate aggressively.
     import re
     text_to_embed = user_text
     # Remove the "=== EXTRACTED ... ===" header
     text_to_embed = re.sub(r'^===.*?===\s*', '', text_to_embed)
-    # Remove common boilerplate lines (addresses, phone numbers, dates, "RE:" lines)
-    text_to_embed = re.sub(r'(?m)^.*?(PHONE|TOLL FREE|FAX|www\.|http|@).*$', '', text_to_embed)
-    text_to_embed = re.sub(r'(?m)^.*?\d{3}[- ]\d{3}[- ]\d{4}.*$', '', text_to_embed)  # phone numbers
-    text_to_embed = re.sub(r'(?m)^.*?[A-Z]\d[A-Z]\s*\d[A-Z]\d.*$', '', text_to_embed)  # postal codes
+    
+    # --- Attempt 1: Extract just the duty section from employment letters ---
+    # Look for common duty section markers in employment letters
+    duty_section = None
+    duty_markers = [
+        # Allow up to 40 chars between "duties" and "included/are/were" to handle
+        # patterns like "duties as a Supervisor included the following"
+        r'(?i)(?:duties|responsibilities|job duties|main duties|key duties|'
+        r'principal duties|role and responsibilities|scope of work|'
+        r'duties and responsibilities).{0,40}?(?:included?|are|were|as follows|'
+        r'but (?:were|are) not limited to|:)',
+    ]
+    for marker in duty_markers:
+        match = re.search(marker, text_to_embed)
+        if match:
+            # Extract from the marker to the end, then trim at common ending markers
+            section = text_to_embed[match.start():]
+            # Trim at signatory/closing markers
+            end_match = re.search(
+                r'(?i)(?:^|\n)\s*(?:if you (?:require|need|have)|sincerely|regards|'
+                r'yours truly|please (?:do not hesitate|feel free)|for verification|'
+                r'should you (?:require|need)|we wish|authorized signatory|'
+                r'managing director|human resource|HR manager)',
+                section
+            )
+            if end_match:
+                section = section[:end_match.start()]
+            duty_section = section.strip()
+            break
+    
+    # --- Attempt 1b: Bullet-point fallback for documents without headers ---
+    # Many employment letters (especially Indian ones) list duties as bullet points
+    # without a preamble like "duties included:". Detect these as duty sections.
+    if not duty_section or len(duty_section) <= 50:
+        bullet_lines = re.findall(r'(?m)^[\s]*[•▪●–\-]\s*.{20,}', text_to_embed)
+        if len(bullet_lines) >= 3:
+            duty_section = '\n'.join(bullet_lines)
+            print(f"[RAG Preprocess] Extracted {len(bullet_lines)} bullet-point duties as fallback")
+    
+    # Also extract job title line if present (important context for embedding)
+    title_line = ""
+    title_match = re.search(
+        r'(?i)(?:job title|position|capacity|role|designation)\s*(?:of|as|:|-|–)?\s*(.+)',
+        text_to_embed
+    )
+    if title_match:
+        title_line = title_match.group(0).strip()[:100]
+    
+    if duty_section and len(duty_section) > 50:
+        # Use the focused duty section with the job title
+        text_to_embed = f"{title_line}\n{duty_section}" if title_line else duty_section
+        print(f"[RAG Preprocess] Extracted duty section: {len(duty_section)} chars "
+              f"(from {len(user_text)} total)")
+    else:
+        # --- Attempt 2: Aggressive boilerplate stripping ---
+        # Remove phone/email/fax lines
+        text_to_embed = re.sub(r'(?m)^.*?(PHONE|TOLL FREE|FAX|www\.|http|@).*$', '', text_to_embed)
+        text_to_embed = re.sub(r'(?m)^.*?\d{3}[- ]\d{3}[- ]\d{4}.*$', '', text_to_embed)
+        # Remove postal/zip codes (Canadian and Indian PIN codes)
+        text_to_embed = re.sub(r'(?m)^.*?[A-Z]\d[A-Z]\s*\d[A-Z]\d.*$', '', text_to_embed)
+        text_to_embed = re.sub(r'(?m)^.*?\d{6}.*$', '', text_to_embed)  # 6-digit PIN codes
+        # Remove GSTIN/tax ID lines
+        text_to_embed = re.sub(r'(?m)^.*?(?:GSTIN|GST|PAN|TIN|EIN)\s*[:#]?\s*\w+.*$', '', text_to_embed)
+        # Remove common letter boilerplate
+        text_to_embed = re.sub(r'(?im)^.*(?:to whom it may concern|this is to certify|'
+                               r'ref\.?\s*no|dated\s*:|sincerely|regards|yours truly|'
+                               r'managing director|authorized signatory|'
+                               r'if you require any|please feel free|'
+                               r'for verification purposes).*$', '', text_to_embed)
+        # Remove date lines (DD/MM/YYYY, MM.DD.YYYY, etc.)
+        text_to_embed = re.sub(r'(?m)^.*?\d{1,2}[./\-]\d{1,2}[./\-]\d{2,4}.*$', '', text_to_embed)
+        # Remove employee bio fluff (dedication, sincerity, etc.)
+        text_to_embed = re.sub(r'(?i)(?:with )?dedication,?\s*determination\s*and\s*sincerity[^.]*\.?', '', text_to_embed)
+        text_to_embed = re.sub(r'(?i)(?:we found|she was|he was) (?:her|him|them) (?:active|professional|hard)[^.]*\.?', '', text_to_embed)
+        text_to_embed = re.sub(r'(?i)(?:we are gratified|we wish)[^.]*\.?', '', text_to_embed)
+        print(f"[RAG Preprocess] No duty section found, used aggressive stripping")
+    
     text_to_embed = re.sub(r'\s+', ' ', text_to_embed).strip()
     
     text_to_embed = text_to_embed[:8000]  # Safe limit for embedding model
@@ -1058,6 +1156,28 @@ def audit_document_with_openai(system_prompt: str, user_content: str, page_image
         
         result["noc_analysis"] = noc_analysis
     
+    # Post-process: Fix math errors from the LLM
+    # LLMs are notoriously bad at math (e.g., outputting 8 instead of 100 for 8/8 requirements).
+    # We recalculate these percentages natively to ensure 100% accuracy.
+    
+    # 1. Compliance Score (out of 8 mandatory requirements)
+    if "mandatory_requirements" in result and "compliance" in result:
+        mand_reqs = result.get("mandatory_requirements", {})
+        true_count = sum(1 for v in mand_reqs.values() if v is True)
+        result["compliance"]["score"] = int((true_count / 8.0) * 100)
+        print(f"[Auditor] Math Fix: Recalculated compliance score to {result['compliance']['score']}% ({true_count}/8)")
+        
+    # 2. Duty Coverage Percentage
+    if "noc_analysis" in result and "duties_match" in result["noc_analysis"]:
+        duties = result["noc_analysis"].get("duties_match", [])
+        if duties:
+            covered = sum(1 for d in duties if d.get("match_strength") in ["strong", "partial"])
+            new_pct = int((covered / len(duties)) * 100)
+            old_pct = result["noc_analysis"].get("duty_coverage_percentage")
+            if new_pct != old_pct:
+                print(f"[Auditor] Math Fix: Corrected duty coverage from {old_pct}% to {new_pct}% ({covered}/{len(duties)})")
+            result["noc_analysis"]["duty_coverage_percentage"] = new_pct
+
     return result
 
 
