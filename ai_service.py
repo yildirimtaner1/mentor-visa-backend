@@ -468,6 +468,26 @@ Example: A "Fire Watch Team Member" who inspects work areas for hazards and reco
 is performing SAFETY SPECIALIST duties — not firefighter duties — even though the word "fire"
 appears frequently. Always ask: "What is this person's core function?"
 
+=== FUNCTION VS. DOMAIN — MANDATORY CLASSIFICATION (DO THIS FIRST) ===
+
+BEFORE selecting any NOC, you MUST classify the applicant's PRIMARY FUNCTION into exactly
+one of these four categories based on their duties:
+
+  (A) TRADES/PRODUCTION — They physically BUILD, FABRICATE, WELD, ASSEMBLE, or INSTALL products
+  (B) INSPECTION/QC — They INSPECT, AUDIT, TEST, REVIEW CERTIFICATES, or ensure COMPLIANCE
+  (C) SUPERVISION — They MANAGE SCHEDULES, HIRE STAFF, ASSIGN WORK, or COORDINATE workers
+  (D) ENGINEERING — They DESIGN SYSTEMS, OPTIMIZE PROCESSES, or DEVELOP PROGRAMS
+
+Key verb signals:
+- "Responsible for fabrication" + "inspection and testing" + "review MTCs" → category (B), NOT (A)
+  The person is responsible for QUALITY OVERSIGHT of fabrication, not physically welding.
+- "Monitoring/witnessing welding activities" → category (B). They WATCH and VERIFY, not weld.
+- "Production planning and man-power management" → category (C) or (D), not (A).
+
+After classifying, your selected NOC MUST belong to the SAME functional category.
+If your top-ranked candidate is a trades NOC (e.g., Boilermakers) but the applicant's function
+is INSPECTION/QC, you MUST reject it and search ALL provided candidates for a QC/inspection NOC.
+
 === EMPLOYER INDUSTRY CROSS-CHECK (MANDATORY — DO THIS BEFORE FINALIZING) ===
 
 BEFORE finalizing your top NOC, verify the EMPLOYER'S INDUSTRY against the NOC's lead statement:
@@ -580,9 +600,10 @@ VALIDATION RESULT:
 - IGNORE any NOC codes written in the document by the employer. Employers frequently choose the
   wrong NOC. Your job is to independently determine the best match based on DUTIES, not to
   confirm the employer's claim.
-- Your selection MUST come from the top 5 candidates by `_duty_match_rank` unless NONE of
-  them have any relevant duties. If you pick a candidate ranked #6 or lower, you must explicitly
-  explain why all top-5 candidates were rejected.
+- Start your evaluation with the top 3 candidates by `_duty_match_rank`. If the applicant's
+  core FUNCTION (e.g., inspecting vs. building vs. supervising vs. designing) does not match
+  those candidates' duties, expand your evaluation to ALL provided candidates and briefly
+  explain why you rejected the higher-ranked options.
 - ALWAYS prefer accuracy over completeness
 - KEEP notes/explanations short and precise (1-2 sentences)
 - ENSURE consistency with IRCC-style evaluation logic
@@ -710,6 +731,15 @@ def semantic_search_nocs(user_text: str, top_k: int = 40) -> dict:
                 section = section[:end_match.start()]
             duty_section = section.strip()
             break
+    
+    # --- Attempt 1b: Bullet-point fallback for documents without headers ---
+    # Many employment letters (especially Indian ones) list duties as bullet points
+    # without a preamble like "duties included:". Detect these as duty sections.
+    if not duty_section or len(duty_section) <= 50:
+        bullet_lines = re.findall(r'(?m)^[\s]*[•▪●–\-]\s*.{20,}', text_to_embed)
+        if len(bullet_lines) >= 3:
+            duty_section = '\n'.join(bullet_lines)
+            print(f"[RAG Preprocess] Extracted {len(bullet_lines)} bullet-point duties as fallback")
     
     # Also extract job title line if present (important context for embedding)
     title_line = ""
