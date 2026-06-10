@@ -1,6 +1,7 @@
 import os
 import json
 import io
+import re
 import datetime
 import base64
 import numpy as np
@@ -12,6 +13,11 @@ from models import AnalysisResponse
 from dotenv import load_dotenv
 from openai import OpenAI
 
+# Load the .env that sits next to this module, so the app works regardless of the
+# current working directory (e.g. when uvicorn is launched from the repo root with
+# --app-dir). Falls back to default discovery; real OS env vars (e.g. on Render)
+# still take precedence since load_dotenv does not override existing vars.
+load_dotenv(os.path.join(os.path.dirname(__file__), ".env"))
 load_dotenv()
 
 # --- Gemini client (used by Letter Builder + ITA Strategy) ---
@@ -40,6 +46,40 @@ NOC_TITLE_TO_CODE = {}
 for _code, _title in NOC_LOOKUP.items():
     NOC_TITLE_TO_CODE[_title.lower().strip()] = _code
 print(f"Built NOC_TITLE_TO_CODE: {len(NOC_TITLE_TO_CODE)} titles")
+
+# Pre-build fast lookup: NOC code -> full index entry. NOC_INDEX is keyed by an
+# internal index key, not the code, so without this map every code->entry lookup
+# was an O(n) linear scan over all 516 entries (done several times per request).
+NOC_CODE_TO_ENTRY = {}
+for _entry in NOC_INDEX.values():
+    _code = _entry.get("code", "")
+    if _code:
+        NOC_CODE_TO_ENTRY[_code] = _entry
+print(f"Built NOC_CODE_TO_ENTRY: {len(NOC_CODE_TO_ENTRY)} entries")
+
+
+def get_noc_entry(code: str) -> dict | None:
+    """Return the full NOC index entry for a 5-digit code, or None. O(1)."""
+    return NOC_CODE_TO_ENTRY.get(code)
+
+
+# Matches employer-stated NOC references like "NOC 42201", "(NOC: 42201)",
+# "NOC Code 42201", or "NOC 42201 - Social and community service workers".
+_EMPLOYER_NOC_RE = re.compile(
+    r'(?i)\(?\s*NOC\s*[:#]?\s*\d{4,5}\s*[-–—]?\s*[^\n)]{0,80}\)?'
+)
+
+
+def strip_employer_noc_references(text: str) -> tuple[str, bool]:
+    """Redact employer-stated NOC codes from input text.
+
+    Employers frequently state an (often incorrect) NOC code in employment
+    letters; leaving it in the prompt anchors the model to that code. Returns
+    (cleaned_text, was_modified). Shared by the NOC Finder, the multi-agent
+    pipeline, and the Auditor so the redaction rule lives in one place.
+    """
+    cleaned = _EMPLOYER_NOC_RE.sub('[EMPLOYER NOC REFERENCE REDACTED]', text)
+    return cleaned, cleaned != text
 
 # Load NOC embeddings for RAG and pre-compute numpy matrix
 NOC_EMBEDDINGS = {}
@@ -85,9 +125,6 @@ if os.path.exists(_lead_emb_path) and os.path.exists(_lead_idx_path):
 else:
     _LEAD_CODE_TO_IDX = {}
     print("WARNING: Lead statement embeddings not found. Lead-weighted reranking disabled.")
-
-# Module-level state for duty-rank enforcement (populated by _duty_level_rerank)
-_LAST_DUTY_TOP5 = {}  # Top-5 duty-ranked NOCs from the last search
 
 # MIME type mapping for images
 IMAGE_MIME_TYPES = {
@@ -154,10 +191,13 @@ Step 3: Provide alternatives with lower confidence
 
 === CRITICAL: SEMANTIC MATCHING, NOT KEYWORD MATCHING ===
 Do NOT match based on surface-level keywords. Focus on the SEMANTIC MEANING of what the person actually does day-to-day.
-For example, a "Fire Watch Team Member" who inspects work areas for hazards, documents conditions, and recommends controls is performing SAFETY SPECIALIST duties — not firefighter duties — even though the word "fire" appears frequently. Always ask: "What is this person's core function?" rather than "What keywords appear most often?"
+A word that appears frequently in the letter (an industry, product, material, or setting) is NOT necessarily the person's function — a role that inspects for hazards and recommends controls is a safety function regardless of the setting. Always ask: "What is this person's core function?" rather than "What keywords appear most often?"
 
 === NO OVER-RELIANCE ON JOB TITLES ===
 Job titles are NOT determinative. Duties override titles. A "Manager" who only does clerical work is NOT performing management duties.
+
+=== MULTI-TITLE NOC GROUPS ===
+Some NOC codes cover several DISTINCT occupations under one code (e.g. "Translators, terminologists and interpreters" — an interpreter is none of the other two). When the detected NOC is such a group, evaluate the applicant ONLY against the duties of the sub-occupation they actually perform. Do NOT treat the other sub-occupations' duties as "missing" — they are NOT APPLICABLE and must be excluded entirely (do not list them in duties_match and do not count them in coverage). A perfect interpreter must not be penalized for not translating documents.
 
 === TIE-BREAKING RULE ===
 If two or more NOC codes score within 5 percentage points of each other, select the NOC whose LEAD STATEMENT most accurately describes the person's primary role. List the close runner-up as the first alternative NOC and explicitly note in the explanation that these two codes are close matches.
@@ -271,9 +311,11 @@ If all checks pass (or only SOFT_FAIL), proceed with the full analysis.
 
 === TASK 2 - DUTY EVIDENCE MAPPING (CRITICAL - This drives the decision) ===
 
-You MUST map EVERY main duty from the selected NOC against the letter's content:
+You MUST map every APPLICABLE main duty from the selected NOC against the letter's content:
 
-For `duties_match`, include ALL main duties from the NOC database - not just the ones that match.
+For `duties_match`, include all main duties from the NOC database - not just the ones that match.
+EXCEPTION (multi-title NOC groups): include only the duties of the applicant's sub-occupation;
+omit the duties belonging to the other occupations packed under the same code (see TASK 1).
 For each duty, set `match_strength`:
   - "strong" - clear semantic alignment, specific evidence quoted from the letter
   - "partial" - related language but vague or incomplete
@@ -386,10 +428,68 @@ Your role is to PROTECT the integrity of the immigration system while giving fai
 Output your analysis strictly conforming to the requested JSON schema. Be precise and evidence-based.
 """
 
-def build_noc_finder_prompt(noc_reference: str, target_noc: str = None) -> str:
+def build_noc_finder_prompt(noc_reference: str, target_noc: str = None, function_classification: dict = None) -> str:
     """Builds the NOC Finder prompt v2 — fast, reliable, IRCC-consistent NOC suggestion."""
 
     today = datetime.date.today().strftime('%B %d, %Y')
+
+    # Build function classification injection block
+    # When the Function Classifier agent has run, its output is injected as a hard
+    # constraint into the NOC selection prompt. This prevents domain bias (picking a
+    # NOC that matches the industry rather than what the person does) by
+    # pre-determining the applicant's functional role.
+    func_block = ""
+    if function_classification and not target_noc:
+        fc = function_classification
+        pf = fc.get('primary_function', 'OTHER')
+        conf = fc.get('confidence', 'low')
+        verbs = ', '.join(fc.get('key_verbs', []))
+        reasoning = fc.get('reasoning', 'N/A')
+        secondary = fc.get('secondary_function', '') or 'None'
+        func_block = f"""
+=== FUNCTION CLASSIFICATION (Pre-determined by independent agent — DO NOT override) ===
+
+An independent analysis of the applicant's duties — performed WITHOUT seeing any
+NOC candidates — classified their primary work function as:
+
+  PRIMARY FUNCTION: {pf}
+  CONFIDENCE: {conf}
+  KEY VERBS: {verbs}
+  REASONING: {reasoning}
+  SECONDARY FUNCTION: {secondary}
+
+You MUST respect this classification when selecting a NOC:
+- Your primary NOC MUST align with the {pf} functional category
+- If your top-ranked candidates by _duty_match_rank belong to a DIFFERENT functional
+  category (e.g., TRADES_PRODUCTION when the classification says INSPECTION_QC), you MUST
+  reject them and select from candidates matching the classified function
+- The ONLY exception: if the classification confidence is "low" AND you have strong
+  evidence from the duties that a different function is more appropriate, you may
+  override — but you MUST explain why in why_this_noc
+"""
+    elif not target_noc:
+        # Fallback: self-classification when Function Classifier hasn't run
+        func_block = """
+=== FUNCTION VS. DOMAIN — MANDATORY CLASSIFICATION (DO THIS FIRST) ===
+
+BEFORE selecting any NOC, you MUST classify the applicant's PRIMARY FUNCTION into exactly
+one of these four categories based on their duties:
+
+  (A) TRADES/PRODUCTION — They physically BUILD, FABRICATE, WELD, ASSEMBLE, or INSTALL products
+  (B) INSPECTION/QC — They INSPECT, AUDIT, TEST, REVIEW CERTIFICATES, or ensure COMPLIANCE
+  (C) SUPERVISION — They MANAGE SCHEDULES, HIRE STAFF, ASSIGN WORK, or COORDINATE workers
+  (D) ENGINEERING — They DESIGN SYSTEMS, OPTIMIZE PROCESSES, or DEVELOP PROGRAMS
+
+Key verb signals:
+- "Responsible for" a process usually means OVERSEEING it, not personally performing it → (B) or (C).
+- "Inspecting / testing / monitoring / verifying / witnessing" work → category (B), even when it
+  happens in a trades or production setting. They check the work; they do not build the product.
+- "Planning / scheduling / managing staff" → category (C), not (A).
+
+After classifying, your selected NOC MUST belong to the SAME functional category.
+If your top-ranked candidate belongs to a different category (e.g., a trades NOC when the applicant's
+function is INSPECTION/QC), reject it and select from the candidates that match the function.
+"""
 
     # --- Task 1 block varies for auto vs targeted evaluation ---
     if target_noc:
@@ -416,13 +516,13 @@ To compute `recommended_noc.confidence`, you MUST:
 
 These three numbers MUST be mathematically consistent. Do NOT estimate — count the duties.
 
-- Classify `result_type` based on confidence: STRONG_MATCH (≥75%), MODERATE_MATCH (60-74%), NO_MATCH (<60%).
+- Classify `result_type` based on confidence: STRONG_MATCH (≥70%), MODERATE_MATCH (45-69%), NO_MATCH (<45%).
 - `key_matches`: List the duties classified as "strong" (up to 5)
 - `key_gaps`: List the duties classified as "missing" (up to 3)
 - You may still list better fits in `alternatives`.
 """
     else:
-        task_1 = """
+        task_1 = f"""
 === TASK 1 — NOC MATCHING ===
 
 === PRE-COMPUTED DUTY COVERAGE (USE THIS DATA) ===
@@ -434,8 +534,8 @@ Each NOC entry in the database below includes machine-computed scores:
 - `_lead_statement_match`: How well the NOC's lead statement (employer type/industry) aligns
   with the user's described work (0.0-1.0). Higher = better industry match.
   CRITICAL: If two NOCs have similar duty scores but different lead_statement_match scores,
-  ALWAYS prefer the one with the higher _lead_statement_match. This prevents misclassifying
-  e.g. a collection agency worker as a bank teller.
+  ALWAYS prefer the one with the higher _lead_statement_match. This corrects cases where two
+  occupations share duties but belong to different industries.
 
 These scores were computed by comparing EACH individual NOC duty against the user's text 
 using embedding similarity. They are OBJECTIVE and should be your PRIMARY signal for 
@@ -464,43 +564,28 @@ Steps:
 
 === CRITICAL: SEMANTIC MATCHING, NOT KEYWORD MATCHING ===
 Focus on the SEMANTIC MEANING of what the person actually does day-to-day.
-Example: A "Fire Watch Team Member" who inspects work areas for hazards and recommends controls
-is performing SAFETY SPECIALIST duties — not firefighter duties — even though the word "fire"
-appears frequently. Always ask: "What is this person's core function?"
+A word that appears frequently in the letter (an industry, material, or setting) is NOT necessarily
+the person's function: a role that inspects for hazards and recommends controls is a safety function
+regardless of the setting it occurs in. Always ask: "What is this person's core function?"
 
-=== FUNCTION VS. DOMAIN — MANDATORY CLASSIFICATION (DO THIS FIRST) ===
+{func_block}
 
-BEFORE selecting any NOC, you MUST classify the applicant's PRIMARY FUNCTION into exactly
-one of these four categories based on their duties:
+=== EMPLOYER INDUSTRY CROSS-CHECK (a tie-breaker, NOT the primary test) ===
 
-  (A) TRADES/PRODUCTION — They physically BUILD, FABRICATE, WELD, ASSEMBLE, or INSTALL products
-  (B) INSPECTION/QC — They INSPECT, AUDIT, TEST, REVIEW CERTIFICATES, or ensure COMPLIANCE
-  (C) SUPERVISION — They MANAGE SCHEDULES, HIRE STAFF, ASSIGN WORK, or COORDINATE workers
-  (D) ENGINEERING — They DESIGN SYSTEMS, OPTIMIZE PROCESSES, or DEVELOP PROGRAMS
+Duties decide the NOC. Use the employer's industry only to break a tie when two NOCs fit the
+duties equally well:
+1. Identify what the employer's business actually is, from the letter's context.
+2. Read the lead statement of each tied NOC — it names the employer types where the occupation
+   is typically found.
+3. When the duty match is genuinely equal, prefer the NOC whose lead statement matches the employer.
 
-Key verb signals:
-- "Responsible for fabrication" + "inspection and testing" + "review MTCs" → category (B), NOT (A)
-  The person is responsible for QUALITY OVERSIGHT of fabrication, not physically welding.
-- "Monitoring/witnessing welding activities" → category (B). They WATCH and VERIFY, not weld.
-- "Production planning and man-power management" → category (C) or (D), not (A).
-
-After classifying, your selected NOC MUST belong to the SAME functional category.
-If your top-ranked candidate is a trades NOC (e.g., Boilermakers) but the applicant's function
-is INSPECTION/QC, you MUST reject it and search ALL provided candidates for a QC/inspection NOC.
-
-=== EMPLOYER INDUSTRY CROSS-CHECK (MANDATORY — DO THIS BEFORE FINALIZING) ===
-
-BEFORE finalizing your top NOC, verify the EMPLOYER'S INDUSTRY against the NOC's lead statement:
-1. Identify what the employer's business actually is (e.g., collection agency, bank, software company,
-   restaurant, staffing firm). Use clues from the letter: company name, address, nature of work described.
-2. Read the lead statement of your selected NOC — it lists the types of employers where this occupation
-   is typically found (e.g., "employed by banks, trust companies, credit unions").
-3. If the employer type DOES NOT appear in the lead statement, search for a NOC whose lead statement
-   explicitly includes that employer type.
-
-This is critical: two NOCs can have overlapping duty keywords but serve completely different industries.
-A person handling "delinquent accounts" at a COLLECTION AGENCY is a collection clerk, not a bank teller.
-Always prefer the NOC whose lead statement matches the actual employer.
+Two important cautions:
+- A strong DUTY match is NOT overridden by an employer-type mismatch. Do not abandon the
+  best duty-aligned NOC just because the employer setting differs from its lead statement.
+- OUTSOURCING / STAFFING / MARKETING / PROMOTIONS / CALL-CENTRE / BPO agencies: the agency's OWN
+  industry does NOT define the occupation — classify by the work actually performed, often for an
+  end client (e.g. someone at a marketing agency selling a bank's products is doing financial-product
+  sales; someone placed by a staffing agency onto a factory line is doing that factory job).
 
 === TIE-BREAKING RULE ===
 If two NOC codes score within 5 points, select the NOC whose LEAD STATEMENT most accurately
@@ -521,12 +606,11 @@ To compute `recommended_noc.confidence`, you MUST:
 These three numbers MUST be mathematically consistent. Do NOT estimate — count the duties.
 
 === MATCH CLASSIFICATION ===
-Based on computed confidence:
-- ≥75% → result_type = "STRONG_MATCH"
-- 60–74% → result_type = "MODERATE_MATCH"
-- <60% → result_type = "NO_MATCH"
+- ≥70% → result_type = "STRONG_MATCH"
+- 45–69% → result_type = "MODERATE_MATCH"
+- <45% → result_type = "NO_MATCH"
 
-If NO NOC reaches ~60%, still return the best candidate but set result_type to NO_MATCH
+If NO NOC reaches ~45%, still return the best candidate but set result_type to NO_MATCH
 and explain in `why_this_noc` that alignment is weak.
 
 === OUTPUT MAPPING ===
@@ -682,26 +766,18 @@ def extract_document_content(doc_bytes: bytes, ext: str, is_image: bool) -> tupl
     return user_content, page_images
 
 
-def semantic_search_nocs(user_text: str, top_k: int = 40) -> dict:
-    """Embed the user's text and find the top_k closest NOC codes.
+def preprocess_duties_for_embedding(user_text: str) -> str:
+    """Extract duty-focused text from employment letters/user input.
     
-    Uses pre-computed numpy embedding matrix for fast vectorized similarity.
-    Default top_k=40 provides good coverage for edge cases where the correct NOC
-    ranks just outside a narrower window (e.g., collection clerks at rank #33).
+    Strips boilerplate (addresses, dates, signatory blocks) and isolates
+    the duty section for embedding. Used by both RAG search and Function Classifier.
+    
+    Returns cleaned, duty-focused text (max 8000 chars).
     """
-    if not openai_client or _NOC_EMB_MATRIX is None:
-        raise ValueError("OpenAI client or NOC embeddings not initialized.")
-    
-    # 1. Pre-process: extract DUTY-FOCUSED text for embedding.
-    #    Employment letters contain boilerplate (company name, addresses, employee bios,
-    #    "To Whom It May Concern", signatory blocks) that dilutes the embedding signal.
-    #    E.g., "Amandeep Agro Chemicals" repeated in letterhead pushes the embedding toward
-    #    agricultural NOCs even though the actual duties are retail supervision.
-    #    Strategy: extract the duty section if possible, else strip boilerplate aggressively.
     import re
-    text_to_embed = user_text
+    text = user_text
     # Remove the "=== EXTRACTED ... ===" header
-    text_to_embed = re.sub(r'^===.*?===\s*', '', text_to_embed)
+    text = re.sub(r'^===.*?===\s*', '', text)
     
     # --- Attempt 1: Extract just the duty section from employment letters ---
     # Look for common duty section markers in employment letters
@@ -715,10 +791,10 @@ def semantic_search_nocs(user_text: str, top_k: int = 40) -> dict:
         r'but (?:were|are) not limited to|:)',
     ]
     for marker in duty_markers:
-        match = re.search(marker, text_to_embed)
+        match = re.search(marker, text)
         if match:
             # Extract from the marker to the end, then trim at common ending markers
-            section = text_to_embed[match.start():]
+            section = text[match.start():]
             # Trim at signatory/closing markers
             end_match = re.search(
                 r'(?i)(?:^|\n)\s*(?:if you (?:require|need|have)|sincerely|regards|'
@@ -733,10 +809,10 @@ def semantic_search_nocs(user_text: str, top_k: int = 40) -> dict:
             break
     
     # --- Attempt 1b: Bullet-point fallback for documents without headers ---
-    # Many employment letters (especially Indian ones) list duties as bullet points
-    # without a preamble like "duties included:". Detect these as duty sections.
+    # Some employment letters list duties as bullet points without a preamble like
+    # "duties included:". Detect these as duty sections.
     if not duty_section or len(duty_section) <= 50:
-        bullet_lines = re.findall(r'(?m)^[\s]*[•▪●–\-]\s*.{20,}', text_to_embed)
+        bullet_lines = re.findall(r'(?m)^[\s]*[•▪●–\-]\s*.{20,}', text)
         if len(bullet_lines) >= 3:
             duty_section = '\n'.join(bullet_lines)
             print(f"[RAG Preprocess] Extracted {len(bullet_lines)} bullet-point duties as fallback")
@@ -745,45 +821,63 @@ def semantic_search_nocs(user_text: str, top_k: int = 40) -> dict:
     title_line = ""
     title_match = re.search(
         r'(?i)(?:job title|position|capacity|role|designation)\s*(?:of|as|:|-|–)?\s*(.+)',
-        text_to_embed
+        text
     )
     if title_match:
         title_line = title_match.group(0).strip()[:100]
     
     if duty_section and len(duty_section) > 50:
         # Use the focused duty section with the job title
-        text_to_embed = f"{title_line}\n{duty_section}" if title_line else duty_section
+        text = f"{title_line}\n{duty_section}" if title_line else duty_section
         print(f"[RAG Preprocess] Extracted duty section: {len(duty_section)} chars "
               f"(from {len(user_text)} total)")
     else:
         # --- Attempt 2: Aggressive boilerplate stripping ---
         # Remove phone/email/fax lines
-        text_to_embed = re.sub(r'(?m)^.*?(PHONE|TOLL FREE|FAX|www\.|http|@).*$', '', text_to_embed)
-        text_to_embed = re.sub(r'(?m)^.*?\d{3}[- ]\d{3}[- ]\d{4}.*$', '', text_to_embed)
+        text = re.sub(r'(?m)^.*?(PHONE|TOLL FREE|FAX|www\.|http|@).*$', '', text)
+        text = re.sub(r'(?m)^.*?\d{3}[- ]\d{3}[- ]\d{4}.*$', '', text)
         # Remove postal/zip codes (Canadian and Indian PIN codes)
-        text_to_embed = re.sub(r'(?m)^.*?[A-Z]\d[A-Z]\s*\d[A-Z]\d.*$', '', text_to_embed)
-        text_to_embed = re.sub(r'(?m)^.*?\d{6}.*$', '', text_to_embed)  # 6-digit PIN codes
+        text = re.sub(r'(?m)^.*?[A-Z]\d[A-Z]\s*\d[A-Z]\d.*$', '', text)
+        text = re.sub(r'(?m)^.*?\d{6}.*$', '', text)  # 6-digit PIN codes
         # Remove GSTIN/tax ID lines
-        text_to_embed = re.sub(r'(?m)^.*?(?:GSTIN|GST|PAN|TIN|EIN)\s*[:#]?\s*\w+.*$', '', text_to_embed)
+        text = re.sub(r'(?m)^.*?(?:GSTIN|GST|PAN|TIN|EIN)\s*[:#]?\s*\w+.*$', '', text)
         # Remove common letter boilerplate
-        text_to_embed = re.sub(r'(?im)^.*(?:to whom it may concern|this is to certify|'
-                               r'ref\.?\s*no|dated\s*:|sincerely|regards|yours truly|'
-                               r'managing director|authorized signatory|'
-                               r'if you require any|please feel free|'
-                               r'for verification purposes).*$', '', text_to_embed)
+        text = re.sub(r'(?im)^.*(?:to whom it may concern|this is to certify|'
+                       r'ref\.?\s*no|dated\s*:|sincerely|regards|yours truly|'
+                       r'managing director|authorized signatory|'
+                       r'if you require any|please feel free|'
+                       r'for verification purposes).*$', '', text)
         # Remove date lines (DD/MM/YYYY, MM.DD.YYYY, etc.)
-        text_to_embed = re.sub(r'(?m)^.*?\d{1,2}[./\-]\d{1,2}[./\-]\d{2,4}.*$', '', text_to_embed)
-        # Remove employee bio fluff (dedication, sincerity, etc.)
-        text_to_embed = re.sub(r'(?i)(?:with )?dedication,?\s*determination\s*and\s*sincerity[^.]*\.?', '', text_to_embed)
-        text_to_embed = re.sub(r'(?i)(?:we found|she was|he was) (?:her|him|them) (?:active|professional|hard)[^.]*\.?', '', text_to_embed)
-        text_to_embed = re.sub(r'(?i)(?:we are gratified|we wish)[^.]*\.?', '', text_to_embed)
+        text = re.sub(r'(?m)^.*?\d{1,2}[./\-]\d{1,2}[./\-]\d{2,4}.*$', '', text)
         print(f"[RAG Preprocess] No duty section found, used aggressive stripping")
     
-    text_to_embed = re.sub(r'\s+', ' ', text_to_embed).strip()
+    text = re.sub(r'\s+', ' ', text).strip()
     
-    text_to_embed = text_to_embed[:8000]  # Safe limit for embedding model
-    if not text_to_embed.strip():
-        text_to_embed = "General professional duties"
+    text = text[:8000]  # Safe limit for embedding model
+    if not text.strip():
+        text = "General professional duties"
+    
+    return text
+
+
+# Number of NOC candidates the semantic search returns before reranking. Wider =
+# higher recall but larger prompts/cost. Tune via backend/tests/eval_noc.py.
+RAG_TOP_K = 40
+
+
+
+def semantic_search_nocs(user_text: str, top_k: int = RAG_TOP_K) -> dict:
+    """Embed the user's text and find the top_k closest NOC codes.
+
+    Uses pre-computed numpy embedding matrix for fast vectorized similarity.
+    The candidate window (RAG_TOP_K) trades recall against prompt size/cost; it is
+    tuned by the accuracy eval (backend/tests/eval_noc.py), not by individual cases.
+    """
+    if not openai_client or _NOC_EMB_MATRIX is None:
+        raise ValueError("OpenAI client or NOC embeddings not initialized.")
+    
+    # 1. Pre-process: extract DUTY-FOCUSED text for embedding
+    text_to_embed = preprocess_duties_for_embedding(user_text)
         
     response = openai_client.embeddings.create(
         model="text-embedding-3-small",
@@ -840,8 +934,9 @@ def _duty_level_rerank(user_vector: np.ndarray, candidates: dict, final_k: int =
     # Compute lead statement similarities using a FOCUSED duty+employer embedding.
     # The full user_vector includes boilerplate that dilutes the lead statement signal.
     # We extract duty-related lines AND employer context, then embed them together.
-    # The employer context is critical: "Gatestone & Co." is a collection agency, not a bank,
-    # and this differentiates 14202 (Collection clerks) from 64400 (Bank tellers).
+    # The employer context is critical: the employer's name/industry distinguishes
+    # occupations that share duties but operate in different industries (the same duties
+    # at different employer types can map to different NOCs).
     # Cost: 1 extra embedding call (~$0.0001).
     lead_sims = {}
     if _LEAD_EMB_MATRIX is not None and openai_client:
@@ -862,12 +957,15 @@ def _duty_level_rerank(user_vector: np.ndarray, candidates: dict, final_k: int =
                 # ALL-CAPS lines are often company names
                 employer_lines.append(stripped)
             # Duty lines
+            # Occupation-neutral action verbs + structural cues that mark a line as a
+            # duty line. Kept deliberately general — domain meaning is captured by the
+            # embeddings, so we avoid biasing toward any single occupation's vocabulary.
             duty_keywords = re.compile(
                 r'(?i)(responsible|duties|functions|tasks|include|perform|manage|develop|'
                 r'maintain|coordinate|review|prepare|process|conduct|provide|assist|'
                 r'monitor|analyze|ensure|create|implement|administer|negotiate|'
-                r'contact|collect|resolve|recommend|advise|report|overdue|account|'
-                r'client|customer|payment|delinquent|credit|invoice|repayment|'
+                r'contact|resolve|recommend|advise|report|inspect|test|operate|install|'
+                r'client|customer|'
                 r'has been employed|position of|role of|job title)',
             )
             if len(stripped) > 15 and duty_keywords.search(stripped):
@@ -951,12 +1049,151 @@ def _duty_level_rerank(user_vector: np.ndarray, candidates: dict, final_k: int =
         enriched["_lead_statement_match"] = round(lead_sim, 4)
         reranked[code] = enriched
     
-    # Store top-10 for post-processing enforcement in find_noc_with_openai
-    # (Named _LAST_DUTY_TOP5 for legacy reasons, but stores top-10 for a wider safety net)
-    global _LAST_DUTY_TOP5
-    _LAST_DUTY_TOP5 = {code: reranked[code] for code in list(reranked.keys())[:10]}
-    
+    # The reranked dict (top `final_k`, each carrying `_duty_match_rank`) is the
+    # ranking signal used by find_noc_with_openai's best-of-3 consensus. It is
+    # returned to the caller and threaded through explicitly rather than stashed in
+    # module-global state, which was not safe under concurrent requests.
     return reranked
+
+
+def semantic_duty_precision(applicant_duties: list, code: str) -> tuple:
+    """Applicant-side semantic precision of a NOC match.
+
+    For EACH applicant duty, find the maximum cosine similarity to ANY official duty of
+    `code`, then return (mean_of_those_maxes, [per_duty_max, ...]).
+
+    This answers "does each thing the applicant actually does map into this NOC?" — which is
+    the right question for classification. Crucially it is robust to MULTI-TITLE NOC groups
+    (e.g. 51114 Translators / terminologists / interpreters): an interpreter's duties all map
+    strongly to the interpreter sub-duties, and the translator/terminologist duties the person
+    does NOT do never enter the denominator. Contrast with recall-style coverage
+    (matched / total_NOC_duties), which deflates every match and collapses on multi-title groups.
+
+    Uses the pre-computed per-duty embedding matrix; one batch embedding call for the applicant
+    duties (~$0.00002). Returns (0.0, []) if embeddings/inputs are unavailable.
+    """
+    if _DUTY_EMB_MATRIX is None or code not in _DUTY_RANGES or not openai_client:
+        return (0.0, [])
+    duties = [d.strip() for d in (applicant_duties or []) if d and d.strip()][:15]
+    if not duties:
+        return (0.0, [])
+    try:
+        resp = openai_client.embeddings.create(model="text-embedding-3-small", input=duties)
+    except Exception as e:
+        print(f"[semantic_duty_precision] embedding failed: {e}")
+        return (0.0, [])
+    A = np.array([d.embedding for d in resp.data], dtype=np.float32)
+    A /= (np.linalg.norm(A, axis=1, keepdims=True) + 1e-9)
+    start, end = _DUTY_RANGES[code]
+    D = _DUTY_EMB_MATRIX[start:end].astype(np.float32)
+    D /= (np.linalg.norm(D, axis=1, keepdims=True) + 1e-9)
+    per_app_max = (A @ D.T).max(axis=1)   # best NOC duty for each applicant duty
+    return (float(per_app_max.mean()), [float(x) for x in per_app_max])
+
+
+# ── NOC match confidence — SINGLE SOURCE OF TRUTH (used by BOTH Finder and Auditor) ──
+# Calibration maps mean applicant-side per-duty similarity → 0-100%. Both tools call this one
+# function so the "NOC match confidence" they display for the same letter+code is identical.
+# Correct matches land ~0.41-0.71, wrong pairings ~0.24-0.34 (clean separation).
+SEM_FIT_FLOOR = 0.25    # mean similarity at/below this → 0% (clearly not this occupation)
+SEM_FIT_CEIL = 0.60     # mean similarity at/above this → 100%
+STRONG_DUTY_SIM = 0.40  # an individual applicant duty counts as "aligned" for the display fraction
+
+
+def noc_match_confidence(applicant_duties: list, code: str):
+    """Calibrated NOC-match confidence (0-100) + (aligned, total) display fraction for `code`,
+    based on applicant-side semantic precision. Returns None if the embedding signal is
+    unavailable, so callers can fall back to their own heuristic.
+
+    This is the ONE definition of 'how well do these duties fit this NOC', shared by the NOC
+    Finder and the Letter Auditor to keep their headline NOC confidence consistent.
+    """
+    mean_max, per = semantic_duty_precision(applicant_duties, code)
+    if not per:
+        return None
+    pct = (mean_max - SEM_FIT_FLOOR) / (SEM_FIT_CEIL - SEM_FIT_FLOOR)
+    confidence = int(min(100, max(0, round(pct * 100))))
+    aligned = sum(1 for x in per if x >= STRONG_DUTY_SIM)
+    return confidence, aligned, len(per)
+
+
+def scoped_duty_coverage(applicant_duties: list, code: str, llm_duties_match: list = None) -> dict | None:
+    """IRCC duty coverage scoped to the applicant's sub-occupation, for MULTI-TITLE NOC groups.
+
+    Many NOC codes pack several distinct occupations under one code (e.g. 51114 = translators /
+    terminologists / interpreters). Coverage against the COMBINED duty list unfairly penalizes an
+    applicant for not performing the OTHER occupations' duties. The official NOC data already stores
+    the split in `duty_groups` (each with a `sub_title`), so we deterministically:
+      1. pick the sub-group the applicant best fits (applicant-side precision), and
+      2. measure coverage against ONLY that sub-group's duties.
+
+    Numerator respects the auditor LLM's strong/partial evidence judgment where a duty can be matched
+    by text; otherwise falls back to semantic similarity. Returns None for single-title NOCs (so the
+    auditor's normal coverage is left completely untouched) or when the signal is unavailable.
+    """
+    entry = NOC_CODE_TO_ENTRY.get(code)
+    if not entry:
+        return None
+    groups = entry.get("duty_groups") or []
+    if len(groups) <= 1:                      # single-title — do NOT touch normal coverage
+        return None
+    if code not in _DUTY_RANGES or _DUTY_EMB_MATRIX is None or not openai_client:
+        return None
+    duties = [d.strip() for d in (applicant_duties or []) if d and d.strip()][:15]
+    if not duties:
+        return None
+
+    start, end = _DUTY_RANGES[code]
+    if (end - start) != sum(len(g.get("duties", [])) for g in groups):
+        return None                            # structure/embedding mismatch — bail safely
+
+    try:
+        resp = openai_client.embeddings.create(model="text-embedding-3-small", input=duties)
+    except Exception as e:
+        print(f"[scoped_duty_coverage] embedding failed: {e}")
+        return None
+    A = np.array([d.embedding for d in resp.data], dtype=np.float32)
+    A /= (np.linalg.norm(A, axis=1, keepdims=True) + 1e-9)
+    Dall = _DUTY_EMB_MATRIX[start:end].astype(np.float32)
+    Dall /= (np.linalg.norm(Dall, axis=1, keepdims=True) + 1e-9)
+
+    # Pick the best-fitting sub-group by applicant-side precision.
+    best = None
+    off = 0
+    for g in groups:
+        gd = [x for x in g.get("duties", []) if x and x.strip()]
+        n = len(g.get("duties", []))
+        if not gd:
+            off += n
+            continue
+        Dg = Dall[off:off + len(gd)]
+        off += n
+        precision = float((A @ Dg.T).max(axis=1).mean())   # how well applicant fits this sub-group
+        if best is None or precision > best["precision"]:
+            best = {"precision": precision, "sub_title": g.get("sub_title", ""), "duties": gd, "Dg": Dg}
+    if best is None:
+        return None
+
+    # Numerator: count evidenced duties in the chosen sub-group.
+    gd, Dg = best["duties"], best["Dg"]
+    sim_app = (Dg @ A.T).max(axis=1)
+    lookup = {}
+    for m in (llm_duties_match or []):
+        nd = (m.get("noc_duty", "") or "").strip().lower()
+        if nd:
+            lookup[nd] = m.get("match_strength", "")
+    covered = 0
+    for i, dt in enumerate(gd):
+        strength = lookup.get(dt.strip().lower())
+        if strength in ("strong", "partial"):
+            covered += 1
+        elif strength in ("weak", "missing"):
+            pass                                # LLM saw it and it's not evidenced
+        elif float(sim_app[i]) >= STRONG_DUTY_SIM:
+            covered += 1                        # no LLM entry to match by text — semantic fallback
+    coverage = int(round(100 * covered / len(gd)))
+    return {"coverage": coverage, "sub_title": best["sub_title"],
+            "group_size": len(gd), "covered": covered, "applicable_duties": gd}
 
 
 def _call_openai_structured(system_prompt: str, user_content: str, page_images: list[tuple[bytes, str]], response_format, label: str = "AI", seed: int = 42) -> dict:
@@ -1007,22 +1244,19 @@ def _call_openai_structured(system_prompt: str, user_content: str, page_images: 
     return _sanitize_noc_response(result)
 
 
-def find_noc_with_openai(system_prompt: str, user_content: str, page_images: list[tuple[bytes, str]] = None) -> dict:
+def find_noc_with_openai(system_prompt: str, user_content: str, page_images: list[tuple[bytes, str]] = None,
+                         ranked_candidates: dict = None) -> dict:
     """NOC Finder: returns NOCFinderResponseSchema.
-    
+
     Strips any employer-stated NOC codes from user_content before sending to the AI
     to prevent the model from deferring to often-incorrect employer classifications.
+
+    ranked_candidates: the reranked dict returned by semantic_search_nocs for THIS
+    request (each entry carries `_duty_match_rank`). Used to break best-of-3 voting
+    ties deterministically. Passing it per-call avoids shared global state.
     """
-    import re
-    # Strip employer NOC code claims — these bias the model toward wrong codes
-    # Matches patterns like: "NOC 42201", "(NOC 42201)", "NOC: 42201", "NOC Code: 42201"
-    # Also matches the title pattern: "NOC 42201 - Social and community service workers"
-    cleaned_content = re.sub(
-        r'(?i)\(?\s*NOC\s*[:#]?\s*\d{4,5}\s*[-–—]?\s*[^\n)]{0,80}\)?',
-        '[EMPLOYER NOC REFERENCE REDACTED]',
-        user_content
-    )
-    if cleaned_content != user_content:
+    cleaned_content, stripped = strip_employer_noc_references(user_content)
+    if stripped:
         print(f"[NOC Finder] Stripped employer NOC references from input to prevent bias")
     
     from models import NOCFinderResponseSchema
@@ -1049,10 +1283,11 @@ def find_noc_with_openai(system_prompt: str, user_content: str, page_images: lis
     codes = [c for _, c in votes if c]
     unique_codes = list(set(codes))
     
-    if len(unique_codes) > 1 and _LAST_DUTY_TOP5:
+    ranked_candidates = ranked_candidates or {}
+    if len(unique_codes) > 1 and ranked_candidates:
         # Votes disagree — pick the result whose NOC has the best duty+lead rank
         def get_rank(code):
-            entry = _LAST_DUTY_TOP5.get(code)
+            entry = ranked_candidates.get(code)
             return entry.get("_duty_match_rank", 999) if entry else 999
         
         best_code = min(unique_codes, key=get_rank)
@@ -1067,33 +1302,25 @@ def find_noc_with_openai(system_prompt: str, user_content: str, page_images: lis
 
 
 def auto_detect_noc(user_content: str, page_images: list[tuple[bytes, str]] = None) -> str | None:
-    """Run the NOC Finder pipeline to auto-detect the best NOC code for a document.
-    
-    Used as a pre-processing step by the auditor when no target_noc is provided.
-    This guarantees the auditor uses the EXACT same NOC detection logic as the
-    NOC Finder — same duty reranking, same employer NOC stripping, same image
-    exclusion, same prompt constraints.
-    
+    """Run the NOC Finder (v2) to auto-detect the best NOC code for a document.
+
     Returns the detected NOC code string, or None if detection fails.
-    Cost: ~$0.001-0.003 (one gpt-4o-mini call, text-only).
+    Side effect: caches the full v2 confidence on `auto_detect_noc.last_confidence` so the Auditor
+    can display the SAME NOC-match confidence the Finder would, for free (no recomputation).
     """
+    auto_detect_noc.last_confidence = None
     try:
-        top_nocs = semantic_search_nocs(user_content)
-        noc_reference = json.dumps(top_nocs, ensure_ascii=False)
-        system_prompt = build_noc_finder_prompt(noc_reference)
-        
-        result = find_noc_with_openai(
-            system_prompt=system_prompt,
-            user_content=f"=== USER INPUT ===\n{user_content}",
-            page_images=page_images  # find_noc_with_openai internally strips images
-        )
-        
-        detected_code = result.get("recommended_noc", {}).get("code")
-        detected_title = result.get("recommended_noc", {}).get("title", "?")
-        confidence = result.get("recommended_noc", {}).get("confidence", 0)
-        
-        if detected_code:
+        import noc_finder_v2
+        result = noc_finder_v2.run_noc_finder_v2(user_content, page_images)
+
+        rec = result.get("recommended_noc", {})
+        detected_code = rec.get("code")
+        detected_title = rec.get("title", "?")
+        confidence = rec.get("confidence", 0)
+
+        if detected_code and detected_code != "00000":
             print(f"[Auto-Detect NOC] Detected: {detected_code} ({detected_title}) — {confidence}% confidence")
+            auto_detect_noc.last_confidence = confidence
             return detected_code
         else:
             print("[Auto-Detect NOC] Failed to detect NOC code from result")
@@ -1111,16 +1338,11 @@ def audit_document_with_openai(system_prompt: str, user_content: str, page_image
             Employer NOC references will be stripped from the text to prevent
             the model from overriding the detected target.
     """
-    import re
     if auto_detected_noc:
         # Strip employer NOC claims to prevent the model from ignoring the auto-detected target.
         # Example: employer writes "NOC 42201" but auto-detect found 41321 is the correct match.
-        cleaned_content = re.sub(
-            r'(?i)\(?\s*NOC\s*[:#]?\s*\d{4,5}\s*[-–—]?\s*[^\n)]{0,80}\)?',
-            '[EMPLOYER NOC REFERENCE REDACTED]',
-            user_content
-        )
-        if cleaned_content != user_content:
+        cleaned_content, stripped = strip_employer_noc_references(user_content)
+        if stripped:
             print(f"[Auditor] Stripped employer NOC references (auto-detected target: {auto_detected_noc})")
         user_content = cleaned_content
     
@@ -1137,7 +1359,7 @@ def audit_document_with_openai(system_prompt: str, user_content: str, page_image
         print(f"[Auditor] Correcting detected_code: model said {model_code}, auto-detect said {auto_detected_noc}")
         
         # Get the correct title from the index
-        target_entry = next((v for v in NOC_INDEX.values() if v.get("code") == auto_detected_noc), None)
+        target_entry = NOC_CODE_TO_ENTRY.get(auto_detected_noc)
         target_title = target_entry.get("title", "") if target_entry else auto_detected_noc
         
         noc_analysis["detected_code"] = auto_detected_noc
@@ -1178,6 +1400,65 @@ def audit_document_with_openai(system_prompt: str, user_content: str, page_image
                 print(f"[Auditor] Math Fix: Corrected duty coverage from {old_pct}% to {new_pct}% ({covered}/{len(duties)})")
             result["noc_analysis"]["duty_coverage_percentage"] = new_pct
 
+    # ── NOC-match confidence: keep it IDENTICAL to what the NOC Finder shows ──
+    # Two distinct numbers, clearly separated:
+    #   • noc_match_confidence  = "is this the right NOC?" (semantic precision — same metric & value
+    #                             as the Finder, so a user sees the same % in both tools)
+    #   • duty_coverage_percentage = "does the letter EVIDENCE enough duties for IRCC?" (recall;
+    #                             drives the ACCEPT/PFL/REFUSE decision — auditor-specific)
+    na = result.get("noc_analysis")
+    if isinstance(na, dict):
+        detected = na.get("detected_code", "")
+        # Applicant duties: prefer the letter_evidence quotes the auditor mapped; fall back to the
+        # official-duty wording it matched. Used for both confidence and sub-group scoping.
+        applicant_duties = [(d.get("letter_evidence") or d.get("noc_duty") or "").strip()
+                            for d in na.get("duties_match", [])]
+        applicant_duties = [d for d in applicant_duties if d and "NOT FOUND" not in d.upper()]
+
+        # (a) NOC-match confidence — keep IDENTICAL to the NOC Finder.
+        noc_conf = None
+        if auto_detected_noc and detected == auto_detected_noc:
+            noc_conf = getattr(auto_detect_noc, "last_confidence", None)  # exact same number as Finder
+        if noc_conf is None and detected:
+            scored = noc_match_confidence(applicant_duties, detected)
+            if scored is not None:
+                noc_conf = scored[0]
+        if noc_conf is not None:
+            na["noc_match_confidence"] = noc_conf
+
+        # (b) Duty coverage — for MULTI-TITLE NOC groups, scope to the applicant's sub-occupation
+        # so a perfect (e.g.) interpreter isn't penalized for not doing translator/terminologist duties.
+        scoped = scoped_duty_coverage(applicant_duties, detected, na.get("duties_match"))
+        if scoped is not None:
+            old_cov = na.get("duty_coverage_percentage")
+            na["duty_coverage_percentage"] = scoped["coverage"]
+            na["coverage_subtitle"] = scoped["sub_title"]
+            print(f"[Auditor] Multi-title NOC {detected}: scoped duty coverage to "
+                  f"'{scoped['sub_title']}' sub-group ({scoped['covered']}/{scoped['group_size']}): "
+                  f"{old_cov}% -> {scoped['coverage']}%")
+            # Trim the duty-by-duty table + missing list to the applicable sub-group (UI clarity).
+            applicable = {d.strip().lower() for d in scoped["applicable_duties"]}
+            dm = [m for m in na.get("duties_match", [])
+                  if (m.get("noc_duty", "") or "").strip().lower() in applicable]
+            if dm:
+                na["duties_match"] = dm
+            na["missing_critical_duties"] = [
+                m.get("noc_duty", "") for m in na.get("duties_match", [])
+                if m.get("match_strength") in ("weak", "missing")
+            ]
+            # Re-derive the coverage-driven verdict — but only ever RELAX it (multi-title deflation
+            # can only have made the verdict too harsh). Compliance-driven severity is left intact.
+            cov = scoped["coverage"]
+            band = "ACCEPT" if cov >= 75 else ("PFL_RISK" if cov >= 50 else "REFUSE")
+            rank = {"REFUSE": 0, "PFL_RISK": 1, "ACCEPT": 2}
+            if rank.get(band, 0) > rank.get(result.get("decision", "REFUSE"), 0):
+                result["decision"] = band
+                ra = result.get("risk_assessment")
+                if isinstance(ra, dict):
+                    ra["overall_risk"] = {"ACCEPT": "low", "PFL_RISK": "moderate", "REFUSE": "high"}[band]
+                    ra["pfl_likelihood"] = {"ACCEPT": "low", "PFL_RISK": "medium", "REFUSE": "high"}[band]
+                print(f"[Auditor] Verdict relaxed to {band} after multi-title coverage correction.")
+
     return result
 
 
@@ -1214,39 +1495,69 @@ def _resolve_noc_code(code: str, model_title: str) -> str:
     return code
 
 
-def _sanitize_noc_response(result: dict) -> dict:
+def _sanitize_noc_response(result: dict, recompute_confidence: bool = True) -> dict:
     """Post-process AI response to fix hallucinated NOC codes/titles.
-    
+
     gpt-4o-mini sometimes invents NOC codes or pairs real codes with wrong titles.
     This function:
     - Resolves code/title mismatches by trusting the model's title (reverse lookup)
     - Removes alternative NOCs with completely fake codes
     - Validates confidence against reported duty counts
+
+    recompute_confidence:
+        True  (default, the v1 LLM path): re-derive confidence as duties_matched / duties_total
+              grounded against the official duty count — necessary because the LLM self-reports
+              these and can hallucinate.
+        False (the v2 path): the caller already computed a calibrated confidence (applicant-side
+              semantic precision) and the recall-style matched/total recompute would CLOBBER it —
+              and collapse multi-title NOC groups like 51114. Only code/title resolution runs.
     """
     # --- Fix NOC Finder response format ---
     rec = result.get("recommended_noc")
     if rec and isinstance(rec, dict):
         model_title = rec.get("title", "")
         code = rec.get("code", "")
-        
-        # Resolve code using title-to-code reverse lookup
+
+        # Resolve code using title-to-code reverse lookup (always — anti-hallucination)
         resolved_code = _resolve_noc_code(code, model_title)
         rec["code"] = resolved_code
-        
+
         # Always set title from DB (source of truth)
         if resolved_code in NOC_LOOKUP:
             rec["title"] = NOC_LOOKUP[resolved_code]
-        
-        # Validate confidence against duty counts (Fix 2b)
-        total = rec.get("duties_total", 0)
-        matched = rec.get("duties_matched", 0)
-        if total > 0:
-            calculated = round((matched / total) * 100)
-            stated = rec.get("confidence", 0)
-            if abs(calculated - stated) > 10:
-                print(f"[Sanitizer] CONFIDENCE CORRECTION: stated={stated}%, "
-                      f"calculated={calculated}% ({matched}/{total} duties). Using calculated.")
+
+        if recompute_confidence:
+            # Get actual duties total from database index if possible to prevent LLM hallucinations
+            actual_entry = NOC_CODE_TO_ENTRY.get(resolved_code)
+            if actual_entry:
+                actual_total = len(actual_entry.get("duties", []))
+                if actual_total > 0:
+                    rec["duties_total"] = actual_total
+
+            # Cap duties_matched to prevent division > 100%
+            total = rec.get("duties_total", 0)
+            matched = rec.get("duties_matched", 0)
+            if matched > total:
+                matched = total
+                rec["duties_matched"] = matched
+
+            # Calculate true confidence from database-grounded counts
+            if total > 0:
+                calculated = round((matched / total) * 100)
+                calculated = min(100, max(0, calculated))
                 rec["confidence"] = calculated
+
+            # Sync root result_type and confidence_level with the calculated confidence
+            conf = rec.get("confidence", 0)
+            if conf >= 70:
+                result["result_type"] = "STRONG_MATCH"
+                result["confidence_level"] = "high"
+            elif conf >= 45:
+                result["result_type"] = "MODERATE_MATCH"
+                result["confidence_level"] = "medium"
+            else:
+                result["result_type"] = "NO_MATCH"
+                result["confidence_level"] = "low"
     
     if "alternatives" in result and isinstance(result["alternatives"], list):
         cleaned = []
@@ -1292,10 +1603,7 @@ def _sanitize_noc_response(result: dict) -> dict:
 
 def get_noc_details(noc_code: str) -> dict | None:
     """Look up a single NOC code from the loaded index. Returns the entry or None."""
-    for entry in NOC_INDEX.values():
-        if entry.get("code") == noc_code:
-            return entry
-    return None
+    return NOC_CODE_TO_ENTRY.get(noc_code)
 
 
 def build_duty_analysis_prompt(noc_entry: dict, user_duty: str) -> str:

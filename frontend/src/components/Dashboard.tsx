@@ -466,6 +466,12 @@ export const Dashboard: FC<DashboardProps> = ({ data, onReset, onUpdate }) => {
               <div style={{ padding: '20px', background: '#FFFFFF', borderRadius: '12px', border: '1px solid #E2E8F0', display: 'flex', flexDirection: 'column', justifyContent: 'space-between', boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.02)' }}>
                 <div>
                   <div style={{ fontSize: '0.75rem', color: '#64748B', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '8px', fontWeight: 600 }}>Duty Coverage</div>
+                  {data.noc_analysis.coverage_subtitle && (
+                    <div style={{ fontSize: '0.7rem', color: '#0EA5E9', fontWeight: 600, marginBottom: '8px' }}
+                         title={`This NOC covers several occupations; coverage is measured against the "${data.noc_analysis.coverage_subtitle}" duties that match your role.`}>
+                      scoped to: {data.noc_analysis.coverage_subtitle}
+                    </div>
+                  )}
                   {!isPremiumUnlocked && <div style={{ fontSize: '0.8rem', color: '#94A3B8', marginBottom: '16px', lineHeight: 1.4 }}>Strong alignment detected with core responsibilities.</div>}
                 </div>
                 <div style={{ fontSize: '1.75rem', fontWeight: 800, color: data.noc_analysis.duty_coverage_percentage >= 75 ? '#059669' : data.noc_analysis.duty_coverage_percentage >= 50 ? '#D97706' : '#EF4444', marginTop: isPremiumUnlocked ? '8px' : '0' }}>
@@ -489,13 +495,13 @@ export const Dashboard: FC<DashboardProps> = ({ data, onReset, onUpdate }) => {
                     <div style={{ fontSize: '0.75rem', color: '#64748B', textTransform: 'uppercase', letterSpacing: '0.05em', fontWeight: 600 }}>NOC Confidence</div>
                     <span style={{ position: 'relative', display: 'inline-flex' }}>
                       <span className="noc-confidence-bulb" style={{ fontSize: '0.85rem', cursor: 'help', lineHeight: 1 }} tabIndex={0}>💡</span>
-                      <span className="noc-confidence-tooltip">How closely your duties match this NOC's official IRCC requirements.</span>
+                      <span className="noc-confidence-tooltip">How well your duties fit this NOC — the same score the NOC Finder shows for this code. (Separate from Duty Coverage, which measures how much the letter evidences for IRCC.)</span>
                     </span>
                   </div>
                   {!isPremiumUnlocked && <div style={{ fontSize: '0.8rem', color: '#94A3B8', marginBottom: '16px', lineHeight: 1.4 }}>High alignment with selected NOC based on provided duties.</div>}
                 </div>
                 <div style={{ fontSize: '1.75rem', fontWeight: 800, color: '#334155', marginTop: isPremiumUnlocked ? '8px' : '0' }}>
-                  {data.noc_analysis.confidence}%
+                  {(data.noc_analysis.noc_match_confidence || data.noc_analysis.confidence)}%
                 </div>
               </div>
               {/* Card 4: PFL Likelihood */}

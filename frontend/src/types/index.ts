@@ -27,6 +27,8 @@ export interface NOCAnalysis {
   detected_title: string;
   match_score: number;
   confidence: number;
+  noc_match_confidence?: number;  // backend-computed; same metric & value as the NOC Finder
+  coverage_subtitle?: string;     // for multi-title NOCs: the sub-occupation coverage was scoped to
   alternative_nocs: AlternativeNOC[];
   notes: string;
   lead_statement_official: string;

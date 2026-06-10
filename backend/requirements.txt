@@ -92,3 +92,4 @@ yarl==1.23.0
 zstandard==0.25.0
 openai==2.36.0
 numpy==1.26.4
+anthropic>=0.100.0

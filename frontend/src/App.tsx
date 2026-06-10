@@ -292,16 +292,19 @@ function App() {
           const noc_code = ana.detected_code || '';
           const teer = noc_code.length >= 2 ? noc_code.charAt(1) : '';
           const cec = ['0', '1', '2', '3'].includes(teer);
+          // NOC-match confidence: prefer the backend's noc_match_confidence so the Auditor shows the
+          // SAME number as the NOC Finder. Fall back to match_score for pre-existing records.
+          const nocConf = (ana.noc_match_confidence ?? ana.match_score) || 0;
           nocResult = {
             document_valid: rawData.document_valid !== false,
             rejection_reason: rawData.rejection_reason || '',
-            result_type: (ana.match_score || 0) >= 75 ? 'STRONG_MATCH' : (ana.match_score || 0) >= 60 ? 'MODERATE_MATCH' : 'NO_MATCH',
+            result_type: nocConf >= 70 ? 'STRONG_MATCH' : nocConf >= 45 ? 'MODERATE_MATCH' : 'NO_MATCH',
             noc_code,
             noc_title: ana.detected_title || '',
-            confidence: ana.match_score || 0,
+            confidence: nocConf,
             teer_category: teer,
             cec_eligible: cec,
-            confidence_level: (ana.match_score || 0) >= 75 ? 'high' : (ana.match_score || 0) >= 60 ? 'medium' : 'low',
+            confidence_level: nocConf >= 70 ? 'high' : nocConf >= 45 ? 'medium' : 'low',
             why_this_noc: ana.notes || '',
             key_matches: (ana.duties_match || []).map((d: any) => d.applicant_duty || '').filter(Boolean),
             key_gaps: [],

@@ -2,14 +2,18 @@ import type { AnalysisResponse } from '../types';
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
 
-export async function uploadDocument(file: File, targetNoc?: string): Promise<AnalysisResponse> {
+export async function uploadDocument(file: File, targetNoc?: string, token?: string): Promise<AnalysisResponse> {
   const formData = new FormData();
   formData.append('document', file);
   if (targetNoc) formData.append('target_noc', targetNoc);
   
+  const headers: Record<string, string> = {};
+  if (token) headers['Authorization'] = `Bearer ${token}`;
+  
   try {
     const response = await fetch(`${API_BASE_URL}/api/v1/analyze`, {
       method: 'POST',
+      headers,
       body: formData,
     });
     

@@ -90,7 +90,62 @@ app = FastAPI(
 # Setup Rate Limiter (IP Based)
 limiter = Limiter(key_func=get_remote_address)
 app.state.limiter = limiter
-app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+
+from fastapi.responses import JSONResponse
+
+async def custom_rate_limit_exceeded_handler(request: Request, exc: RateLimitExceeded):
+    auth_header = request.headers.get("Authorization")
+    is_signed_in = False
+    tier = "free"
+    
+    if auth_header and auth_header.startswith("Bearer "):
+        token = auth_header.split(" ")[1]
+        try:
+            import jwt
+            claims = jwt.decode(token, options={"verify_signature": False})
+            user_id = claims.get("sub")
+            if user_id:
+                is_signed_in = True
+                # Query DB to get subscription tier
+                from database import SessionLocal
+                import db_models
+                db = SessionLocal()
+                try:
+                    user = db.query(db_models.UserAccount).filter_by(user_id=user_id).first()
+                    tier = user.subscription_tier if user else "free"
+                except Exception:
+                    tier = "free"
+                finally:
+                    db.close()
+        except Exception:
+            pass
+
+    if not is_signed_in:
+        return JSONResponse(
+            status_code=429,
+            content={
+                "detail": "Rate limit exceeded (3 requests per hour). Sign up/in to increase your hourly limit to 5 searches!",
+                "action": "SIGN_IN"
+            }
+        )
+    elif tier in ("starter", "complete"):
+        return JSONResponse(
+            status_code=429,
+            content={
+                "detail": "Rate limit exceeded (15 requests per hour for premium tiers). Please try again in an hour.",
+                "action": "WAIT"
+            }
+        )
+    else:
+        return JSONResponse(
+            status_code=429,
+            content={
+                "detail": "Rate limit exceeded (5 requests per hour for free accounts). Upgrade to Optimize or Execute tier to increase your limit to 15 searches!",
+                "action": "UPGRADE"
+            }
+        )
+
+app.add_exception_handler(RateLimitExceeded, custom_rate_limit_exceeded_handler)
 
 # Register Journey routes
 from journey_routes import router as journey_router
@@ -111,8 +166,51 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+def dynamic_rate_limit_key(request: Request) -> str:
+    # Default to IP address
+    ip = get_remote_address(request)
+    
+    # Try to extract JWT token from Authorization header
+    auth_header = request.headers.get("Authorization")
+    if auth_header and auth_header.startswith("Bearer "):
+        token = auth_header.split(" ")[1]
+        try:
+            import jwt
+            # Decode without verification for speed (the route dependency performs verification)
+            claims = jwt.decode(token, options={"verify_signature": False})
+            user_id = claims.get("sub")
+            if user_id:
+                # Query DB to get user's subscription tier
+                from database import SessionLocal
+                import db_models
+                db = SessionLocal()
+                try:
+                    user = db.query(db_models.UserAccount).filter_by(user_id=user_id).first()
+                    tier = user.subscription_tier if user else "free"
+                except Exception:
+                    tier = "free"
+                finally:
+                    db.close()
+                return f"user:{user_id}:{tier}"
+        except Exception:
+            pass
+    return f"anon:{ip}"
+
+def dynamic_rate_limit_value(key: str) -> str:
+    # Dev mode bypass — don't rate-limit during local development
+    if DEV_CACHE_MODE:
+        return "1000/hour"
+    if key.startswith("anon:"):
+        return "3/hour"
+    parts = key.split(":")
+    if len(parts) >= 3:
+        tier = parts[2]
+        if tier in ("starter", "complete"):
+            return "15/hour"
+    return "5/hour"
+
 @app.post("/api/v1/analyze")
-@limiter.limit("7/hour")
+@limiter.limit(dynamic_rate_limit_value, key_func=dynamic_rate_limit_key)
 async def analyze_document_endpoint(
     request: Request,
     document: UploadFile = File(...),
@@ -208,7 +306,7 @@ async def analyze_document_endpoint(
         
         # Auditor Fix: Always include the target_noc in the reference sheet so the AI can evaluate against it!
         if target_noc:
-            target_data = next((data for data in ai_service.NOC_INDEX.values() if data.get("code") == target_noc), None)
+            target_data = ai_service.NOC_CODE_TO_ENTRY.get(target_noc)
             if target_data:
                 top_nocs[target_noc] = target_data
                 
@@ -570,24 +668,26 @@ def reevaluate_document(
             else:
                 user_content, page_images = ai_service.extract_document_content(doc_bytes, ext, is_image)
             
-            top_nocs = ai_service.semantic_search_nocs(user_content)
-            
-            # Auditor Fix: Always include the target_noc in the reference sheet so the AI can evaluate against it!
-            if req.target_noc:
-                target_data = next((data for data in ai_service.NOC_INDEX.values() if data.get("code") == req.target_noc), None)
-                if target_data:
-                    top_nocs[req.target_noc] = target_data
-                    
-            noc_reference = json.dumps(top_nocs, ensure_ascii=False)
-            system_prompt = ai_service.build_noc_finder_prompt(noc_reference, req.target_noc)
-            
             try:
                 import openai
-                result_json = ai_service.find_noc_with_openai(
-                    system_prompt=system_prompt,
-                    user_content=f"=== USER INPUT ===\n{user_content}",
-                    page_images=page_images if page_images else None
-                )
+                if not req.target_noc:
+                    # Auto-detection: multi-agent pipeline
+                    import noc_finder_v2
+                    result_json = noc_finder_v2.run_noc_finder_v2(user_content, page_images if page_images else None)
+                else:
+                    # Targeted evaluation: existing single-prompt path
+                    top_nocs = ai_service.semantic_search_nocs(user_content)
+                    target_data = ai_service.NOC_CODE_TO_ENTRY.get(req.target_noc)
+                    if target_data:
+                        top_nocs[req.target_noc] = target_data
+                    noc_reference = json.dumps(top_nocs, ensure_ascii=False)
+                    system_prompt = ai_service.build_noc_finder_prompt(noc_reference, req.target_noc)
+                    result_json = ai_service.find_noc_with_openai(
+                        system_prompt=system_prompt,
+                        user_content=f"=== USER INPUT ===\n{user_content}",
+                        page_images=page_images if page_images else None,
+                        ranked_candidates=top_nocs
+                    )
             except openai.RateLimitError:
                 raise HTTPException(status_code=429, detail="OpenAI Rate Limit Exceeded. Please try again later.")
             except openai.APIError as e:
@@ -635,7 +735,7 @@ def reevaluate_document(
             top_nocs = ai_service.semantic_search_nocs(user_content)
             
             if effective_target:
-                target_data = next((data for data in ai_service.NOC_INDEX.values() if data.get("code") == effective_target), None)
+                target_data = ai_service.NOC_CODE_TO_ENTRY.get(effective_target)
                 if target_data:
                     top_nocs[effective_target] = target_data
                     
@@ -697,7 +797,7 @@ from typing import Optional
 from models import NOCFinderResponseSchema
 
 @app.post("/api/v1/noc-finder")
-@limiter.limit("7/hour")
+@limiter.limit(dynamic_rate_limit_value, key_func=dynamic_rate_limit_key)
 async def noc_finder_endpoint(
     request: Request,
     job_title: Optional[str] = Form(None),
@@ -753,18 +853,6 @@ async def noc_finder_endpoint(
         else:
             user_content = f"Job Title: {job_title}\nMain Duties: {duties_description}"
 
-        top_nocs = ai_service.semantic_search_nocs(user_content)
-        
-        # Auditor Fix: Always include the target_noc in the reference sheet so the AI can evaluate against it!
-        if target_noc:
-            target_data = next((data for data in ai_service.NOC_INDEX.values() if data.get("code") == target_noc), None)
-            if target_data:
-                top_nocs[target_noc] = target_data
-                
-        noc_reference = json.dumps(top_nocs, ensure_ascii=False)
-        
-        system_prompt = ai_service.build_noc_finder_prompt(noc_reference, target_noc)
-
         # DEV CACHE: return cached response if available
         if DEV_CACHE_MODE:
             cached = _load_cache("noc_finder")
@@ -789,11 +877,24 @@ async def noc_finder_endpoint(
 
         try:
             import openai
-            result = ai_service.find_noc_with_openai(
-                system_prompt=system_prompt,
-                user_content=f"=== USER INPUT ===\n{user_content}",
-                page_images=page_images if page_images else None
-            )
+            if not target_noc:
+                # Auto-detection: multi-agent pipeline
+                import noc_finder_v2
+                result = noc_finder_v2.run_noc_finder_v2(user_content, page_images if page_images else None)
+            else:
+                # Targeted evaluation: existing single-prompt path
+                top_nocs = ai_service.semantic_search_nocs(user_content)
+                target_data = ai_service.NOC_CODE_TO_ENTRY.get(target_noc)
+                if target_data:
+                    top_nocs[target_noc] = target_data
+                noc_reference = json.dumps(top_nocs, ensure_ascii=False)
+                system_prompt = ai_service.build_noc_finder_prompt(noc_reference, target_noc)
+                result = ai_service.find_noc_with_openai(
+                    system_prompt=system_prompt,
+                    user_content=f"=== USER INPUT ===\n{user_content}",
+                    page_images=page_images if page_images else None,
+                    ranked_candidates=top_nocs
+                )
         except openai.RateLimitError as e:
             print(f"OpenAI RateLimitError details: {e.response.json() if hasattr(e, 'response') else str(e)}")
             raise HTTPException(status_code=429, detail=f"OpenAI Rate Limit Exceeded: {str(e)}")

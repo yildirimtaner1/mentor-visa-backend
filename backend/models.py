@@ -25,6 +25,8 @@ class NOCAnalysis(BaseModel):
     detected_title: str = Field(description="The official NOC 2021 title for the detected code")
     match_score: int = Field(description="Overall duty coverage percentage (0-100). Count how many of the NOC's main duties are demonstrated in the letter.")
     confidence: int = Field(description="How confident are you in this NOC selection (0-100). A low match_score with high confidence means you're sure this IS the right NOC but the letter is weak.")
+    noc_match_confidence: int = Field(default=0, description="Populated by the backend (NOT the model): the SAME NOC-match confidence the NOC Finder reports for this code, so both tools agree. Leave as 0; the server overwrites it.")
+    coverage_subtitle: str = Field(default="", description="Populated by the backend (NOT the model): for multi-title NOC groups, the sub-occupation that duty coverage was scoped to (e.g. 'Interpreters'). Empty for single-title NOCs.")
     alternative_nocs: List[AlternativeNOC] = Field(description="Secondary NOC codes that also match well (>= 50%). If none, pass an empty list.")
     notes: str = Field(description="Explanation of why this NOC was selected, and what key duties are missing or weak")
     lead_statement_official: str = Field(description="The exact lead statement from the official NOC 2021 database for the detected code")
@@ -124,7 +126,7 @@ class NOCFinderResponseSchema(BaseModel):
 
     # Result classification
     result_type: Literal["STRONG_MATCH", "MODERATE_MATCH", "NO_MATCH"] = Field(
-        description="STRONG_MATCH if >=75% duty alignment, MODERATE_MATCH if 60-74%, NO_MATCH if <60%"
+        description="STRONG_MATCH if >=70% duty alignment, MODERATE_MATCH if 45-69%, NO_MATCH if <45%"
     )
 
     # Primary recommendation
@@ -152,3 +154,102 @@ class NOCFinderResponseSchema(BaseModel):
     next_step: str = Field(
         description="CTA directing user to the paid auditor"
     )
+
+
+# ── Function Classifier Schema (Multi-Agent NOC Finder) ──
+# Independent agent that classifies the applicant's primary work function
+# WITHOUT seeing any NOC candidates — prevents domain bias.
+
+class FunctionClassifierResponse(BaseModel):
+    """Output of the Function Classifier agent — determines the applicant's primary function
+    without seeing any NOC candidates, preventing domain-biased classification."""
+    primary_function: Literal[
+        "TRADES_PRODUCTION",       # Physically builds, fabricates, welds, assembles, installs
+        "INSPECTION_QC",           # Inspects, audits, tests, reviews certificates, ensures compliance
+        "SUPERVISION_MANAGEMENT",  # Manages schedules, hires staff, assigns work, coordinates
+        "ENGINEERING_DESIGN",      # Designs systems, optimizes processes, develops programs
+        "ADMINISTRATIVE_CLERICAL", # Data entry, filing, scheduling, correspondence
+        "SALES_SERVICE",           # Customer service, sales, account management
+        "HEALTHCARE",              # Patient care, clinical duties, therapy
+        "EDUCATION_TRAINING",      # Teaching, curriculum development, training
+        "IT_TECHNICAL",            # Software development, system administration, technical support
+        "TRANSPORT_LOGISTICS",     # Driving, shipping, warehousing, supply chain
+        "OTHER"                    # Doesn't fit neatly into the above
+    ] = Field(description="The applicant's primary work function based on their duties")
+    confidence: Literal["high", "medium", "low"] = Field(
+        description="Confidence in the classification: high = duties clearly point to one function, "
+                    "medium = some ambiguity, low = genuinely unclear"
+    )
+    reasoning: str = Field(description="1-2 sentence explanation of why this function was selected")
+    key_verbs: List[str] = Field(description="3-6 action verbs from the duties that most strongly indicate the function")
+    secondary_function: str = Field(
+        default="",
+        description="If the role is clearly hybrid (e.g., supervises AND inspects), "
+                    "note the secondary function here. Empty string if role is clearly single-function."
+    )
+
+
+# ── Multi-Agent NOC Finder: Agent Schemas ──
+
+_FUNCTION_CATEGORIES = Literal[
+    "TRADES_PRODUCTION", "INSPECTION_QC", "SUPERVISION_MANAGEMENT",
+    "ENGINEERING_DESIGN", "ADMINISTRATIVE_CLERICAL", "SALES_SERVICE",
+    "HEALTHCARE", "EDUCATION_TRAINING", "IT_TECHNICAL",
+    "TRANSPORT_LOGISTICS", "OTHER"
+]
+
+class ExtractionAgentResponse(BaseModel):
+    """Agent 1: Structured extraction from employment document."""
+    document_valid: bool = Field(description="True if input is a valid employment document with duties")
+    rejection_reason: str = Field(default="", description="Why document is invalid. Empty if valid.")
+    job_title: str = Field(default="", description="Normalized job title")
+    main_duties: List[str] = Field(default_factory=list, description="List of distinct duties extracted")
+    skills: List[str] = Field(default_factory=list, description="Skills/certifications/tools mentioned")
+    industry: str = Field(default="", description="Employer's industry sector")
+    employer_name: str = Field(default="Unknown", description="Employer name if found")
+    employer_type: str = Field(default="", description="e.g. Manufacturing plant, Collection agency, Hospital")
+    management_level: Literal["none", "supervisory", "management", "senior_management"] = Field(
+        default="none", description="Applicant's management/supervision level"
+    )
+    primary_function: _FUNCTION_CATEGORIES = Field(
+        default="OTHER", description="Applicant's primary work function based on their duties"
+    )
+    key_observations: str = Field(default="", description="Important classification notes")
+    location: Literal["canada", "outside_canada", "unknown"] = Field(
+        default="unknown", description="Where the work experience was gained"
+    )
+
+# ── Hybrid Multi-Model Pipeline: Voter + Resolver Schemas ──
+
+class VoterAgentResponse(BaseModel):
+    """Output of each voter agent (GPT or Claude) — independent NOC recommendation."""
+    noc_code: str = Field(description="5-digit NOC 2021 code")
+    title: str = Field(description="Official NOC 2021 title")
+    reasoning: str = Field(description="2-3 sentences: why this NOC is the best match")
+    teer_level: int = Field(description="TEER level 0-5, must match the code's 2nd digit")
+    function_classification: _FUNCTION_CATEGORIES = Field(
+        default="OTHER", description="The applicant's primary function as determined by this voter"
+    )
+    level_of_function: Literal["support_clerical", "execution_decision", "management_strategic"] = Field(
+        description="Role level: support_clerical (TEER 3-5), execution_decision (TEER 1-2), management_strategic (TEER 0-1)"
+    )
+    ircc_defensible: bool = Field(description="Would IRCC accept this classification based on the duties?")
+    duties_matched: int = Field(description="Number of official NOC duties with evidence in applicant's work")
+    duties_total: int = Field(description="Total main duties for the recommended NOC")
+    rejected_alternative_code: str = Field(default="", description="NOC code of the top rejected alternative")
+    rejected_alternative_reason: str = Field(default="", description="Why the alternative was rejected")
+
+
+class ResolverAgentResponse(BaseModel):
+    """Output of the resolver agent — only invoked when GPT and Claude disagree."""
+    winning_code: str = Field(description="The NOC code that wins the conflict")
+    winning_title: str = Field(description="Official title of the winning NOC")
+    reasoning: str = Field(description="2-3 sentences: why this code is the better choice")
+    conflict_resolution: str = Field(
+        description="Detailed explanation: what each voter picked, why they disagreed, and why the winner is correct"
+    )
+    duties_matched: int = Field(description="Duties matched for the winning NOC")
+    duties_total: int = Field(description="Total duties for the winning NOC")
+    losing_code: str = Field(description="The NOC code that lost")
+    losing_reason: str = Field(description="Why the losing code was rejected")
+

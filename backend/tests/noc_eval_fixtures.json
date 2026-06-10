@@ -1,0 +1,66 @@
+[
+  {
+    "id": "software-developer",
+    "expected_noc": "21232",
+    "expected_title_contains": "software",
+    "text": "Letter of Employment. This confirms that the employee held the position of Software Developer. Duties included: designing, developing and testing web application features in Python and JavaScript; writing and reviewing code; debugging production issues; collaborating with product managers to define requirements; and maintaining CI/CD pipelines."
+  },
+  {
+    "id": "collection-clerk",
+    "expected_noc": "14202",
+    "expected_title_contains": "collection",
+    "text": "To whom it may concern. The employee worked as a Collections Agent at a collection agency. Duties: contacting clients with overdue accounts by phone and email; negotiating repayment arrangements on delinquent accounts; recording payment commitments; updating account notes; and escalating unresolved accounts to senior staff.",
+    "min_confidence": 70
+  },
+  {
+    "id": "cook",
+    "expected_noc": "63200",
+    "expected_title_contains": "cook",
+    "text": "This is to certify employment as a Cook in a full-service restaurant. Responsibilities: preparing and cooking complete meals and individual dishes; preparing dishes for customers with food allergies; planning menus; estimating food requirements and ordering supplies; and maintaining kitchen sanitation.",
+    "min_confidence": 70
+  },
+  {
+    "id": "administrative-assistant",
+    "expected_noc": "13110",
+    "expected_title_contains": "administrative assistant",
+    "text": "Employment letter. Position: Administrative Assistant. Duties included answering and forwarding phone calls; scheduling and confirming appointments; preparing and editing correspondence and reports; filing and maintaining records; data entry; and ordering office supplies.",
+    "min_confidence": 70
+  },
+  {
+    "id": "retail-salesperson",
+    "expected_noc": "64100",
+    "expected_title_contains": "retail",
+    "text": "This letter confirms employment as a Sales Associate at a retail clothing store. Duties: greeting customers and assisting them in selecting merchandise; operating the point-of-sale cash register; processing payments and returns; restocking shelves and arranging displays; and maintaining the sales floor.",
+    "min_confidence": 70
+  },
+  {
+    "id": "fabrication-qc-inspector",
+    "expected_noc": "22230",
+    "expected_title_contains": "inspector",
+    "_note": "Protected case: the 'boilermaker trap'. A quality inspector at a steel/boiler fabrication plant must resolve to an inspection NOC, NOT Boilermakers/Welders. Tests the function-vs-domain rule after the boiler-specific prompt examples are removed.",
+    "text": "To whom it may concern. This certifies employment as a Quality Control Inspector at a heavy steel fabrication plant. Duties: performing visual, ultrasonic and radiographic non-destructive testing of welded joints; calibrating and operating NDT inspection equipment; interpreting radiographs and test readouts; reviewing material test certificates (MTCs) for incoming steel; witnessing and monitoring welding activities for code compliance; and preparing detailed inspection reports against applicable standards."
+  },
+  {
+    "id": "safety-officer-fire-watch",
+    "expected_noc": "22232",
+    "expected_title_contains": "occupational health and safety",
+    "_note": "Protected case: the 'Fire Watch' example. A safety/fire-watch role must resolve to an occupational health and safety NOC, not a firefighter NOC, even though 'fire' appears often. Tests the 'frequent keyword is not the function' rule.",
+    "text": "This letter confirms employment as a Safety Officer (Fire Watch) on a construction site. Duties: conducting workplace safety inspections and hazard assessments; recommending and implementing controls; monitoring hot-work and standing fire watch during welding operations; delivering safety training and toolbox talks; investigating incidents and near-misses; and ensuring compliance with occupational health and safety regulations."
+  },
+  {
+    "id": "accountant-india-bullets",
+    "expected_noc": "11100",
+    "expected_title_contains": "accountant",
+    "_note": "Protected case: bullet-list + tax-ID-heavy letter with flowery closing phrasing. Tests that preprocessing still extracts duties after the literal one-letter phrase regexes are removed.",
+    "text": "M/s Sharma & Associates\nGSTIN: 27ABCDE1234F1Z5  PAN: ABCDE1234F\nPlot 14, MIDC Industrial Area, Pune 411001\n\nTO WHOM IT MAY CONCERN\n\nThis is to certify that the employee was employed with us in the position of Accountant. Her duties were as follows:\n• Preparing financial statements and monthly management accounts\n• Conducting internal audits and ensuring statutory compliance\n• Filing GST and income tax returns and liaising with external auditors\n• Examining and analyzing ledger entries and reconciling accounts\n• Advising management on financial controls and reporting\n\nWith dedication, determination and sincerity she performed all duties assigned to her. We wish her success in her future endeavours.\n\nAuthorized Signatory",
+    "min_confidence": 65
+  },
+  {
+    "id": "interpreter-phone-multi-title",
+    "expected_noc": "51114",
+    "expected_title_contains": "interpreter",
+    "_note": "Protected case: multi-title NOC group. NOC 51114 covers translators, terminologists AND interpreters. An interpreter-only role should score high confidence against the interpreter sub-group duties, not low confidence against the full 14-duty combined list. Tests sub-group-aware confidence scoring.",
+    "text": "Reference Letter - Kelly Services (Canada) Ltd., Mississauga ON. Taner Yildirim is currently employed as English-Turkish Interpreter, working at Languageline LLC. Full-time 30 hours per week, remote, Ontario. $19.50/hour, start date March 11 2024, ongoing.\nDuties:\n- Provides on-demand interpreter service over the phone\n- Interprets conversations between individuals with limited English language skills and representatives from Healthcare, Insurance, Financial, and Law Enforcement industries\n- Performs interpretation in consecutive mode, rendering spoken communication from one language to another after each speaker completes their turn\n- Renders correct concepts and meanings according to established interpretation protocol, avoiding omissions or additions\n- Maintains professional demeanor throughout audio interpreting sessions\n- Remains calm during sessions involving incoherent or upset speakers, including emergency situations such as 911 calls\n- All interpretation conducted over the phone using professional equipment in accordance with industry standards",
+    "min_confidence": 60
+  }
+]

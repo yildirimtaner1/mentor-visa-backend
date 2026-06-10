@@ -152,7 +152,11 @@ export const AuditorPage: FC = () => {
     setResult(null);
 
     try {
-      const res = await uploadDocument(selectedFile);
+      let token: string | undefined = undefined;
+      if (isSignedIn) {
+        token = await getToken() || undefined;
+      }
+      const res = await uploadDocument(selectedFile, undefined, token);
       setResult(res);
       ReactGA.event("tool_engagement", { tool_name: "Employment Letter Auditor" });
       sessionStorage.setItem('mentorVisaAnalysisResult', JSON.stringify(res));
