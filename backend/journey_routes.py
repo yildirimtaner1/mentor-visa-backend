@@ -11,8 +11,8 @@ import datetime
 import database
 import db_models
 from journey_models import (
-    PRJourney, DocumentItem,
-    JourneyUpdateRequest, JourneyResponse, DocumentUpdateRequest
+    PRJourney, DocumentItem, ImmitrackerCase,
+    JourneyUpdateRequest, JourneyResponse, DocumentUpdateRequest, DocumentCreateRequest
 )
 
 router = APIRouter(prefix="/api/v1/journey", tags=["journey"])
@@ -73,6 +73,20 @@ def ensure_user_exists(user_id: str, db: Session):
         db.commit()
 
 
+def _doc_to_dict(doc) -> dict:
+    """Serialize a DocumentItem to the response shape (shared by all document endpoints)."""
+    return {
+        "id": doc.id,
+        "document_type": doc.document_type,
+        "label": doc.label,
+        "status": doc.status,
+        "expiry_date": doc.expiry_date.isoformat() if doc.expiry_date else None,
+        "notes": doc.notes,
+        "person_ref": doc.person_ref or "principal",
+        "meta": doc.meta,
+    }
+
+
 def _journey_to_response(journey: PRJourney, documents: list) -> dict:
     """Convert a PRJourney ORM object to a response dict."""
     return {
@@ -90,18 +104,9 @@ def _journey_to_response(journey: PRJourney, documents: list) -> dict:
         "crs_calculated_at": journey.crs_calculated_at.isoformat() if journey.crs_calculated_at else None,
         "category_draw_eligible": journey.category_draw_eligible,
         "profile_data": journey.profile_data,
+        "tracker_data": journey.tracker_data,
         "subscription_tier": journey.subscription_tier or "free",
-        "documents": [
-            {
-                "id": doc.id,
-                "document_type": doc.document_type,
-                "label": doc.label,
-                "status": doc.status,
-                "expiry_date": doc.expiry_date.isoformat() if doc.expiry_date else None,
-                "notes": doc.notes,
-            }
-            for doc in documents
-        ],
+        "documents": [_doc_to_dict(doc) for doc in documents],
         "created_at": journey.created_at.isoformat() if journey.created_at else None,
         "updated_at": journey.updated_at.isoformat() if journey.updated_at else None,
     }
@@ -272,19 +277,7 @@ def get_documents(
         return {"documents": []}
     
     documents = db.query(DocumentItem).filter_by(journey_id=journey.id).all()
-    return {
-        "documents": [
-            {
-                "id": doc.id,
-                "document_type": doc.document_type,
-                "label": doc.label,
-                "status": doc.status,
-                "expiry_date": doc.expiry_date.isoformat() if doc.expiry_date else None,
-                "notes": doc.notes,
-            }
-            for doc in documents
-        ]
-    }
+    return {"documents": [_doc_to_dict(doc) for doc in documents]}
 
 
 @router.put("/documents/{doc_id}")
@@ -316,16 +309,180 @@ def update_document(
     
     if update.notes is not None:
         doc.notes = update.notes
-    
+
     db.commit()
-    
+    db.refresh(doc)
+    return _doc_to_dict(doc)
+
+
+@router.post("/documents")
+def create_document(
+    create: DocumentCreateRequest,
+    user_id: str = Depends(get_current_user),
+    db: Session = Depends(database.get_db)
+):
+    """Create a document item — e.g. a per-country police certificate or a per-dependent doc."""
+    ensure_user_exists(user_id, db)
+    journey = db.query(PRJourney).filter_by(user_id=user_id).first()
+    if not journey:
+        raise HTTPException(status_code=404, detail="No journey found for this user.")
+
+    status = create.status or "not_started"
+    if status not in ("not_started", "in_progress", "obtained"):
+        raise HTTPException(status_code=400, detail="Invalid status.")
+
+    expiry = None
+    if create.expiry_date:
+        try:
+            expiry = datetime.datetime.fromisoformat(create.expiry_date)
+        except ValueError:
+            raise HTTPException(status_code=400, detail="Invalid date format. Use ISO 8601 (YYYY-MM-DD).")
+
+    doc = DocumentItem(
+        journey_id=journey.id,
+        document_type=create.document_type,
+        label=create.label,
+        person_ref=create.person_ref or "principal",
+        meta=create.meta,
+        status=status,
+        expiry_date=expiry,
+        notes=create.notes,
+    )
+    db.add(doc)
+    db.commit()
+    db.refresh(doc)
+    return _doc_to_dict(doc)
+
+
+@router.delete("/documents/{doc_id}")
+def delete_document(
+    doc_id: int,
+    user_id: str = Depends(get_current_user),
+    db: Session = Depends(database.get_db)
+):
+    """Delete a document item owned by the current user's journey."""
+    journey = db.query(PRJourney).filter_by(user_id=user_id).first()
+    if not journey:
+        raise HTTPException(status_code=404, detail="No journey found for this user.")
+    doc = db.query(DocumentItem).filter_by(id=doc_id, journey_id=journey.id).first()
+    if not doc:
+        raise HTTPException(status_code=404, detail="Document item not found.")
+    db.delete(doc)
+    db.commit()
+    return {"deleted": doc_id}
+
+
+# ── Processing-time predictions (Optimize tier) ────────────────────────────────
+# Cohort-based estimates from community case data (immitracker_cases). For each milestone
+# transition we use the MOST SPECIFIC cohort that has enough samples, falling back to broader
+# cohorts so we always return a defensible estimate with its sample size.
+_PROC_TRANSITIONS = [
+    ("aor_to_bil",      "AOR to Biometrics"),
+    ("aor_to_meds",     "AOR to Medical passed"),
+    ("aor_to_decision", "AOR to Final Decision"),
+    ("aor_to_p1",       "AOR to P1 (PR Portal)"),
+    ("aor_to_ppr",      "AOR to PPR / Portal 2"),
+    ("aor_to_ecopr",    "AOR to eCOPR"),
+]
+_PROC_MIN_N = 15
+
+
+def _percentile(xs: list, p: float):
+    xs = sorted(xs)
+    if not xs:
+        return None
+    i = min(len(xs) - 1, int(round((p / 100) * (len(xs) - 1))))
+    return xs[i]
+
+
+def _cohort_stats(cases: list, stream, country, category, vo):
+    """Per-transition percentiles using the most specific cohort with >= _PROC_MIN_N samples."""
+    levels = [
+        ("stream + country + category + office",
+         lambda c: c.stream == stream and c.country_of_residence == country and c.ee_draw_category == category and (vo is None or c.primary_vo == vo)),
+        ("stream + country + category",
+         lambda c: c.stream == stream and c.country_of_residence == country and c.ee_draw_category == category),
+        ("stream + category", lambda c: c.stream == stream and c.ee_draw_category == category),
+        ("stream + country", lambda c: c.stream == stream and c.country_of_residence == country),
+        ("stream", lambda c: c.stream == stream),
+        ("all applicants", lambda c: True),
+    ]
+    if not category:
+        levels = [lv for lv in levels if "category" not in lv[0]]
+    if not country:
+        levels = [lv for lv in levels if "country" not in lv[0]]
+    if not vo:
+        levels = [lv for lv in levels if "office" not in lv[0]]
+
+    out = {}
+    for key, label in _PROC_TRANSITIONS:
+        chosen_label, vals = None, []
+        for lvl_label, pred in levels:
+            v = [getattr(c, key) for c in cases if pred(c) and getattr(c, key) is not None]
+            if len(v) >= _PROC_MIN_N:
+                chosen_label, vals = lvl_label, v
+                break
+        if chosen_label is None:  # nothing met MIN — use broadest non-empty
+            v = [getattr(c, key) for c in cases if getattr(c, key) is not None]
+            if v:
+                chosen_label, vals = "all applicants", v
+        out[key] = ({
+            "label": label, "n": len(vals), "cohort": chosen_label,
+            "p25": _percentile(vals, 25), "median": _percentile(vals, 50),
+            "p75": _percentile(vals, 75), "p90": _percentile(vals, 90),
+        } if vals else None)
+    return out
+
+
+@router.get("/tracker-options")
+def tracker_options(
+    user_id: str = Depends(get_current_user),
+    db: Session = Depends(database.get_db),
+):
+    """Distinct cohort-input options present in our case data (frequency-sorted), so the tracker's
+    dropdowns only offer values that actually match real cases. Available to any signed-in user."""
+    cases = db.query(ImmitrackerCase).all()
+
+    def distinct(attr):
+        counts = {}
+        for c in cases:
+            v = getattr(c, attr)
+            if v:
+                counts[v] = counts.get(v, 0) + 1
+        return [k for k, _ in sorted(counts.items(), key=lambda kv: -kv[1])]
+
     return {
-        "id": doc.id,
-        "document_type": doc.document_type,
-        "label": doc.label,
-        "status": doc.status,
-        "expiry_date": doc.expiry_date.isoformat() if doc.expiry_date else None,
-        "notes": doc.notes,
+        "streams": distinct("stream"),
+        "countries": distinct("country_of_residence"),
+        "categories": distinct("ee_draw_category"),
+        "visa_offices": distinct("primary_vo"),
+    }
+
+
+@router.get("/processing-stats")
+def processing_stats(
+    stream: str = None,
+    country: str = None,
+    category: str = None,
+    vo: str = None,
+    user_id: str = Depends(get_current_user),
+    db: Session = Depends(database.get_db),
+):
+    """Cohort processing-time estimates for the Application Tracker. Optimize tier only."""
+    ua = db.query(db_models.UserAccount).filter_by(user_id=user_id).first()
+    tier = (ua.subscription_tier if ua else "free") or "free"
+    if tier not in ("starter", "complete"):
+        raise HTTPException(status_code=403, detail="Upgrade to Optimize to unlock processing-time predictions.")
+
+    if not stream:
+        raise HTTPException(status_code=400, detail="stream is required.")
+
+    cases = db.query(ImmitrackerCase).all()
+    stats = _cohort_stats(cases, stream, country, category, vo)
+    return {
+        "inputs": {"stream": stream, "country": country, "category": category, "vo": vo},
+        "total_cases": len(cases),
+        "transitions": stats,
     }
 
 
@@ -349,59 +506,70 @@ def generate_document_checklist(
     profile = journey.profile_data or {}
     programs = journey.eligible_programs or {}
     
-    # Base documents required for all Express Entry programs
-    base_documents = [
-        {"type": "passport", "label": "Valid Passport"},
-        {"type": "digital_photos", "label": "Digital Photos (35mm × 45mm)"},
-        {"type": "language_test", "label": "Language Test Results (IELTS General Training / CELPIP / TEF)"},
-        {"type": "eca", "label": "Educational Credential Assessment (ECA)"},
-        {"type": "medical_exam", "label": "Immigration Medical Exam (IMM 1017B)"},
-        {"type": "employment_letter_primary", "label": "Employment Reference Letter — Primary Employer"},
+    # ── Build required-document specs, each scoped to a person ──
+    # spec shape: {"type", "label", "person_ref", "meta"?}
+    specs = [
+        {"type": "passport", "label": "Valid Passport", "person_ref": "principal"},
+        {"type": "digital_photos", "label": "Digital Photos (35mm × 45mm)", "person_ref": "principal"},
+        {"type": "language_test", "label": "Language Test Results (IELTS / CELPIP / TEF)", "person_ref": "principal"},
+        {"type": "eca", "label": "Educational Credential Assessment (ECA)", "person_ref": "principal"},
+        {"type": "medical_exam", "label": "Immigration Medical Exam", "person_ref": "principal"},
+        {"type": "biometrics", "label": "Biometrics", "person_ref": "principal"},
+        {"type": "employment_letter_primary", "label": "Employment Reference Letter — Primary Employer", "person_ref": "principal"},
     ]
-    
-    # Program-specific documents
     if programs.get("fswp"):
-        base_documents.append({"type": "proof_of_funds", "label": "Proof of Funds (Bank Letter)"})
-    
-    # Spouse documents
-    if profile.get("marital_status") in ("married", "common_law") and profile.get("spouse_accompanying"):
-        base_documents.extend([
-            {"type": "marriage_certificate", "label": "Marriage / Common-Law Certificate"},
-            {"type": "spouse_passport", "label": "Spouse — Valid Passport"},
-            {"type": "spouse_language_test", "label": "Spouse — Language Test Results"},
-        ])
-    
-    # Police certificates based on countries lived in
-    countries = profile.get("countries_lived_in", [])
-    for country_entry in countries:
-        country = country_entry.get("country", "")
-        months = country_entry.get("months", 0)
-        if country and months >= 6:
-            doc_type = f"police_cert_{country.lower().replace(' ', '_')}"
-            base_documents.append({
-                "type": doc_type,
-                "label": f"Police Certificate — {country}"
+        specs.append({"type": "proof_of_funds", "label": "Proof of Funds (Bank Letter)", "person_ref": "principal"})
+
+    # Principal police certificates — one per country lived in 6+ months (each its own row + country meta).
+    for country_entry in profile.get("countries_lived_in", []):
+        country = (country_entry.get("country") or "").strip()
+        if country and country_entry.get("months", 0) >= 6:
+            specs.append({
+                "type": "police_cert",
+                "label": f"Police Certificate — {country}",
+                "person_ref": "principal",
+                "meta": {"country": country},
             })
-    
-    # Check which documents already exist for this journey
-    existing_types = set()
-    existing_docs = db.query(DocumentItem).filter_by(journey_id=journey.id).all()
-    for doc in existing_docs:
-        existing_types.add(doc.document_type)
-    
-    # Create only new documents
+
+    # Per-dependent documents (from the free-tier dependents list in tracker_data).
+    for dep in (journey.tracker_data or {}).get("dependents", []) or []:
+        pid = dep.get("id")
+        if not pid:
+            continue
+        nm = (dep.get("name") or dep.get("relationship") or "Dependent").strip()
+        specs += [
+            {"type": "passport", "label": f"{nm} — Valid Passport", "person_ref": pid},
+            {"type": "medical_exam", "label": f"{nm} — Immigration Medical Exam", "person_ref": pid},
+            {"type": "biometrics", "label": f"{nm} — Biometrics", "person_ref": pid},
+        ]
+        if dep.get("relationship") == "spouse":
+            specs.append({"type": "marriage_certificate", "label": "Marriage / Common-Law Certificate", "person_ref": "principal"})
+
+    # Idempotent: dedupe on (document_type, person_ref, country) against existing rows + within this batch.
+    def _key(t, pref, meta):
+        return (t, pref or "principal", (meta or {}).get("country"))
+
+    existing = {
+        _key(doc.document_type, doc.person_ref, doc.meta)
+        for doc in db.query(DocumentItem).filter_by(journey_id=journey.id).all()
+    }
     created = []
-    for doc_spec in base_documents:
-        if doc_spec["type"] not in existing_types:
-            new_doc = DocumentItem(
-                journey_id=journey.id,
-                document_type=doc_spec["type"],
-                label=doc_spec["label"],
-                status="not_started"
-            )
-            db.add(new_doc)
-            created.append(doc_spec["type"])
-    
+    for spec in specs:
+        pref = spec.get("person_ref") or "principal"
+        k = _key(spec["type"], pref, spec.get("meta"))
+        if k in existing:
+            continue
+        existing.add(k)
+        db.add(DocumentItem(
+            journey_id=journey.id,
+            document_type=spec["type"],
+            label=spec.get("label"),
+            person_ref=pref,
+            meta=spec.get("meta"),
+            status="not_started",
+        ))
+        created.append(f"{spec['type']}:{pref}")
+
     db.commit()
     
     # Return the full updated list
@@ -409,15 +577,6 @@ def generate_document_checklist(
     return {
         "created": created,
         "total": len(all_docs),
-        "documents": [
-            {
-                "id": doc.id,
-                "document_type": doc.document_type,
-                "label": doc.label,
-                "status": doc.status,
-                "expiry_date": doc.expiry_date.isoformat() if doc.expiry_date else None,
-                "notes": doc.notes,
-            }
-            for doc in all_docs
+        "documents": [_doc_to_dict(doc) for doc in all_docs
         ]
     }

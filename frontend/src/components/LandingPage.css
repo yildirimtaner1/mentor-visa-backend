@@ -218,10 +218,24 @@
   display: none;
   flex-direction: column;
   gap: 4px;
-  padding: 12px 24px 20px;
+  padding: 12px 24px 24px;
   border-top: 1px solid var(--border-color);
   background: white;
   animation: fadeInUp 0.3s ease-out;
+  /* Scroll within the menu so the Login / Sign Up CTAs at the bottom are always reachable
+     even when the full list is taller than the screen. */
+  max-height: calc(100vh - 64px);
+  max-height: calc(100dvh - 64px);
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
+}
+
+/* Make the auth CTAs at the bottom of the mobile menu prominent and easy to tap. */
+.mobile-menu .btn-primary,
+.mobile-menu .btn-ghost {
+  padding: 12px 16px;
+  border-radius: 10px;
 }
 
 .mobile-menu-link {

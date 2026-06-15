@@ -147,11 +147,12 @@ export function PricingPage() {
           </div>
           <ul className="pricing-features">
             <Feature included>Everything in Explore</Feature>
-            <Feature included highlight>20 Question Credits - Express Entry AI Assistant</Feature>
             <Feature included highlight>Unlimited Employment Letter Audits</Feature>
+            <Feature included highlight>Smart Post-ITA Milestone Tracker &amp; Predictor</Feature>
             <Feature included highlight>Unlimited CRS Point Simulator (What-If Scenarios)</Feature>
+            <Feature included highlight>20 Question Credits - Express Entry AI Assistant</Feature>
             <Feature included highlight>Personalized Document Checklist</Feature>
-            <Feature included highlight>Document Expiry Tracking</Feature>
+            <Feature included highlight>Document Expiry Tracker</Feature>
           </ul>
           <div className="pricing-card-footer">
             {!isSignedIn ? (

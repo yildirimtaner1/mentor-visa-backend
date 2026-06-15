@@ -285,11 +285,12 @@ export const LandingPage: FC<LandingPageProps> = ({ onNavigate }) => {
             </div>
             <ul className="pricing-features">
               <li className="pricing-feature"><CheckCircle2 size={16} className="feature-check" /><span>Everything in Explore</span></li>
-              <li className="pricing-feature highlight"><CheckCircle2 size={16} className="feature-check" /><span>20 Question Credits - Express Entry AI Assistant</span></li>
               <li className="pricing-feature highlight"><CheckCircle2 size={16} className="feature-check" /><span>Unlimited Employment Letter Audits</span></li>
+              <li className="pricing-feature highlight"><CheckCircle2 size={16} className="feature-check" /><span>Smart Post-ITA Milestone Tracker &amp; Predictor</span></li>
               <li className="pricing-feature highlight"><CheckCircle2 size={16} className="feature-check" /><span>Unlimited CRS Point Simulator (What-If Scenarios)</span></li>
+              <li className="pricing-feature highlight"><CheckCircle2 size={16} className="feature-check" /><span>20 Question Credits - Express Entry AI Assistant</span></li>
               <li className="pricing-feature highlight"><CheckCircle2 size={16} className="feature-check" /><span>Personalized Document Checklist</span></li>
-              <li className="pricing-feature highlight"><CheckCircle2 size={16} className="feature-check" /><span>Document Expiry Tracking</span></li>
+              <li className="pricing-feature highlight"><CheckCircle2 size={16} className="feature-check" /><span>Document Expiry Tracker</span></li>
             </ul>
             <div className="pricing-card-footer">
               <button className="pricing-btn primary" onClick={() => onNavigate('pricing')}>Get Optimize — $49</button>

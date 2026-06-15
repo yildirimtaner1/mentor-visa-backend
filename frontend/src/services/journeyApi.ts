@@ -91,6 +91,77 @@ export async function updateDocument(token: string, docId: number, data: Record<
 }
 
 /**
+ * Create a document item — e.g. a per-country police certificate or a per-dependent doc.
+ */
+export async function createDocument(token: string, data: Record<string, any>) {
+  const response = await fetch(`${API_BASE_URL}/api/v1/journey/documents`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${token}`,
+    },
+    body: JSON.stringify(data),
+  });
+  if (!response.ok) {
+    const err = await response.json().catch(() => ({}));
+    throw new Error(err.detail || 'Failed to create document.');
+  }
+  return response.json();
+}
+
+/**
+ * Delete a document item by id.
+ */
+export async function deleteDocument(token: string, docId: number) {
+  const response = await fetch(`${API_BASE_URL}/api/v1/journey/documents/${docId}`, {
+    method: 'DELETE',
+    headers: { 'Authorization': `Bearer ${token}` },
+  });
+  if (!response.ok) {
+    const err = await response.json().catch(() => ({}));
+    throw new Error(err.detail || 'Failed to delete document.');
+  }
+  return response.json();
+}
+
+/**
+ * Distinct cohort-input dropdown options (streams/countries/categories/visa offices) from our data.
+ */
+export async function getTrackerOptions(token: string) {
+  const response = await fetch(`${API_BASE_URL}/api/v1/journey/tracker-options`, {
+    headers: { 'Authorization': `Bearer ${token}` },
+  });
+  if (!response.ok) {
+    const err = await response.json().catch(() => ({}));
+    throw new Error(err.detail || 'Failed to fetch tracker options.');
+  }
+  return response.json();
+}
+
+/**
+ * Cohort processing-time estimates for the Application Tracker (Optimize tier).
+ * Returns per-transition percentiles (p25/median/p75/p90 + n + cohort used).
+ */
+export async function getProcessingStats(
+  token: string,
+  params: { stream: string; country?: string; category?: string; vo?: string }
+) {
+  const qs = new URLSearchParams();
+  qs.set('stream', params.stream);
+  if (params.country) qs.set('country', params.country);
+  if (params.category) qs.set('category', params.category);
+  if (params.vo) qs.set('vo', params.vo);
+  const response = await fetch(`${API_BASE_URL}/api/v1/journey/processing-stats?${qs.toString()}`, {
+    headers: { 'Authorization': `Bearer ${token}` },
+  });
+  if (!response.ok) {
+    const err = await response.json().catch(() => ({}));
+    throw new Error(err.detail || 'Failed to fetch processing-time stats.');
+  }
+  return response.json();
+}
+
+/**
  * Generate a personalized document checklist based on the user's profile.
  * Idempotent — won't duplicate documents that already exist.
  */

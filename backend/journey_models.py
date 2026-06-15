@@ -43,13 +43,54 @@ class PRJourney(Base):
     
     # Profile data (shared across tools)
     profile_data = Column(JSON, nullable=True)  # Full profile: age, education, language, experience, etc.
-    
+
+    # PR Application Tracker (free tier): milestone dates + stream + dependents.
+    # Shape: {"stream": "inland"|"outland"|null,
+    #         "milestones": {"pool_entry": "2026-01-15", "ita": "...", ...},
+    #         "dependents": [{"id": "...", "name": "...", "relationship": "spouse"|"child"}]}
+    # Documents/expiry (paid) live in DocumentItem rows, not here.
+    tracker_data = Column(JSON, nullable=True)
+
     # Subscription
     subscription_tier = Column(String, default="free")  # "free", "starter", "complete"
     
     # Timestamps
     created_at = Column(DateTime, default=func.now())
     updated_at = Column(DateTime, default=func.now(), onupdate=func.now())
+
+
+class ImmitrackerCase(Base):
+    """Community-reported Express Entry case (refreshed monthly from a provided export).
+    Powers cohort-based processing-time predictions for the Application Tracker.
+    Reference data — NOT linked to a user."""
+    __tablename__ = "immitracker_cases"
+
+    id = Column(Integer, primary_key=True, index=True)
+    case_id = Column(String, unique=True, index=True, nullable=False)
+
+    # Cohort dimensions (used to filter predictions to similar applicants)
+    stream = Column(String, index=True, nullable=True)               # CEC, FSW-Outland, PNP-Inland, ...
+    country_of_residence = Column(String, index=True, nullable=True)
+    primary_vo = Column(String, nullable=True)                       # visa office (optional input)
+    ee_draw_category = Column(String, index=True, nullable=True)
+    nationality = Column(String, nullable=True)
+    noc_code = Column(String, nullable=True)
+    crs_score = Column(Integer, nullable=True)
+
+    # Milestone day-deltas (already provided in the source; the prediction signal)
+    aor_to_bil = Column(Integer, nullable=True)
+    aor_to_meds = Column(Integer, nullable=True)
+    aor_to_ppr = Column(Integer, nullable=True)          # AOR -> Portal 2 / PPR date
+    submission_to_ppr = Column(Integer, nullable=True)
+    meds_to_ppr = Column(Integer, nullable=True)
+    aor_to_p1 = Column(Integer, nullable=True)           # AOR -> Portal 1 invite (inland)
+    aor_to_decision = Column(Integer, nullable=True)     # AOR -> Final Decision Made
+    aor_to_ecopr = Column(Integer, nullable=True)        # AOR -> eCOPR
+
+    current_status = Column(String, nullable=True)
+    state = Column(String, nullable=True)                            # Active / etc.
+    raw = Column(JSON, nullable=True)                                # full source row, for fidelity
+    imported_at = Column(DateTime, default=func.now(), onupdate=func.now())
 
 
 class DocumentItem(Base):
@@ -60,11 +101,16 @@ class DocumentItem(Base):
     id = Column(Integer, primary_key=True, index=True)
     journey_id = Column(Integer, ForeignKey("pr_journeys.id"), index=True, nullable=False)
     
-    document_type = Column(String, nullable=False)  # "ielts", "eca", "police_cert_india", etc.
+    document_type = Column(String, nullable=False)  # "ielts", "eca", "police_cert", etc.
     label = Column(String, nullable=True)            # Human-readable label
     status = Column(String, default="not_started")   # "not_started", "in_progress", "obtained"
     expiry_date = Column(DateTime, nullable=True)
     notes = Column(Text, nullable=True)
+
+    # Per-person scoping: "principal" or a dependent id from tracker_data.dependents.
+    person_ref = Column(String, nullable=True, default="principal")
+    # Free-form attributes, e.g. {"country": "India", "is_current_residence": true} for police certs.
+    meta = Column(JSON, nullable=True)
     
     created_at = Column(DateTime, default=func.now())
     updated_at = Column(DateTime, default=func.now(), onupdate=func.now())
@@ -159,6 +205,7 @@ class JourneyUpdateRequest(BaseModel):
     crs_score: Optional[int] = None
     category_draw_eligible: Optional[List[str]] = None
     profile_data: Optional[dict] = None
+    tracker_data: Optional[dict] = None
     subscription_tier: Optional[str] = None
 
 
@@ -178,6 +225,7 @@ class JourneyResponse(BaseModel):
     crs_calculated_at: Optional[str] = None
     category_draw_eligible: Optional[List[str]] = None
     profile_data: Optional[dict] = None
+    tracker_data: Optional[dict] = None
     subscription_tier: str = "free"
     documents: List[dict] = []
     created_at: Optional[str] = None
@@ -190,5 +238,16 @@ class JourneyResponse(BaseModel):
 class DocumentUpdateRequest(BaseModel):
     """Update a single document item's status or expiry."""
     status: Optional[str] = None
+    expiry_date: Optional[str] = None
+    notes: Optional[str] = None
+
+
+class DocumentCreateRequest(BaseModel):
+    """Create a document item (e.g. a per-country police certificate, or a per-dependent doc)."""
+    document_type: str
+    label: Optional[str] = None
+    person_ref: Optional[str] = "principal"
+    meta: Optional[dict] = None
+    status: Optional[str] = "not_started"
     expiry_date: Optional[str] = None
     notes: Optional[str] = None

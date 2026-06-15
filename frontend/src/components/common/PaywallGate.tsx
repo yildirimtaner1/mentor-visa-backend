@@ -21,6 +21,8 @@ interface PaywallGateProps {
   children: ReactNode;
   previewLines?: number; // How many lines of content to show in preview
   blurAmount?: number;
+  features?: string[]; // Optional override for the feature bullets shown in the CTA
+  onUpgrade?: () => void; // If provided, the CTA calls this (e.g. direct Stripe checkout) instead of routing to /pricing
 }
 
 const TIER_ORDER = { free: 0, starter: 1, complete: 2 };
@@ -33,9 +35,11 @@ const TIER_PRICES: Record<string, string> = {
 const TIER_FEATURES: Record<string, string[]> = {
   starter: [
     'Unlimited Employment Letter Audits',
-    'Personalized Document Tracker',
-    'CRS Point Maximization Simulator',
-    'Category-Based Draw Matcher',
+    'Smart Post-ITA Milestone Tracker & Predictor',
+    'Unlimited CRS Point Simulator (What-If Scenarios)',
+    '20 Question Credits — Express Entry AI Assistant',
+    'Personalized Document Checklist',
+    'Document Expiry Tracker',
   ],
   complete: [
     'Everything in Optimize',
@@ -50,11 +54,16 @@ export function PaywallGate({
   featureName,
   children,
   blurAmount = 5,
+  features,
+  onUpgrade,
 }: PaywallGateProps) {
   const { tier } = useJourneyStore();
   const navigate = useNavigate();
 
   const hasAccess = TIER_ORDER[tier] >= TIER_ORDER[requiredTier];
+  const featureList = features ?? TIER_FEATURES[requiredTier] ?? [];
+  const tierLabel = requiredTier === 'starter' ? 'Optimize' : 'Execute';
+  const handleUpgrade = onUpgrade ?? (() => navigate(`/pricing?upgrade=${requiredTier}`));
 
   if (hasAccess) {
     return <>{children}</>;
@@ -71,16 +80,15 @@ export function PaywallGate({
 
       <div className="paywall-overlay">
         <div className="upgrade-card">
-          <div className="upgrade-card-icon">🔒</div>
-          <h3 className="upgrade-card-title">
-            Unlock {featureName}
-          </h3>
+          <div className="upgrade-card-icon">🔓</div>
+          <h3 className="upgrade-card-title">Unlock {featureName}</h3>
+          <div className="upgrade-card-price">{TIER_PRICES[requiredTier].replace(' CAD', '')} <span>CAD</span></div>
           <p className="upgrade-card-subtitle">
-            Upgrade to {requiredTier === 'starter' ? 'Optimize' : 'Execute'} to access this feature.
+            Included in <strong>{tierLabel}</strong> — unlock this plus every premium tool.
           </p>
 
           <ul className="upgrade-card-features">
-            {TIER_FEATURES[requiredTier]?.map((feature, i) => (
+            {featureList.map((feature, i) => (
               <li key={i}>
                 <span className="upgrade-card-check">✓</span>
                 {feature}
@@ -88,11 +96,8 @@ export function PaywallGate({
             ))}
           </ul>
 
-          <button
-            className="upgrade-card-btn-primary"
-            onClick={() => navigate(`/pricing?upgrade=${requiredTier}`)}
-          >
-            Upgrade to {requiredTier === 'starter' ? 'Optimize' : 'Execute'} — {TIER_PRICES[requiredTier]}
+          <button className="upgrade-card-btn-primary" onClick={handleUpgrade}>
+            Get {tierLabel} — {TIER_PRICES[requiredTier]}
           </button>
 
           <p className="upgrade-card-guarantee">

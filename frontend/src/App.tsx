@@ -24,6 +24,8 @@ import { DocumentsPage } from './components/DocumentsPage';
 import { PricingPage } from './components/PricingPage';
 import { ProfilePage } from './components/ProfilePage';
 import ProfileBuilderPage from './components/ProfileBuilderPage';
+import { ApplicationTrackerPage } from './components/ApplicationTrackerPage';
+import { ProcessingTimesPage } from './components/ProcessingTimesPage';
 import { useAuth, UserButton } from '@clerk/clerk-react';
 import { saveEvaluation, cancelPaymentEvent } from './services/api';
 import { useJourneySync } from './hooks/useJourneySync';
@@ -368,6 +370,8 @@ function App() {
       <Route path="/noc-codes/:code" element={<SharedLayout><NOCDetailsPage /></SharedLayout>} />
       <Route path="/glossary" element={<SharedLayout><GlossaryPage /></SharedLayout>} />
       <Route path="/draw-results" element={<SharedLayout><DrawResultsPage onNavigate={(p) => navigate(`/${p}`)} /></SharedLayout>} />
+      <Route path="/track-my-application" element={<SharedLayout><ApplicationTrackerPage /></SharedLayout>} />
+      <Route path="/express-entry-processing-times" element={<SharedLayout><ProcessingTimesPage onNavigate={(p) => navigate(`/${p}`)} /></SharedLayout>} />
 
       {/* Legal Pages */}
       <Route path="/privacy-policy" element={<SharedLayout><PrivacyPolicyPage /></SharedLayout>} />
