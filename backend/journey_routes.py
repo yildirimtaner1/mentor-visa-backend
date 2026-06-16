@@ -396,7 +396,14 @@ def _percentile(xs: list, p: float):
 
 
 def _cohort_stats(cases: list, stream, country, category, vo):
-    """Per-transition percentiles using the most specific cohort with >= _PROC_MIN_N samples."""
+    """Processing-time percentiles for a user's milestone sequence.
+
+    All transitions are computed from ONE shared cohort so the milestones stay mutually
+    consistent (e.g. P2 can never be predicted earlier than P1 just because it happened to
+    use a broader sample). We pick the MOST SPECIFIC cohort level at which every transition
+    relevant to this applicant clears _PROC_MIN_N, then clamp the resulting day-offsets to be
+    monotonically non-decreasing along the real milestone order (_PROC_TRANSITIONS is already
+    chronological: BIL -> MEP -> Decision -> P1 -> PPR/P2 -> eCOPR)."""
     levels = [
         ("stream + country + category + office",
          lambda c: c.stream == stream and c.country_of_residence == country and c.ee_draw_category == category and (vo is None or c.primary_vo == vo)),
@@ -414,23 +421,51 @@ def _cohort_stats(cases: list, stream, country, category, vo):
     if not vo:
         levels = [lv for lv in levels if "office" not in lv[0]]
 
+    def count_at(pred, key):
+        return sum(1 for c in cases if pred(c) and getattr(c, key) is not None)
+
+    # Which transitions are relevant for this applicant? A transition is "relevant" only if the
+    # applicant's own stream populates it enough to be meaningful — this also drops inland-only
+    # stages (e.g. aor_to_p1) for outland streams that never report them.
+    stream_pred = (lambda c: c.stream == stream)
+    relevant = [k for k, _ in _PROC_TRANSITIONS if count_at(stream_pred, k) >= _PROC_MIN_N]
+    if not relevant:  # stream too sparse — fall back to the whole dataset for guidance
+        relevant = [k for k, _ in _PROC_TRANSITIONS if count_at(lambda c: True, k) >= _PROC_MIN_N]
+
+    # ONE cohort level for the entire sequence: most specific where ALL relevant transitions clear MIN.
+    chosen_label, chosen_pred = "all applicants", (lambda c: True)
+    for lvl_label, pred in levels:
+        if relevant and all(count_at(pred, k) >= _PROC_MIN_N for k in relevant):
+            chosen_label, chosen_pred = lvl_label, pred
+            break
+
     out = {}
     for key, label in _PROC_TRANSITIONS:
-        chosen_label, vals = None, []
-        for lvl_label, pred in levels:
-            v = [getattr(c, key) for c in cases if pred(c) and getattr(c, key) is not None]
-            if len(v) >= _PROC_MIN_N:
-                chosen_label, vals = lvl_label, v
-                break
-        if chosen_label is None:  # nothing met MIN — use broadest non-empty
-            v = [getattr(c, key) for c in cases if getattr(c, key) is not None]
-            if v:
-                chosen_label, vals = "all applicants", v
+        if key not in relevant:
+            out[key] = None
+            continue
+        vals = [getattr(c, key) for c in cases if chosen_pred(c) and getattr(c, key) is not None]
         out[key] = ({
             "label": label, "n": len(vals), "cohort": chosen_label,
             "p25": _percentile(vals, 25), "median": _percentile(vals, 50),
             "p75": _percentile(vals, 75), "p90": _percentile(vals, 90),
         } if vals else None)
+
+    # Monotonic clamp: a later milestone's day-offset can never precede an earlier one's, and
+    # within each transition keep p25 <= median <= p75 <= p90 intact after clamping.
+    prev = None
+    for key, _ in _PROC_TRANSITIONS:
+        s = out.get(key)
+        if not s:
+            continue
+        if prev is not None:
+            for q in ("p25", "median", "p75", "p90"):
+                if s[q] is not None and prev[q] is not None and s[q] < prev[q]:
+                    s[q] = prev[q]
+        for lo, hi in (("p25", "median"), ("median", "p75"), ("p75", "p90")):
+            if s[lo] is not None and s[hi] is not None and s[hi] < s[lo]:
+                s[hi] = s[lo]
+        prev = s
     return out
 
 
