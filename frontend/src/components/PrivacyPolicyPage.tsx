@@ -6,7 +6,7 @@ export const PrivacyPolicyPage: FC = () => (
     <SEO title="Privacy Policy | Mentor Visa" description="Learn how Mentor Visa collects, uses, and protects your personal information." canonical="/privacy-policy" />
     
     <h1 style={{ fontSize: '2rem', fontWeight: 800, marginBottom: '8px', color: 'var(--primary-dark)' }}>Privacy Policy</h1>
-    <p style={{ color: 'var(--text-muted)', marginBottom: '32px', fontSize: '0.9rem' }}>Last updated: April 8, 2026</p>
+    <p style={{ color: 'var(--text-muted)', marginBottom: '32px', fontSize: '0.9rem' }}>Last updated: June 16, 2026</p>
 
     <div style={{ lineHeight: 1.8, fontSize: '0.95rem', color: '#374151' }}>
       <p>Mentor Visa ("we", "us", or "our") operates the <strong>mentorvisa.com</strong> website ("Service"). This Privacy Policy explains how we collect, use, disclose, and safeguard your information when you visit our website and use our services. We are committed to protecting your privacy in compliance with Canada's <strong>Personal Information Protection and Electronic Documents Act (PIPEDA)</strong>.</p>
@@ -16,8 +16,11 @@ export const PrivacyPolicyPage: FC = () => (
       <h3 style={{ fontSize: '1.1rem', fontWeight: 600, margin: '20px 0 8px' }}>1.1 Information You Provide Directly</h3>
       <ul style={{ paddingLeft: '24px', marginBottom: '16px' }}>
         <li><strong>Account Information:</strong> When you sign up, we collect your name and email address through our authentication provider (Clerk).</li>
-        <li><strong>Uploaded Documents:</strong> Employment letters, job descriptions, and other documents you upload for analysis. These are stored securely on our infrastructure.</li>
+        <li><strong>Uploaded Documents:</strong> Employment letters, job descriptions, proof-of-funds bank letters, and other documents you upload for analysis. These are stored securely on our infrastructure.</li>
         <li><strong>Manual Input:</strong> Job titles, duty descriptions, and other text you enter into our tools.</li>
+        <li><strong>Profile &amp; Assessment Data:</strong> Eligibility answers and the CRS factors you enter (age, education, language scores, work experience, marital status, and similar), used to calculate your score, run the simulator, and power the AI Profile Assistant.</li>
+        <li><strong>Application Tracker Data:</strong> If you use the Smart Application Tracker, we store the milestone dates you enter, your selected cohort (stream, country of residence, draw category, visa office), and any dependents you add — so your timeline persists and we can generate predictions for you.</li>
+        <li><strong>Document Checklist Data:</strong> The documents, statuses, and expiry dates you track for yourself and any dependents you add.</li>
         <li><strong>Payment Information:</strong> When you purchase a pass, payment is processed by Stripe. We do <strong>not</strong> store your credit card number, CVV, or full card details. Stripe handles all payment data under PCI-DSS Level 1 compliance.</li>
       </ul>
 
@@ -54,10 +57,14 @@ export const PrivacyPolicyPage: FC = () => (
         <li><strong>Clerk</strong> — Authentication and user management</li>
         <li><strong>Stripe</strong> — Payment processing</li>
         <li><strong>Supabase</strong> — Database and file storage</li>
-        <li><strong>Google (Gemini AI)</strong> — Document analysis processing. Uploaded document contents are sent to Google's Gemini API for analysis. Google's data usage policies apply to this processing.</li>
+        <li><strong>OpenAI</strong> — AI processing for the NOC Code Finder and Employment Letter Auditor. The text and document contents you submit to these tools are sent to OpenAI's API for analysis.</li>
+        <li><strong>Anthropic (Claude)</strong> — Additional AI processing for the NOC Code Finder and Employment Letter Auditor (we use more than one model to improve accuracy).</li>
+        <li><strong>Google (Gemini)</strong> — AI processing for the AI Profile Assistant and the proof-of-funds Bank Letter analysis. The relevant inputs are sent to Google's Gemini API.</li>
         <li><strong>Vercel</strong> — Website hosting and analytics</li>
         <li><strong>Google Analytics</strong> — Anonymized usage analytics</li>
       </ul>
+      <p>These AI providers process your inputs only to return a result to you. We do not authorize them to use your data to train their models, and content you submit is handled under each provider's enterprise/API data-use terms.</p>
+      <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>Note: the Smart Application Tracker's timeline predictions are derived from aggregated, community-reported case data we maintain. That reference dataset does not contain your personal information, and your own tracker entries are never shared with other users.</p>
 
       <h2 style={{ fontSize: '1.3rem', fontWeight: 700, margin: '32px 0 12px', color: 'var(--primary-dark)' }}>5. Data Retention</h2>
       <ul style={{ paddingLeft: '24px', marginBottom: '16px' }}>

@@ -1,0 +1,127 @@
+/* Processing Times page — visual styling for stat cards, milestone timeline, table, FAQ */
+
+/* ── Headline stat cards ─────────────────────────────────── */
+.pt-stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 16px;
+  margin: 0 auto 8px;
+}
+
+.pt-stat {
+  background: var(--surface-color);
+  border: 1px solid var(--border-color);
+  border-radius: 16px;
+  padding: 22px 20px;
+  text-align: center;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.05), 0 8px 24px rgba(0,0,0,0.03);
+}
+
+.pt-stat-number {
+  font-size: 2.1rem;
+  font-weight: 800;
+  line-height: 1;
+  background: linear-gradient(135deg, var(--primary-light), var(--primary-color));
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+.pt-stat-unit { font-size: 1rem; font-weight: 700; color: var(--primary-color); }
+
+.pt-stat-label {
+  margin-top: 8px;
+  font-size: 0.82rem;
+  color: var(--text-muted);
+  line-height: 1.4;
+}
+
+/* ── Milestone timeline ──────────────────────────────────── */
+.pt-timeline {
+  display: flex;
+  align-items: stretch;
+  gap: 0;
+  overflow-x: auto;
+  padding: 8px 2px 14px;
+}
+
+.pt-node {
+  position: relative;
+  flex: 1 1 0;
+  min-width: 120px;
+  text-align: center;
+  padding: 0 6px;
+}
+
+/* connecting line between nodes */
+.pt-node::before {
+  content: '';
+  position: absolute;
+  top: 19px;
+  left: -50%;
+  width: 100%;
+  height: 3px;
+  background: linear-gradient(90deg, var(--primary-light), var(--primary-color));
+  z-index: 0;
+}
+.pt-node:first-child::before { display: none; }
+
+.pt-dot {
+  position: relative;
+  z-index: 1;
+  width: 40px;
+  height: 40px;
+  margin: 0 auto 10px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(135deg, var(--primary-light), var(--primary-color));
+  color: #fff;
+}
+
+.pt-node-days { font-size: 1.15rem; font-weight: 800; color: var(--text-main); }
+.pt-node-label { font-size: 0.74rem; color: var(--text-muted); line-height: 1.35; margin-top: 2px; }
+.pt-node-sub { font-size: 0.66rem; color: var(--text-muted); opacity: 0.8; }
+
+/* ── Table ───────────────────────────────────────────────── */
+.pt-table-wrap { overflow-x: auto; border-radius: 14px; border: 1px solid var(--border-color); }
+.pt-table { width: 100%; border-collapse: collapse; min-width: 540px; }
+.pt-table thead th {
+  background: var(--bg-color);
+  text-align: center;
+  padding: 12px 14px;
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: var(--text-main);
+  border-bottom: 2px solid var(--border-color);
+}
+.pt-table thead th:first-child { text-align: left; }
+.pt-table td {
+  text-align: center;
+  padding: 11px 14px;
+  font-size: 0.88rem;
+  border-bottom: 1px solid var(--border-color);
+}
+.pt-table tbody tr:last-child td { border-bottom: none; }
+.pt-table tbody tr:nth-child(even) { background: rgba(0,0,0,0.015); }
+.pt-table td:first-child { text-align: left; font-weight: 600; }
+.pt-table .pt-col-all { background: rgba(67,56,202,0.05); font-weight: 700; color: var(--primary-dark); }
+.pt-cell-empty { color: #cbd5e1; }
+
+/* ── FAQ cards ───────────────────────────────────────────── */
+.pt-faq-item {
+  background: var(--surface-color);
+  border: 1px solid var(--border-color);
+  border-radius: 12px;
+  padding: 18px 20px;
+  margin-bottom: 14px;
+}
+.pt-faq-item h3 { font-size: 1.02rem; font-weight: 700; margin: 0 0 6px; color: var(--text-main); }
+.pt-faq-item p { line-height: 1.65; color: var(--text-muted); margin: 0; font-size: 0.92rem; }
+
+@media (max-width: 640px) {
+  .pt-stat-number { font-size: 1.8rem; }
+  .pt-timeline { gap: 0; }
+  .pt-node { min-width: 104px; }
+}

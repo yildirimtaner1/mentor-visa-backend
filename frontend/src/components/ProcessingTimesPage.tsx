@@ -1,6 +1,8 @@
 import { type FC } from 'react';
+import { Fingerprint, Stethoscope, Scale, Send, Award } from 'lucide-react';
 import { SEO } from './common/SEO';
 import data from '../data/processingTimes.json';
+import './ProcessingTimes.css';
 
 /**
  * Public, content-rich SEO landing page for Express Entry processing-time queries
@@ -90,32 +92,77 @@ export const ProcessingTimesPage: FC<{ onNavigate?: (p: string) => void }> = () 
       </section>
 
       <div className="page-container">
+        {/* Headline stats */}
+        <section className="page-section">
+          <div className="pt-stats">
+            <div className="pt-stat">
+              <div className="pt-stat-number">{ALL.aor_to_ppr?.median}<span className="pt-stat-unit">d</span></div>
+              <div className="pt-stat-label">Median AOR → PPR / Portal 2</div>
+            </div>
+            <div className="pt-stat">
+              <div className="pt-stat-number">{ALL.aor_to_ecopr?.median}<span className="pt-stat-unit">d</span></div>
+              <div className="pt-stat-label">Median AOR → eCOPR</div>
+            </div>
+            <div className="pt-stat">
+              <div className="pt-stat-number">{ALL.aor_to_bil?.median}<span className="pt-stat-unit">d</span></div>
+              <div className="pt-stat-label">Median AOR → Biometrics</div>
+            </div>
+            <div className="pt-stat">
+              <div className="pt-stat-number">{TOTAL}<span className="pt-stat-unit">+</span></div>
+              <div className="pt-stat-label">Real cases in the dataset</div>
+            </div>
+          </div>
+        </section>
+
+        {/* Visual timeline (overall medians) */}
+        <section className="page-section">
+          <h2 style={{ fontSize: '1.5rem', fontWeight: 800, marginBottom: 6 }}>The typical journey, AOR to eCOPR</h2>
+          <p style={{ color: 'var(--text-muted)', marginBottom: 18 }}>
+            Median days from AOR across all {TOTAL} cases. Your dates depend on your stream and country — the tracker tailors them to you.
+          </p>
+          <div className="pt-timeline">
+            {[
+              { icon: <Fingerprint size={20} />, label: 'Biometrics', sub: 'BIL', days: ALL.aor_to_bil?.median },
+              { icon: <Stethoscope size={20} />, label: 'Medical passed', sub: 'MEP', days: ALL.aor_to_meds?.median },
+              { icon: <Scale size={20} />, label: 'Final decision', sub: '', days: ALL.aor_to_decision?.median },
+              { icon: <Send size={20} />, label: 'PPR / Portal 2', sub: 'P1/P2 inland', days: ALL.aor_to_ppr?.median },
+              { icon: <Award size={20} />, label: 'eCOPR', sub: 'PR confirmed', days: ALL.aor_to_ecopr?.median },
+            ].map((m, i) => (
+              <div key={i} className="pt-node">
+                <div className="pt-dot">{m.icon}</div>
+                <div className="pt-node-days">~{m.days}d</div>
+                <div className="pt-node-label">{m.label}</div>
+                {m.sub && <div className="pt-node-sub">{m.sub}</div>}
+              </div>
+            ))}
+          </div>
+          <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: 6 }}>Cumulative median days measured from AOR.</p>
+        </section>
+
         <section className="page-section">
           <h2 style={{ fontSize: '1.5rem', fontWeight: 800, marginBottom: 6 }}>Median days between milestones, by stream</h2>
           <p style={{ color: 'var(--text-muted)', marginBottom: 18 }}>
             Median (50th-percentile) days from AOR. Lower is faster. Based on {TOTAL} cases reported since mid-2025.
           </p>
-          <div style={{ overflowX: 'auto' }}>
-            <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 520 }}>
+          <div className="pt-table-wrap">
+            <table className="pt-table">
               <thead>
                 <tr>
-                  <th style={{ textAlign: 'left', padding: '10px 12px', borderBottom: '2px solid var(--border-color)', fontSize: '0.85rem' }}>Milestone</th>
-                  {STREAMS.map(s => (
-                    <th key={s} style={{ textAlign: 'center', padding: '10px 12px', borderBottom: '2px solid var(--border-color)', fontSize: '0.85rem' }}>{s}</th>
-                  ))}
-                  <th style={{ textAlign: 'center', padding: '10px 12px', borderBottom: '2px solid var(--border-color)', fontSize: '0.85rem' }}>All</th>
+                  <th>Milestone</th>
+                  {STREAMS.map(s => (<th key={s}>{s}</th>))}
+                  <th className="pt-col-all">All</th>
                 </tr>
               </thead>
               <tbody>
                 {ROWS.map(r => (
                   <tr key={r.key}>
-                    <td style={{ padding: '10px 12px', borderBottom: '1px solid var(--border-color)', fontWeight: 600, fontSize: '0.88rem' }}>{r.label}</td>
+                    <td>{r.label}</td>
                     {STREAMS.map(s => (
-                      <td key={s} style={{ textAlign: 'center', padding: '10px 12px', borderBottom: '1px solid var(--border-color)', fontSize: '0.88rem', color: BY_STREAM[s]?.[r.key] ? 'var(--text-main)' : '#cbd5e1' }}>
+                      <td key={s} className={BY_STREAM[s]?.[r.key] ? '' : 'pt-cell-empty'}>
                         {fmtRange(BY_STREAM[s]?.[r.key])}
                       </td>
                     ))}
-                    <td style={{ textAlign: 'center', padding: '10px 12px', borderBottom: '1px solid var(--border-color)', fontSize: '0.88rem', fontWeight: 700 }}>{fmtRange(ALL[r.key])}</td>
+                    <td className="pt-col-all">{fmtRange(ALL[r.key])}</td>
                   </tr>
                 ))}
               </tbody>
@@ -146,9 +193,9 @@ export const ProcessingTimesPage: FC<{ onNavigate?: (p: string) => void }> = () 
         <section className="page-section">
           <h2 style={{ fontSize: '1.5rem', fontWeight: 800, marginBottom: 16 }}>Frequently asked questions</h2>
           {FAQ.map((f, i) => (
-            <div key={i} style={{ marginBottom: 18 }}>
-              <h3 style={{ fontSize: '1.05rem', fontWeight: 700, marginBottom: 6 }}>{f.q}</h3>
-              <p style={{ lineHeight: 1.7, color: 'var(--text-main)' }}>{f.a}</p>
+            <div key={i} className="pt-faq-item">
+              <h3>{f.q}</h3>
+              <p>{f.a}</p>
             </div>
           ))}
         </section>

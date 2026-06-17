@@ -6,7 +6,7 @@ export const TermsOfServicePage: FC = () => (
     <SEO title="Terms of Service | Mentor Visa" description="Read the Terms of Service for using Mentor Visa's AI-powered immigration document analysis tools." canonical="/terms-of-service" />
     
     <h1 style={{ fontSize: '2rem', fontWeight: 800, marginBottom: '8px', color: 'var(--primary-dark)' }}>Terms of Service</h1>
-    <p style={{ color: 'var(--text-muted)', marginBottom: '32px', fontSize: '0.9rem' }}>Last updated: April 8, 2026</p>
+    <p style={{ color: 'var(--text-muted)', marginBottom: '32px', fontSize: '0.9rem' }}>Last updated: June 16, 2026</p>
 
     <div style={{ lineHeight: 1.8, fontSize: '0.95rem', color: '#374151' }}>
       <p>Welcome to Mentor Visa. By accessing or using our website at <strong>mentorvisa.com</strong> ("Service"), you agree to be bound by these Terms of Service ("Terms"). If you do not agree to these Terms, please do not use the Service.</p>
@@ -20,12 +20,16 @@ export const TermsOfServicePage: FC = () => (
       </div>
 
       <h2 style={{ fontSize: '1.3rem', fontWeight: 700, margin: '32px 0 12px', color: 'var(--primary-dark)' }}>2. Description of Service</h2>
-      <p>Mentor Visa provides AI-powered tools including:</p>
+      <p>Mentor Visa provides a suite of tools and resources for Express Entry applicants, including:</p>
       <ul style={{ paddingLeft: '24px', marginBottom: '16px' }}>
-        <li><strong>Employment Letter Auditor:</strong> Analyzes employment letters against IRCC formatting and content requirements.</li>
+        <li><strong>Eligibility Check:</strong> A questionnaire indicating which Express Entry programs you may qualify for.</li>
+        <li><strong>CRS Calculator &amp; Simulator:</strong> Estimates Comprehensive Ranking System scores and models "what-if" point scenarios.</li>
         <li><strong>NOC Code Finder:</strong> Matches job duties to the National Occupational Classification (NOC) 2021 system.</li>
-        <li><strong>CRS Calculator:</strong> Estimates Comprehensive Ranking System scores for Express Entry.</li>
-        <li><strong>CEC Guide & Checklist:</strong> Informational resources for Canadian Experience Class applicants.</li>
+        <li><strong>Employment Letter Auditor:</strong> Analyzes employment letters against IRCC formatting and content requirements.</li>
+        <li><strong>AI Profile Assistant:</strong> Provides informational, AI-generated answers and suggestions about your profile.</li>
+        <li><strong>Smart Application Tracker:</strong> Lets you record post-ITA milestones and generates timeline estimates from aggregated community-reported case data.</li>
+        <li><strong>Document Checklist &amp; Expiry Tracker:</strong> Helps you organize required documents and track expiry dates for you and your dependents.</li>
+        <li><strong>Guides, Draw Results, Processing Times &amp; NOC Directory:</strong> Informational resources for Express Entry applicants.</li>
       </ul>
 
       <h2 style={{ fontSize: '1.3rem', fontWeight: 700, margin: '32px 0 12px', color: 'var(--primary-dark)' }}>3. No Guarantee of Outcomes</h2>
@@ -34,6 +38,7 @@ export const TermsOfServicePage: FC = () => (
         <li>A "Compliant" result from our auditor does <strong>not</strong> guarantee your document will be accepted by IRCC or any immigration authority.</li>
         <li>NOC code matching is based on AI interpretation and may differ from an official IRCC assessment.</li>
         <li>CRS score calculations are estimates and may not reflect your actual score as determined by IRCC.</li>
+        <li>Smart Application Tracker timelines are statistical estimates derived from community-reported cases. They are <strong>not</strong> predictions of how IRCC will process your specific application, and actual processing times vary.</li>
         <li>Immigration laws, policies, and processing requirements change frequently. Our tools may not always reflect the most current requirements.</li>
       </ul>
 
@@ -64,7 +69,7 @@ export const TermsOfServicePage: FC = () => (
         <li>You retain ownership of all documents and content you upload.</li>
         <li>By uploading content, you grant Mentor Visa a limited license to process, analyze, and store your documents solely for the purpose of providing the Service.</li>
         <li>You represent that you have the right to upload any content you submit and that it does not violate any third party's rights.</li>
-        <li>Uploaded documents are sent to Google's Gemini AI for analysis. By using the Service, you consent to this processing.</li>
+        <li>Content you submit is sent to third-party AI providers (OpenAI, Anthropic, and Google) for analysis, as described in our <a href="/privacy-policy" style={{ color: 'var(--primary-color)' }}>Privacy Policy</a>. By using the Service, you consent to this processing.</li>
       </ul>
 
       <h2 style={{ fontSize: '1.3rem', fontWeight: 700, margin: '32px 0 12px', color: 'var(--primary-dark)' }}>8. Limitation of Liability</h2>
