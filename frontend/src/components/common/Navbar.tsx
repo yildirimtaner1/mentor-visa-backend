@@ -53,7 +53,7 @@ export const Navbar: FC = () => {
   const location = useLocation();
 
   // Credit balance
-  const [credits, setCredits] = useState<{ noc: number; audit: number; builder: number; ita: number; tier: string } | null>(null);
+  const [credits, setCredits] = useState<{ noc: number; audit: number; tier: string } | null>(null);
 
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect
@@ -62,51 +62,33 @@ export const Navbar: FC = () => {
       const tk = await getToken();
       if (!tk) return;
       const c = await fetchUserCredits(tk);
-      setCredits({ 
-        noc: c.find_noc_credits || 0, 
+      setCredits({
+        noc: c.find_noc_credits || 0,
         audit: c.audit_letter_credits || 0,
-        builder: c.letter_builder_credits || 0,
-        ita: c.ita_strategy_credits || 0,
         tier: c.subscription_tier || 'free'
       });
     };
     load();
   }, [isSignedIn, getToken]);
 
-  const isTierUnlimited = (type: 'audit' | 'builder') => {
-    if (!credits) return false;
-    if (type === 'audit') return ['starter', 'complete'].includes(credits.tier);
-    if (type === 'builder') return credits.tier === 'complete';
-    return false;
-  };
+  const isAuditUnlimited = () => !!credits && ['starter', 'complete'].includes(credits.tier);
 
   const totalCreditsDisplay = () => {
     if (!credits) return '0 credits';
-    
-    const isAuditUnlimited = isTierUnlimited('audit');
-    const isBuilderUnlimited = isTierUnlimited('builder');
-    
-    // Calculate credits for tools NOT covered by unlimited tier
-    const otherCredits = (isAuditUnlimited ? 0 : credits.audit) + 
-                        (isBuilderUnlimited ? 0 : credits.builder) + 
-                        credits.noc + 
-                        credits.ita;
-                       
-    if (isAuditUnlimited && isBuilderUnlimited) {
+
+    // Credits for tools NOT covered by an unlimited tier (Letter Auditor is unlimited on Optimize+).
+    const otherCredits = (isAuditUnlimited() ? 0 : credits.audit) + credits.noc;
+
+    if (isAuditUnlimited()) {
       return otherCredits > 0 ? `Unlimited + ${otherCredits} credit${otherCredits !== 1 ? 's' : ''}` : 'Unlimited Access';
     }
-    
-    if (isAuditUnlimited || isBuilderUnlimited) {
-      return otherCredits > 0 ? `Unlimited + ${otherCredits} credit${otherCredits !== 1 ? 's' : ''}` : 'Unlimited Access';
-    }
-    
     return `${otherCredits} credit${otherCredits !== 1 ? 's' : ''}`;
   };
 
   const creditBadgeElement = credits !== null ? (
     <div
       onClick={() => navigate('/dashboard')}
-      title={`NOC Finder: ${credits.noc} | Letter Builder: ${isTierUnlimited('builder') ? 'Unlimited' : credits.builder} | Letter Auditor: ${isTierUnlimited('audit') ? 'Unlimited' : credits.audit}${credits.ita > 0 ? ` | ITA Strategy: ${credits.ita}` : ''}`}
+      title={`NOC Finder: ${credits.noc} | Letter Auditor: ${isAuditUnlimited() ? 'Unlimited' : credits.audit}`}
       style={{
         display: 'flex', alignItems: 'center', gap: '5px',
         background: 'linear-gradient(135deg, #EEF2FF, #E0E7FF)',

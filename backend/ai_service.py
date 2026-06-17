@@ -179,49 +179,40 @@ def extract_text_from_docx(docx_bytes: bytes) -> str:
 def _build_prompt_text(noc_reference: str, target_noc: str = None) -> str:
     """Builds the system instruction for the skeptical immigration officer auditor prompt."""
     
-    task_noc_matching = """
-=== TASK 1 - NOC DETECTION & ALIGNMENT ===
-
-Read the employment letter carefully. Compare the duties described in the letter against the "duties" arrays in the NOC 2021 database.
-
-NOC MATCHING STRATEGY:
-Step 1: Identify TOP 3 candidate NOCs based on duties
-Step 2: Select BEST-FIT NOC (highest duty coverage)
-Step 3: Provide alternatives with lower confidence
-
-=== CRITICAL: SEMANTIC MATCHING, NOT KEYWORD MATCHING ===
-Do NOT match based on surface-level keywords. Focus on the SEMANTIC MEANING of what the person actually does day-to-day.
-A word that appears frequently in the letter (an industry, product, material, or setting) is NOT necessarily the person's function — a role that inspects for hazards and recommends controls is a safety function regardless of the setting. Always ask: "What is this person's core function?" rather than "What keywords appear most often?"
-
-=== NO OVER-RELIANCE ON JOB TITLES ===
-Job titles are NOT determinative. Duties override titles. A "Manager" who only does clerical work is NOT performing management duties.
-
-=== MULTI-TITLE NOC GROUPS ===
-Some NOC codes cover several DISTINCT occupations under one code (e.g. "Translators, terminologists and interpreters" — an interpreter is none of the other two). When the detected NOC is such a group, evaluate the applicant ONLY against the duties of the sub-occupation they actually perform. Do NOT treat the other sub-occupations' duties as "missing" — they are NOT APPLICABLE and must be excluded entirely (do not list them in duties_match and do not count them in coverage). A perfect interpreter must not be penalized for not translating documents.
-
-=== TIE-BREAKING RULE ===
-If two or more NOC codes score within 5 percentage points of each other, select the NOC whose LEAD STATEMENT most accurately describes the person's primary role. List the close runner-up as the first alternative NOC and explicitly note in the explanation that these two codes are close matches.
-
-- In `noc_analysis.detected_code`, return the 5-digit code.
-- In `noc_analysis.detected_title`, return the exact title from the database.
-- In `noc_analysis.match_score`, evaluate objective duty coverage out of 100.
-- In `noc_analysis.confidence`, rate how confident you are in this selection (0-100). Low match_score + high confidence = sure it's the right NOC but the letter is weak.
-- In `noc_analysis.alternative_nocs`, list secondary matches >= 50%.
-  **IMPORTANT: Score each alternative NOC as if you were doing a deep, dedicated evaluation against that specific NOC. Do NOT give rough estimates.**
-  **CRITICAL: You may ONLY list alternative NOCs whose codes appear in the provided database. NEVER invent or recall NOC codes from memory.**
-"""
+    # NOTE: The NOC code is determined UPSTREAM by the NOC Finder (auto_detect_noc) and force-locked
+    # in code after this prompt runs, so the Auditor does NOT re-derive the NOC from scratch — it
+    # EVALUATES the applicant's duty coverage against the supplied NOC. `target_noc` is therefore set
+    # on essentially every call; the no-target branch below is only a defensive fallback.
+    multi_title_rule = """
+MULTI-TITLE NOC GROUPS: Some codes cover several DISTINCT occupations (e.g. "Translators, terminologists and interpreters" — an interpreter is none of the other two). When the NOC is such a group, evaluate the applicant ONLY against the duties of the sub-occupation they actually perform. The other sub-occupations' duties are NOT APPLICABLE — exclude them entirely (do not list them in duties_match and do not count them in coverage). A perfect interpreter must not be penalized for not translating documents."""
 
     if target_noc:
         task_noc_matching = f"""
-=== TASK 1 - TARGETED NOC EVALUATION ===
-The user explicitly requested to evaluate this document against NOC {target_noc}.
-You MUST lock the primary match to NOC {target_noc}. Evaluate how strongly the applicant's duties align specifically with NOC {target_noc}.
+=== TASK 1 - NOC EVALUATION (against the pre-determined code) ===
+The primary NOC for this document has already been determined: NOC {target_noc}. Your job is to
+EVALUATE the applicant's duty alignment against it, not to search for a different code.
 - Set `noc_analysis.detected_code` strictly to "{target_noc}".
 - Fetch and set `noc_analysis.detected_title` to the exact title for {target_noc} from the database.
-- In `noc_analysis.match_score`, evaluate the objective percentage out of 100 showing how well their duties align with {target_noc}. (It is okay if it is low, be honest).
-- In `noc_analysis.confidence`, rate how confident you are in this selection (0-100).
-- You may still list other better fits in `alternative_nocs`.
-- Map their duties strictly against the official duties of NOC {target_noc}. Explain where they overlap and note glaring gaps if any.
+- In `noc_analysis.match_score`, give the objective duty-coverage percentage (0-100). Be honest — it is fine if it is low.
+- In `noc_analysis.confidence`, rate how confident you are that {target_noc} is the right occupation (0-100).
+- Map their duties strictly against the official duties of NOC {target_noc}; explain overlaps and note glaring gaps.
+- You may list genuinely better fits in `alternative_nocs` (codes from the provided database ONLY).
+{multi_title_rule}
+"""
+    else:
+        # Defensive fallback only — auto-detection upstream failed. Pick by duty coverage from the
+        # provided candidates; keep it lean since this path is rarely reached.
+        task_noc_matching = f"""
+=== TASK 1 - NOC SELECTION (fallback — pick best fit from the provided candidates) ===
+Compare the letter's duties against the official "duties" of each candidate NOC and select the code
+with the highest genuine duty coverage. Match on the SEMANTIC FUNCTION the person performs, not on
+surface keywords or the job title (a frequent industry/product/setting word is not the function).
+- `noc_analysis.detected_code`: the 5-digit code (from the provided database ONLY — never invent codes).
+- `noc_analysis.detected_title`: the exact title from the database.
+- `noc_analysis.match_score`: objective duty coverage out of 100.
+- `noc_analysis.confidence`: how confident you are in the selection (0-100).
+- `noc_analysis.alternative_nocs`: secondary matches >= 50% (database codes only).
+{multi_title_rule}
 """
 
     return f"""You are an advanced AI system acting as a STRICT, SKEPTICAL, and FAIR Canadian Immigration Officer auditing employment letters under Express Entry - Canadian Experience Class (CEC).

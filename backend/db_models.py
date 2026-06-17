@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, DateTime, JSON, ForeignKey
+from sqlalchemy import Column, Integer, String, DateTime, JSON, ForeignKey, event
 import datetime
 import pytz
 from database import Base
@@ -43,6 +43,30 @@ class Evaluation(Base):
     timestamp_toronto = Column(DateTime, default=get_toronto_now)
     
     payload = Column(JSON, nullable=False)
+
+
+def _noc_code_from_payload(payload) -> str | None:
+    """Pull the resulting NOC code out of an evaluation payload, regardless of tool shape:
+    NOC Finder uses `recommended_noc.code`; the Auditor uses `noc_analysis.detected_code`."""
+    if not isinstance(payload, dict):
+        return None
+    rec = payload.get("recommended_noc")
+    if isinstance(rec, dict) and rec.get("code"):
+        return str(rec["code"]).strip() or None
+    na = payload.get("noc_analysis")
+    if isinstance(na, dict) and na.get("detected_code"):
+        return str(na["detected_code"]).strip() or None
+    return None
+
+
+@event.listens_for(Evaluation, "before_insert")
+@event.listens_for(Evaluation, "before_update")
+def _populate_detected_noc_code(mapper, connection, target):
+    """Keep the denormalized `detected_noc_code` column in sync with the payload on every write,
+    so analytics/filtering by NOC code work without each call site remembering to set it."""
+    code = _noc_code_from_payload(target.payload)
+    if code:
+        target.detected_noc_code = code
 
 
 class PaymentEvent(Base):

@@ -133,6 +133,15 @@ Pick the SINGLE best NOC code for this applicant.
 3. Verify the TEER level fits the applicant's level of responsibility.
 4. Ignore the job title on the letter if it conflicts with the duties — titles are often
    marketing labels.
+5. SETTING-SPECIFIC vs GENERAL codes: some NOC pairs differ only by work setting — a specialized
+   code (e.g. 13111 Legal administrative assistants, 13112 Medical administrative assistants) and a
+   GENERAL code (e.g. 13110 Administrative assistants). Choose the specialized code ONLY when the
+   applicant performs its DEFINING duties (the duties unique to that setting — e.g. preparing legal
+   documents such as deeds, wills, affidavits and briefs for 13111). If the applicant only performs
+   GENERIC duties of that occupation (filing, scheduling, correspondence, supplies) and the legal /
+   medical / etc. setting is merely the backdrop, the GENERAL code is the correct primary and the
+   specialized code is at most a close runner-up. Working near a setting is NOT performing its
+   specialized function.
 
 Choose the winner and a runner-up. For multi-title NOC groups (one code covering several distinct
 occupations, e.g. 51114 Translators / terminologists / interpreters), pick the code if the applicant
@@ -140,7 +149,13 @@ clearly matches ANY one of its occupation types — do not reject it because the
 perform the OTHER types' duties.
 
 Report duty coverage HONESTLY (duties_matched out of the winner's duties_total). Base duties_matched
-on real evidence in the applicant's duties, not optimism."""
+on real evidence in the applicant's duties, not optimism.
+
+=== REASONING — STATE ONLY WHAT IS IN THE PROFILE ===
+In `reasoning`, justify the choice using ONLY facts present in the applicant's structured profile.
+Do NOT assert an employer name, industry, or setting that is not actually stated — if the employer
+type / industry is empty or "unknown", reason from the DUTIES alone and do not claim the employer is
+"explicitly" in any sector. Never invent context to support the chosen NOC."""
 
 
 # ── Title -> code grounding (local, free) ─────────────────────────────────────
@@ -456,8 +471,8 @@ def _build_v2_response(winning_code: str, auditor: dict | None,
 
     sem = _semantic_confidence(applicant_duties, winning_code)
     if sem is not None:
-        sem_conf, disp_matched, disp_total = sem
-        confidence = max(sem_conf, lex_conf)   # semantic primary; lexical is a floor only
+        sem_conf, _sem_matched, _sem_total = sem   # applicant-side precision — drives confidence only
+        confidence = max(sem_conf, lex_conf)        # semantic primary; lexical is a floor only
     else:
         # Embeddings unavailable — fall back to the auditor count / lexical heuristic.
         a_total = auditor.get("duties_total", 0) or 0
@@ -465,7 +480,14 @@ def _build_v2_response(winning_code: str, auditor: dict | None,
         auditor_pct = (a_matched / a_total) if a_total > 0 else 0
         lex_pct = (lex_matched / lex_total) if lex_total > 0 else 0
         confidence = min(100, max(0, round(max(auditor_pct, lex_pct) * 100)))
-        disp_matched, disp_total = (a_matched or lex_matched), (a_total or lex_total)
+
+    # The DISPLAYED "X / Y duties" must be NOC-side COVERAGE computed on the same basis as
+    # key_gaps/key_matches (word-overlap over the NOC's official duties), so the headline fraction
+    # can never contradict the listed gaps. (Confidence above is a separate, semantic "is this the
+    # right NOC?" signal — the precision count is intentionally NOT shown as the duty fraction.)
+    disp_matched, disp_total = noc_agents._count_duty_coverage(extraction, noc_entry)
+    if disp_total <= 0:  # no NOC duties to score against — fall back so we never show "0/0"
+        disp_matched, disp_total = lex_matched, lex_total
 
     # Alternative confidence: use the recall-style score (matched / alt-NOC duties), which reads
     # as appropriately SECONDARY. We deliberately do NOT use applicant-side precision here —
