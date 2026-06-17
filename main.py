@@ -82,7 +82,7 @@ IMAGE_EXTENSIONS = {'.jpg', '.jpeg', '.png', '.bmp', '.tiff', '.tif', '.webp'}
 
 app = FastAPI(
     title="Mentor Visa Analyzer API",
-    description="Canadian Experience Class (CEC) Document Analysis API powered by Google Gemini",
+    description="Express Entry toolkit API — NOC Finder & Employment Letter Auditor (OpenAI + Claude), AI Profile Assistant (Gemini).",
     version="2.0.0"
 )
 
@@ -1048,7 +1048,8 @@ from letter_builder_models import DutyAnalysisRequest, LetterGenerationRequest
 
 @app.get("/api/v1/letter-builder/noc-duties/{noc_code}")
 def get_noc_duties(noc_code: str):
-    """Returns the official duties list for a given NOC code from the index."""
+    """RETIRED: the Letter Builder is a legacy product and is no longer offered."""
+    raise HTTPException(status_code=410, detail="The Letter Builder has been retired.")
     entry = ai_service.get_noc_details(noc_code)
     if not entry:
         raise HTTPException(status_code=404, detail=f"NOC code {noc_code} not found.")
@@ -1069,7 +1070,8 @@ async def analyze_duty_endpoint(
     req: DutyAnalysisRequest,
     user_id: str = Depends(get_current_user),
 ):
-    """Analyze a single user-written duty against a target NOC code."""
+    """RETIRED: the Letter Builder is a legacy product and is no longer offered."""
+    raise HTTPException(status_code=410, detail="The Letter Builder has been retired.")
     if not req.duty_text.strip():
         raise HTTPException(status_code=400, detail="Duty text cannot be empty.")
     if len(req.duty_text) > 2000:
@@ -1090,8 +1092,8 @@ async def generate_letter_endpoint(
     user_id: str = Depends(get_current_user),
     db: Session = Depends(database.get_db)
 ):
-    """Assemble the final employment letter from user-approved data.
-    Requires a letter_builder credit."""
+    """RETIRED: the Letter Builder is a legacy product and is no longer offered."""
+    raise HTTPException(status_code=410, detail="The Letter Builder has been retired.")
     ensure_user_exists(user_id, db)
     
     # Check access: Complete tier gets unlimited, otherwise need credits
@@ -1442,9 +1444,10 @@ def generate_ita_strategy_endpoint(
     user_id: str = Depends(get_current_user),
     db: Session = Depends(database.get_db)
 ):
-    """Generate a personalized ITA strategy report using AI. Requires 1 ita_strategy credit."""
+    """RETIRED: the ITA Strategy report is a legacy product and is no longer offered."""
+    raise HTTPException(status_code=410, detail="The ITA Strategy report has been retired.")
     ensure_user_exists(user_id, db)
-    
+
     # Check credits
     user = db.query(db_models.UserAccount).filter_by(user_id=user_id).first()
     if not user or user.ita_strategy_credits < 1:
@@ -1509,7 +1512,8 @@ def get_ita_strategy(
     user_id: str = Depends(get_current_user),
     db: Session = Depends(database.get_db)
 ):
-    """Retrieve a previously generated ITA strategy report."""
+    """RETIRED: the ITA Strategy report is a legacy product and is no longer offered."""
+    raise HTTPException(status_code=410, detail="The ITA Strategy report has been retired.")
     # Look for ita_strategy records that reference this source evaluation
     strategies = db.query(db_models.Evaluation).filter_by(
         user_id=user_id,
