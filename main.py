@@ -301,9 +301,14 @@ async def analyze_document_endpoint(
         if not target_noc:
             target_noc = ai_service.auto_detect_noc(user_content, page_images)
             auto_detected = target_noc  # Remember this was auto-detected, not user-specified
-        
+
         top_nocs = ai_service.semantic_search_nocs(user_content)
-        
+
+        # The Auditor evaluates against a determined NOC; if auto-detection failed, fall back to the
+        # top semantic candidate so we never run the prompt's from-scratch detection path.
+        if not target_noc and top_nocs:
+            target_noc = next(iter(top_nocs))
+
         # Auditor Fix: Always include the target_noc in the reference sheet so the AI can evaluate against it!
         if target_noc:
             target_data = ai_service.NOC_CODE_TO_ENTRY.get(target_noc)
@@ -731,9 +736,14 @@ def reevaluate_document(
             if not effective_target:
                 effective_target = ai_service.auto_detect_noc(user_content, page_images)
                 auto_detected = effective_target
-            
+
             top_nocs = ai_service.semantic_search_nocs(user_content)
-            
+
+            # Fall back to the top semantic candidate if detection failed, so the Auditor always
+            # evaluates against a determined NOC rather than re-detecting from scratch.
+            if not effective_target and top_nocs:
+                effective_target = next(iter(top_nocs))
+
             if effective_target:
                 target_data = ai_service.NOC_CODE_TO_ENTRY.get(effective_target)
                 if target_data:
