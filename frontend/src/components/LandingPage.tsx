@@ -2,7 +2,7 @@ import type { FC } from 'react';
 import { Navbar } from './common/Navbar';
 import { SEO } from './common/SEO';
 import { Testimonials } from './ui/testimonials-columns-1';
-import { CheckCircle2, Search, LineChart, FileText, DollarSign, ShieldCheck, ArrowRight, TrendingDown } from 'lucide-react';
+import { CheckCircle2, Search, LineChart, FileText, DollarSign, ShieldCheck, ArrowRight, TrendingDown, Bot, FileCheck, CalendarClock, FolderCheck, BarChart3, Calculator } from 'lucide-react';
 import { ALL_DRAWS } from '../data/drawResults';
 import './LandingPage.css';
 import './PricingPage.css';
@@ -88,7 +88,7 @@ export const LandingPage: FC<LandingPageProps> = ({ onNavigate }) => {
             <span className="hero-highlight">a $5,000 Consultant.</span>
           </h1>
           <p className="hero-subtitle">
-            Check your eligibility, calculate your exact CRS score, find your NOC code, and track every document — all in one platform. The smarter first step before hiring anyone.
+            Check eligibility, calculate your exact CRS, find your NOC code, audit your employment letter, and track every milestone after your ITA — eight tools in one platform. The smarter first step before hiring anyone.
           </p>
 
           {/* Single Primary CTA */}
@@ -114,17 +114,17 @@ export const LandingPage: FC<LandingPageProps> = ({ onNavigate }) => {
           <div className="hero-stats">
             <div className="hero-stat">
               <div className="hero-stat-number">2,847+</div>
-              <div className="hero-stat-label">Users</div>
+              <div className="hero-stat-label">Applicants</div>
             </div>
             <div className="hero-stat-divider" />
             <div className="hero-stat">
-              <div className="hero-stat-number">12</div>
-              <div className="hero-stat-label">Critical Mistakes Covered</div>
+              <div className="hero-stat-number">8</div>
+              <div className="hero-stat-label">Tools, One Platform</div>
             </div>
             <div className="hero-stat-divider" />
             <div className="hero-stat">
-              <div className="hero-stat-number">3</div>
-              <div className="hero-stat-label">EE Programs Covered</div>
+              <div className="hero-stat-number">2,000+</div>
+              <div className="hero-stat-label">Real Cases Behind Predictions</div>
             </div>
           </div>
         </div>
@@ -214,11 +214,42 @@ export const LandingPage: FC<LandingPageProps> = ({ onNavigate }) => {
       </section>
 
       {/* ═══════════════════════════════════════════ */}
-      {/* HOW IT WORKS — Benefit-driven 4 steps       */}
+      {/* TOOLKIT — Every tool in the platform         */}
+      {/* ═══════════════════════════════════════════ */}
+      <section className="section" id="toolkit">
+        <h2 className="section-title">One Platform, Every Step of Express Entry</h2>
+        <p className="section-subtitle">Eight purpose-built tools that take you from "Am I eligible?" all the way to eCoPR.</p>
+
+        <div className="toolkit-grid">
+          {[
+            { icon: <CheckCircle2 size={22} />, name: 'Eligibility Check', desc: 'Answer 5 questions to see if you qualify for FSWP, CEC, or FSTP.', tier: 'Free', page: 'get-started' },
+            { icon: <Calculator size={22} />, name: 'CRS Calculator & Simulator', desc: 'Your exact score, the gap to the latest cutoff, and what-if point scenarios.', tier: 'Free', page: 'crs-calculator' },
+            { icon: <Search size={22} />, name: 'NOC Code Finder', desc: 'AI matches your duties against all 516 NOC 2021 unit groups with a confidence score.', tier: 'Free', page: 'find-my-noc' },
+            { icon: <FileCheck size={22} />, name: 'Employment Letter Auditor', desc: 'An IRCC-style, duty-by-duty audit of your reference letter before you submit.', tier: 'Optimize', page: 'audit-employment-letter' },
+            { icon: <Bot size={22} />, name: 'AI Profile Assistant', desc: 'Personalized answers and a tailored action plan to raise your CRS.', tier: 'Optimize', page: 'ai-profile-assistant' },
+            { icon: <CalendarClock size={22} />, name: 'Smart Application Tracker', desc: 'Track every post-ITA milestone and get timeline predictions from 2,000+ real cases.', tier: 'Optimize', page: 'track-my-application' },
+            { icon: <FolderCheck size={22} />, name: 'Document Checklist & Expiry Tracker', desc: 'A personalized checklist with expiry alerts for you and your dependents.', tier: 'Optimize', page: 'documents' },
+            { icon: <BarChart3 size={22} />, name: 'Draws & Processing Times', desc: 'Every recent Express Entry draw plus real-world processing-time data.', tier: 'Free', page: 'draw-results' },
+          ].map((t) => (
+            <div key={t.name} className="tool-card" onClick={() => onNavigate(t.page)}>
+              <div className="tool-card-top">
+                <span className="tool-card-icon">{t.icon}</span>
+                <span className={`tool-card-tier ${t.tier === 'Free' ? 'free' : 'paid'}`}>{t.tier}</span>
+              </div>
+              <h3 className="tool-card-name">{t.name}</h3>
+              <p className="tool-card-desc">{t.desc}</p>
+              <span className="tool-card-link">Open <ArrowRight size={13} /></span>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      {/* ═══════════════════════════════════════════ */}
+      {/* HOW IT WORKS — Benefit-driven 5 steps       */}
       {/* ═══════════════════════════════════════════ */}
       <section id="how-it-works" className="section section-dark">
-        <h2 className="section-title">Your PR Journey in 4 Steps</h2>
-        <p className="section-subtitle">From "Am I eligible?" to "My application is ready." — everything in one place.</p>
+        <h2 className="section-title">Your PR Journey, End to End</h2>
+        <p className="section-subtitle">From "Am I eligible?" to confirmation of PR — everything in one place.</p>
         <div className="steps-grid">
           <div className="step-card" onClick={() => onNavigate('get-started')} style={{ cursor: 'pointer' }}>
             <div className="step-number">1</div>
@@ -242,7 +273,13 @@ export const LandingPage: FC<LandingPageProps> = ({ onNavigate }) => {
             <div className="step-number">4</div>
             <div className="step-icon"><FileText size={32} color="var(--primary-color)" /></div>
             <h3>Are My Documents Ready?</h3>
-            <p>Track every document, catch expiry dates, and avoid the 12 most common mistakes that get applications refused.</p>
+            <p>Build a personalized checklist for you and your dependents, with expiry alerts so nothing lapses before you submit.</p>
+          </div>
+          <div className="step-card" onClick={() => onNavigate('track-my-application')} style={{ cursor: 'pointer' }}>
+            <div className="step-number">5</div>
+            <div className="step-icon"><CalendarClock size={32} color="var(--primary-color)" /></div>
+            <h3>When Will I Hear Back?</h3>
+            <p>After your ITA, track each milestone and get timeline predictions — biometrics, medical, P1/P2 or PPR, and eCoPR — from 2,000+ real cases.</p>
           </div>
         </div>
       </section>
@@ -372,9 +409,11 @@ export const LandingPage: FC<LandingPageProps> = ({ onNavigate }) => {
           </div>
           <div className="landing-footer-links">
             <button onClick={() => onNavigate('get-started')}>Check Eligibility</button>
-            <button onClick={() => onNavigate('find-my-noc')}>Find My NOC</button>
             <button onClick={() => onNavigate('crs-calculator')}>CRS Calculator</button>
-            <button onClick={() => onNavigate('documents')}>12 Mistakes</button>
+            <button onClick={() => onNavigate('find-my-noc')}>Find My NOC</button>
+            <button onClick={() => onNavigate('audit-employment-letter')}>Letter Auditor</button>
+            <button onClick={() => onNavigate('track-my-application')}>Application Tracker</button>
+            <button onClick={() => onNavigate('documents')}>Documents</button>
             <button onClick={() => onNavigate('pricing')}>Pricing</button>
             <button onClick={() => onNavigate('draw-results')}>Draw Results</button>
             <button onClick={() => onNavigate('noc-codes')}>NOC Directory</button>
