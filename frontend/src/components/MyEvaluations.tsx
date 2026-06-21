@@ -189,7 +189,7 @@ export const MyEvaluations: FC<MyEvaluationsProps> = ({ onSelectEvaluation }) =>
                       
                       {!isCRS && ev.payload?.reevaluated_against_noc && (
                         <span className="eval-type-badge" style={{ background: '#FEF3C7', color: '#92400E' }}>
-                          vs NOC {ev.payload.reevaluated_against_noc}
+                          {isLocked ? 'vs NOC 🔒' : `vs NOC ${ev.payload.reevaluated_against_noc}`}
                         </span>
                       )}
 
@@ -208,7 +208,7 @@ export const MyEvaluations: FC<MyEvaluationsProps> = ({ onSelectEvaluation }) =>
                       <span className="meta-tag">
                         🕒 {timeAgo(ev.timestamp)}
                       </span>
-                      {!isCRS && ev.payload?.noc_analysis?.detected_code && (
+                      {!isCRS && ev.payload?.noc_analysis?.detected_code && !isLocked && (
                         <span className="meta-tag">
                           NOC {ev.payload.noc_analysis.detected_code}
                         </span>

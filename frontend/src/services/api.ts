@@ -124,7 +124,19 @@ export async function fetchUserCredits(token: string) {
   return response.json();
 }
 
-export async function createCheckoutSession(passType: 'finder' | 'auditor' | 'letter_builder' | 'ita_strategy' | 'war_room' | 'starter' | 'complete', token: string, returnPath: string = '/dashboard') {
+// After signing in following an anonymous NOC search, ask the backend whether this user is entitled
+// to the FULL report (paid, or spends one credit) or should see the upgrade gate — without re-running AI.
+export async function revealNocResult(token: string, storedFileId: string): Promise<{ access: 'full' | 'gated'; finder_credits_remaining: number | null; tier: string; result?: any }> {
+  const response = await fetch(`${API_BASE_URL}/api/v1/noc-finder/reveal`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+    body: JSON.stringify({ stored_file_id: storedFileId }),
+  });
+  if (!response.ok) return { access: 'gated', finder_credits_remaining: 0, tier: 'free' };
+  return response.json();
+}
+
+export async function createCheckoutSession(passType: 'finder' | 'finder_1' | 'finder_3' | 'finder_5' | 'auditor' | 'letter_builder' | 'ita_strategy' | 'war_room' | 'starter' | 'complete', token: string, returnPath: string = '/dashboard') {
   const returnUrl = window.location.origin + returnPath;
   const response = await fetch(`${API_BASE_URL}/api/v1/create-checkout-session`, {
     method: 'POST',

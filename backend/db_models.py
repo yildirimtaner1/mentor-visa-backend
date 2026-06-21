@@ -12,7 +12,7 @@ class UserAccount(Base):
     __tablename__ = "users"
     
     user_id = Column(String, primary_key=True, index=True)
-    find_noc_credits = Column(Integer, default=0, nullable=False)
+    find_noc_credits = Column(Integer, default=2, nullable=False)  # free full NOC Finder reports before the Optimize gate
     audit_letter_credits = Column(Integer, default=0, nullable=False)
     letter_builder_credits = Column(Integer, default=0, nullable=False)
     ita_strategy_credits = Column(Integer, default=0, nullable=False)

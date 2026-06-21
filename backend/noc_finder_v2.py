@@ -321,11 +321,16 @@ def _cache_key(text: str) -> str:
 
 
 # ── Pipeline ──────────────────────────────────────────────────────────────────
-def run_noc_finder_v2(user_content: str, page_images=None) -> dict:
-    """Run the knowledge-first multi-model NOC Finder. Returns NOCFinderResponseSchema dict."""
+def run_noc_finder_v2(user_content: str, page_images=None, target_noc: str = None, from_document: bool = False) -> dict:
+    """Run the knowledge-first multi-model NOC Finder. Returns NOCFinderResponseSchema dict.
+
+    target_noc: when set, lock the result to that NOC (re-evaluation / alternative / manual code) and
+    skip proposing+adjudication — it is still scored honestly via semantic precision + duty-by-duty.
+    from_document: True when the input is an uploaded letter/document (drives input_reliability)."""
     t_start = time.time()
     # Serve repeat calls on the same letter from cache (text-only) for Finder/Auditor consistency.
-    cache_key = _cache_key(user_content) if not page_images else None
+    # Never cache targeted evals — the cache key is the letter only, not the requested code.
+    cache_key = _cache_key(user_content) if (not page_images and not target_noc) else None
     if cache_key and cache_key in _RESULT_CACHE:
         import copy
         print("[v2] cache hit — returning identical result (Finder/Auditor consistency)")
@@ -345,6 +350,20 @@ def run_noc_finder_v2(user_content: str, page_images=None) -> dict:
     )
     print(f"[Stage 1] Extraction: title=\"{extraction.get('job_title','?')}\" "
           f"employer=\"{extraction.get('employer_type','?')}\" ({time.time()-t0:.1f}s)")
+    # ── Targeted evaluation: lock to the requested NOC, skip proposing/adjudication ──────────
+    # Scored the SAME way as a fresh result (Auditor / semantic), so a forced code shows its true
+    # (possibly low) fit — never the old single-prompt "100/100". This runs BEFORE the strict
+    # document-validity gate on purpose: the user already got a result for this document and is
+    # deliberately re-checking it against a chosen code, so a borderline/non-deterministic extraction
+    # rejection must not block the re-evaluation ("Could not validate input" bug).
+    if target_noc and target_noc in ai_service.NOC_LOOKUP:
+        result = _build_v2_response(target_noc, None, extraction, [target_noc], from_document=from_document, letter_text=cleaned)
+        result = ai_service._sanitize_noc_response(result, recompute_confidence=False)
+        rec = result.get("recommended_noc", {})
+        print(f"[v2] TARGETED {target_noc}: {rec.get('confidence')}% coverage={result.get('duty_coverage')}% "
+              f"({time.time()-t_start:.1f}s)")
+        return result
+
     if not extraction.get("document_valid", True):
         print(f"[v2] REJECTED: {extraction.get('rejection_reason')}")
         return noc_agents._build_rejection_response(extraction)
@@ -431,7 +450,7 @@ def run_noc_finder_v2(user_content: str, page_images=None) -> dict:
         print(f"[Stage 4] Adjudication failed ({e}) — using top grounded candidate {winning_code}")
 
     # ── Build response (frontend-compatible) ──────────────────────────────────
-    result = _build_v2_response(winning_code, auditor, extraction, codes)
+    result = _build_v2_response(winning_code, auditor, extraction, codes, from_document=from_document, letter_text=cleaned)
     # recompute_confidence=False: v2 already set a calibrated semantic-precision confidence;
     # the sanitizer's recall-style matched/total recompute would clobber it (and break 51114).
     result = ai_service._sanitize_noc_response(result, recompute_confidence=False)
@@ -455,7 +474,8 @@ def _semantic_confidence(applicant_duties: list, code: str):
 
 
 def _build_v2_response(winning_code: str, auditor: dict | None,
-                       extraction: dict, candidate_codes: list) -> dict:
+                       extraction: dict, candidate_codes: list, from_document: bool = False,
+                       letter_text: str = "") -> dict:
     """Assemble a NOCFinderResponseSchema dict from the auditor's grounded decision."""
     auditor = auditor or {}
     noc_entry = ai_service.get_noc_entry(winning_code)
@@ -513,6 +533,64 @@ def _build_v2_response(winning_code: str, auditor: dict | None,
     else:
         result_type, level = "NO_MATCH", "low"
 
+    # NOC-side duty analysis (same basis as the Employment Letter Auditor): coverage = official NOC
+    # duties demonstrated / total official duties, scoped to the applicant's sub-occupation. The
+    # gauge, gaps, and duty-by-duty breakdown all come from this ONE scoped duty set, so they agree.
+    # PRIMARY: reuse the Employment Letter Auditor's EXACT grading against the winning code, so the
+    # Finder's coverage + duty-by-duty breakdown are identical to the Auditor's (option c). Falls back
+    # to the deterministic semantic analysis when there's no letter text or the Auditor rejects the input
+    # (e.g. typed job-title/duties rather than a real letter).
+    full_audit_result = None  # the complete Auditor result, surfaced for the "Audit my letter" reuse cache
+    # Document uploads run the FULL Auditor (exact convergence with the paid Auditor). Typed text uses
+    # the gpt-4o grader below instead — the full Auditor rejects non-letters, and text is lower-signal.
+    audit_cov = ai_service.audit_duty_coverage(letter_text, winning_code) if (from_document and letter_text) else None
+    if audit_cov:
+        duty_cov = audit_cov["coverage"]
+        coverage_subtitle = audit_cov["sub_title"]
+        breakdown = audit_cov["duties_breakdown"]
+        scoped_gaps = audit_cov["key_gaps"]
+        full_audit_result = audit_cov.get("_full_audit")
+        _cov = sum(1 for b in breakdown if b["match"] in ("strong", "partial"))
+        disp_matched, disp_total = _cov, len(breakdown)
+    else:
+        analysis = ai_service.finder_noc_analysis(applicant_duties, winning_code, role_hint=extraction.get("job_title", ""))
+        if analysis:
+            coverage_subtitle = analysis["sub_title"]
+            set_duties = analysis.get("set_duties") or []
+            # Text input (the full Auditor rejects non-letters): grade the scoped duties with gpt-4o using
+            # the Auditor's rubric, so coverage converges with what the Auditor would produce. Semantic is
+            # the last-resort fallback if the grader fails.
+            graded = ai_service.grade_scoped_duties_llm(letter_text or "; ".join(applicant_duties), set_duties)
+            if graded and set_duties and len(graded) == len(set_duties):
+                covered = sum(1 for g in graded if g["match"] in ("strong", "partial"))
+                duty_cov = int(round(100 * covered / len(set_duties)))
+                breakdown = graded
+                scoped_gaps = [g["noc_duty"] for g in graded if g["match"] in ("weak", "missing")]
+                disp_matched, disp_total = covered, len(set_duties)
+            else:
+                duty_cov = analysis["coverage"]
+                breakdown = analysis["duties_breakdown"]
+                scoped_gaps = analysis["key_gaps"]
+                disp_matched, disp_total = analysis["covered"], analysis["total"]
+        else:
+            duty_cov = int(round(100 * disp_matched / disp_total)) if disp_total else 0
+            coverage_subtitle = ""
+            breakdown = []
+            scoped_gaps = noc_agents._build_key_gaps(extraction, noc_entry)
+
+    # The duty-by-duty breakdown shows the applicant's OWN duties (letter-centric): keep only entries
+    # with evidence in the letter (strong/partial/weak). Official duties with NO evidence ("missing")
+    # are surfaced separately as gaps, not as breakdown rows.
+    breakdown = [b for b in (breakdown or []) if b.get("match") != "missing"]
+
+    # Summary. Auto-detect uses the adjudicator's reasoning; a targeted re-evaluation has no reasoning,
+    # so build an informative coverage summary instead of the old one-line generic fallback.
+    why_this_noc = (auditor.get("reasoning") if auditor else "") or (
+        f"Evaluated against NOC {winning_code} — {official_title}. Your experience demonstrates "
+        f"{disp_matched} of {disp_total} of this NOC's official main duties ({duty_cov}% coverage)."
+        if disp_total else f"Evaluated against NOC {winning_code} — {official_title}."
+    )
+
     return {
         "document_valid": True,
         "rejection_reason": "",
@@ -526,13 +604,22 @@ def _build_v2_response(winning_code: str, auditor: dict | None,
             "duties_total": disp_total,
             "duties_matched": disp_matched,
         },
+        "duty_coverage": duty_cov,
+        "coverage_subtitle": coverage_subtitle,  # sub-occupation the coverage is scoped to (multi-title NOCs)
+        # Transient: full Auditor result for the "Audit my letter" reuse cache. The endpoint pops this
+        # before saving/returning, so it is never persisted or sent to the client.
+        "_audit_full": full_audit_result,
         "confidence_level": level,
-        "why_this_noc": auditor.get("reasoning", "") or f"Best match for the described duties at this employer type.",
+        "why_this_noc": why_this_noc,
         "key_matches": noc_agents._build_key_matches(extraction, noc_entry),
-        "key_gaps": noc_agents._build_key_gaps(extraction, noc_entry),
+        # Official NOC duties NOT yet demonstrated (same scoped set as the coverage gauge).
+        "key_gaps": scoped_gaps,
+        # Letter-duty -> official-NOC-duty pairing with a match verdict (deterministic, embedding-based).
+        "duties_breakdown": breakdown,
         "alternatives": alternatives,
-        "input_reliability": "high" if extraction.get("location") == "canada" else "medium",
+        # Reliability reflects the INPUT TYPE: an uploaded employment letter is high-signal; typed
+        # job-title/duties (or a resume) is medium. (Not tied to country of experience.)
+        "input_reliability": "high" if from_document else "medium",
         "location_of_experience": extraction.get("location", "unknown"),
-        "important_note": "This is a preliminary NOC suggestion. For immigration applications, a full duty-by-duty audit is recommended.",
         "next_step": "Use the Premium Auditor for a detailed IRCC-style compliance assessment.",
     }

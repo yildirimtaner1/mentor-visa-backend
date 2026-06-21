@@ -286,7 +286,22 @@ function App() {
             next_step: rawData.next_step || '',
             stored_file_id: rawData.stored_file_id || ev.stored_file_id,
             is_premium_unlocked: rawData.is_premium_unlocked || ev.is_premium_unlocked,
-            is_signed_in: true
+            is_signed_in: true,
+            // Carry server-applied gating so a locked report stays gated in the history view too
+            gated: !!rawData.gated,
+            gate_reason: rawData.gate_reason,
+            gaps_count: rawData.gaps_count,
+            alt_count: rawData.alt_count,
+            // NOC-side coverage gauge + duty-by-duty breakdown (must survive the history round-trip)
+            duty_coverage: typeof rawData.duty_coverage === 'number'
+              ? rawData.duty_coverage
+              : (rawData.recommended_noc?.duties_total ? Math.round(100 * (rawData.recommended_noc.duties_matched || 0) / rawData.recommended_noc.duties_total) : 0),
+            coverage_subtitle: rawData.coverage_subtitle || '',
+            duties_breakdown: rawData.duties_breakdown || [],
+            breakdown_count: rawData.breakdown_count ?? (rawData.duties_breakdown || []).length,
+            // Was this NOC check from a document upload? If so, "Audit my letter" can run/reuse the
+            // stored audit on the original file (vs. just opening the Auditor upload page for text input).
+            from_file: !!(ev.original_filename && ev.original_filename !== 'Text Input'),
           };
         } else if (rawData.noc_analysis) {
           // Legacy old schema from backend — convert to v2 format

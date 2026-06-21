@@ -455,7 +455,9 @@ export const Dashboard: FC<DashboardProps> = ({ data, onReset, onUpdate }) => {
                   </div>
                 )}
                 <div className="result-card-subtitle" style={{ color: '#4B5563', fontSize: '1.05rem', marginTop: '6px' }}>
-                  Target: NOC {data.noc_analysis.detected_code} — {data.noc_analysis.detected_title}
+                  {isPremiumUnlocked
+                    ? <>Target: NOC {data.noc_analysis.detected_code} — {data.noc_analysis.detected_title}</>
+                    : <>Target NOC: <span style={{ fontWeight: 700 }}>🔒 Unlock to reveal</span></>}
                 </div>
               </div>
             </div>
@@ -465,14 +467,20 @@ export const Dashboard: FC<DashboardProps> = ({ data, onReset, onUpdate }) => {
               {/* Card 1: Duty Coverage */}
               <div style={{ padding: '20px', background: '#FFFFFF', borderRadius: '12px', border: '1px solid #E2E8F0', display: 'flex', flexDirection: 'column', justifyContent: 'space-between', boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.02)' }}>
                 <div>
-                  <div style={{ fontSize: '0.75rem', color: '#64748B', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '8px', fontWeight: 600 }}>Duty Coverage</div>
-                  {data.noc_analysis.coverage_subtitle && (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '5px', marginBottom: '8px' }}>
+                    <div style={{ fontSize: '0.75rem', color: '#64748B', textTransform: 'uppercase', letterSpacing: '0.05em', fontWeight: 600 }}>Duty Coverage</div>
+                    <span style={{ position: 'relative', display: 'inline-flex' }}>
+                      <span className="noc-confidence-bulb" style={{ fontSize: '0.85rem', cursor: 'help', lineHeight: 1 }} tabIndex={0}>💡</span>
+                      <span className="noc-confidence-tooltip">How many of this NOC's official main duties your letter actually evidences. IRCC expects you to perform a substantial majority of them. (Different from NOC Confidence, which is about whether this is the right NOC at all.)</span>
+                    </span>
+                  </div>
+                  {isPremiumUnlocked && data.noc_analysis.coverage_subtitle && (
                     <div style={{ fontSize: '0.7rem', color: '#0EA5E9', fontWeight: 600, marginBottom: '8px' }}
                          title={`This NOC covers several occupations; coverage is measured against the "${data.noc_analysis.coverage_subtitle}" duties that match your role.`}>
                       scoped to: {data.noc_analysis.coverage_subtitle}
                     </div>
                   )}
-                  {!isPremiumUnlocked && <div style={{ fontSize: '0.8rem', color: '#94A3B8', marginBottom: '16px', lineHeight: 1.4 }}>Strong alignment detected with core responsibilities.</div>}
+                  {!isPremiumUnlocked && <div style={{ fontSize: '0.8rem', color: '#94A3B8', marginBottom: '16px', lineHeight: 1.4 }}>{data.noc_analysis.duty_coverage_percentage >= 75 ? 'Strong alignment with this NOC’s core duties.' : data.noc_analysis.duty_coverage_percentage >= 50 ? 'Partial alignment — some core duties need clearer evidence.' : 'Limited alignment — many core duties are not clearly evidenced.'}</div>}
                 </div>
                 <div style={{ fontSize: '1.75rem', fontWeight: 800, color: data.noc_analysis.duty_coverage_percentage >= 75 ? '#059669' : data.noc_analysis.duty_coverage_percentage >= 50 ? '#D97706' : '#EF4444', marginTop: isPremiumUnlocked ? '8px' : '0' }}>
                   {data.noc_analysis.duty_coverage_percentage}%
@@ -482,7 +490,7 @@ export const Dashboard: FC<DashboardProps> = ({ data, onReset, onUpdate }) => {
               <div style={{ padding: '20px', background: '#FFFFFF', borderRadius: '12px', border: '1px solid #E2E8F0', display: 'flex', flexDirection: 'column', justifyContent: 'space-between', boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.02)' }}>
                 <div>
                   <div style={{ fontSize: '0.75rem', color: '#64748B', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '8px', fontWeight: 600 }}>Compliance Score</div>
-                  {!isPremiumUnlocked && <div style={{ fontSize: '0.8rem', color: '#94A3B8', marginBottom: '16px', lineHeight: 1.4 }}>All key elements appear present, but wording clarity may still impact evaluation.</div>}
+                  {!isPremiumUnlocked && <div style={{ fontSize: '0.8rem', color: '#94A3B8', marginBottom: '16px', lineHeight: 1.4 }}>{data.compliance.score >= 88 ? 'All key elements appear present.' : data.compliance.score >= 63 ? 'Most elements present — some wording/clarity gaps remain.' : 'Several required elements are missing or unclear.'}</div>}
                 </div>
                 <div style={{ fontSize: '1.75rem', fontWeight: 800, color: data.compliance.score >= 88 ? '#059669' : data.compliance.score >= 63 ? '#D97706' : '#EF4444', marginTop: isPremiumUnlocked ? '8px' : '0' }}>
                   {data.compliance.score}%
@@ -495,10 +503,10 @@ export const Dashboard: FC<DashboardProps> = ({ data, onReset, onUpdate }) => {
                     <div style={{ fontSize: '0.75rem', color: '#64748B', textTransform: 'uppercase', letterSpacing: '0.05em', fontWeight: 600 }}>NOC Confidence</div>
                     <span style={{ position: 'relative', display: 'inline-flex' }}>
                       <span className="noc-confidence-bulb" style={{ fontSize: '0.85rem', cursor: 'help', lineHeight: 1 }} tabIndex={0}>💡</span>
-                      <span className="noc-confidence-tooltip">How well your duties fit this NOC — the same score the NOC Finder shows for this code. (Separate from Duty Coverage, which measures how much the letter evidences for IRCC.)</span>
+                      <span className="noc-confidence-tooltip">How likely this is the RIGHT NOC for the applicant's occupation. (Different from Duty Coverage, which measures how many of this NOC's official duties the letter actually evidences for IRCC.)</span>
                     </span>
                   </div>
-                  {!isPremiumUnlocked && <div style={{ fontSize: '0.8rem', color: '#94A3B8', marginBottom: '16px', lineHeight: 1.4 }}>High alignment with selected NOC based on provided duties.</div>}
+                  {!isPremiumUnlocked && (() => { const nc = data.noc_analysis.noc_match_confidence || data.noc_analysis.confidence; return <div style={{ fontSize: '0.8rem', color: '#94A3B8', marginBottom: '16px', lineHeight: 1.4 }}>{nc >= 70 ? 'High likelihood this is the right NOC.' : nc >= 45 ? 'Moderate likelihood this is the right NOC.' : 'Low likelihood — another NOC may fit better.'}</div>; })()}
                 </div>
                 <div style={{ fontSize: '1.75rem', fontWeight: 800, color: '#334155', marginTop: isPremiumUnlocked ? '8px' : '0' }}>
                   {(data.noc_analysis.noc_match_confidence || data.noc_analysis.confidence)}%
@@ -515,9 +523,11 @@ export const Dashboard: FC<DashboardProps> = ({ data, onReset, onUpdate }) => {
                   </div>
                   {!isPremiumUnlocked && (
                     <div style={{ fontSize: '0.75rem', color: '#94A3B8', fontWeight: 400, marginTop: '6px', lineHeight: 1.3 }}>
-                      {data.risk_assessment.pfl_likelihood === 'low' 
-                        ? '(based on preliminary signals \u2014 full review required for confirmation)' 
-                        : 'Elevated Risk Detected \u2014 Full audit highly recommended to identify exact refusal triggers'}
+                      {data.risk_assessment.pfl_likelihood === 'low'
+                        ? '(based on preliminary signals \u2014 full review confirms)'
+                        : data.risk_assessment.pfl_likelihood === 'medium'
+                        ? 'Some risk detected \u2014 a full audit can pinpoint the issues'
+                        : 'Elevated risk detected \u2014 full audit highly recommended to identify exact refusal triggers'}
                     </div>
                   )}
                 </div>

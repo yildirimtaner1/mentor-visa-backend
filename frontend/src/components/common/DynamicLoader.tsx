@@ -184,12 +184,23 @@ export const DynamicLoader: FC<DynamicLoaderProps> = ({ tool, targetNoc }) => {
         ))}
       </div>
 
-      <p style={{ 
-        fontSize: '0.8rem', color: '#9CA3AF', lineHeight: 1.5, 
+      <p style={{
+        fontSize: '0.8rem', color: '#9CA3AF', lineHeight: 1.5,
         maxWidth: '340px', marginTop: '20px', marginBottom: 0
       }}>
         Deep analysis against official IRCC standards takes <strong style={{ color: '#6B7280' }}>15–45 seconds</strong>.
       </p>
+      <div style={{
+        marginTop: '12px', maxWidth: '360px',
+        display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px',
+        padding: '10px 14px', borderRadius: '10px',
+        background: '#FEF3C7', border: '1px solid #FDE68A',
+      }}>
+        <span style={{ fontSize: '1rem' }}>⏳</span>
+        <span style={{ fontSize: '0.82rem', color: '#92400E', fontWeight: 600, lineHeight: 1.4 }}>
+          Please keep this page open and don't refresh — your results will appear here automatically.
+        </span>
+      </div>
 
       <style>{`
         @keyframes spinSmooth {

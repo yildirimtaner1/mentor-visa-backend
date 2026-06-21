@@ -57,6 +57,15 @@ export const AuditorPage: FC = () => {
   const location = useLocation();
 
   useEffect(() => {
+    // Arriving from the NOC Finder with TEXT input (not a real letter): start fresh on the upload page,
+    // clearing any stale prior audit so we don't show a previous analysis.
+    if (location.state?.resetAudit) {
+      setResult(null);
+      setError(null);
+      sessionStorage.removeItem('mentorVisaAnalysisResult');
+      window.history.replaceState({}, document.title, window.location.pathname);
+      return;
+    }
     // If navigating from NOC Finder with an already stored file
     if (location.state?.fileId) {
       const performAutoAudit = async () => {

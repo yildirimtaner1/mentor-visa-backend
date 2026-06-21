@@ -1108,7 +1108,7 @@ def noc_match_confidence(applicant_duties: list, code: str):
     return confidence, aligned, len(per)
 
 
-def scoped_duty_coverage(applicant_duties: list, code: str, llm_duties_match: list = None) -> dict | None:
+def scoped_duty_coverage(applicant_duties: list, code: str, llm_duties_match: list = None, role_hint: str = "") -> dict | None:
     """IRCC duty coverage scoped to the applicant's sub-occupation, for MULTI-TITLE NOC groups.
 
     Many NOC codes pack several distinct occupations under one code (e.g. 51114 = translators /
@@ -1148,8 +1148,21 @@ def scoped_duty_coverage(applicant_duties: list, code: str, llm_duties_match: li
     Dall = _DUTY_EMB_MATRIX[start:end].astype(np.float32)
     Dall /= (np.linalg.norm(Dall, axis=1, keepdims=True) + 1e-9)
 
-    # Pick the best-fitting sub-group by applicant-side precision.
-    best = None
+    # ── Choose the sub-occupation ────────────────────────────────────────────
+    # The applicant's JOB TITLE is the most reliable signal for which sub-occupation applies
+    # (an "Interpreter" -> the Interpreters sub-group). Embedding precision alone is unreliable here
+    # because translator/terminologist/interpreter duties sit extremely close in vector space, so we
+    # use the title as the PRIMARY signal and fall back to precision only when the title is uninformative.
+    def _stems(text):
+        out = set()
+        for t in re.findall(r"[a-z]+", (text or "").lower()):
+            if len(t) < 4 or t in ("and", "the", "for", "with"):
+                continue
+            out.add(t[:-1] if t.endswith("s") else t)   # crude singularize (interpreters -> interpreter)
+        return out
+    role_stems = _stems(role_hint)
+
+    candidates = []
     off = 0
     for g in groups:
         gd = [x for x in g.get("duties", []) if x and x.strip()]
@@ -1160,10 +1173,20 @@ def scoped_duty_coverage(applicant_duties: list, code: str, llm_duties_match: li
         Dg = Dall[off:off + len(gd)]
         off += n
         precision = float((A @ Dg.T).max(axis=1).mean())   # how well applicant fits this sub-group
-        if best is None or precision > best["precision"]:
-            best = {"precision": precision, "sub_title": g.get("sub_title", ""), "duties": gd, "Dg": Dg}
-    if best is None:
+        sub_stems = _stems(g.get("sub_title", ""))
+        # fraction of the sub-title's OWN words present in the role title (1.0 = "Interpreters" fully in "... Interpreter")
+        title_score = (len(sub_stems & role_stems) / len(sub_stems)) if sub_stems else 0.0
+        candidates.append({"precision": precision, "title_score": title_score,
+                           "sub_title": g.get("sub_title", ""), "duties": gd, "Dg": Dg})
+    if not candidates:
         return None
+
+    best_title = max(c["title_score"] for c in candidates)
+    if best_title > 0:
+        # A sub-title matches the role — pick it (break ties by precision).
+        best = max((c for c in candidates if c["title_score"] == best_title), key=lambda c: c["precision"])
+    else:
+        best = max(candidates, key=lambda c: c["precision"])
 
     # Numerator: count evidenced duties in the chosen sub-group.
     gd, Dg = best["duties"], best["Dg"]
@@ -1185,6 +1208,219 @@ def scoped_duty_coverage(applicant_duties: list, code: str, llm_duties_match: li
     coverage = int(round(100 * covered / len(gd)))
     return {"coverage": coverage, "sub_title": best["sub_title"],
             "group_size": len(gd), "covered": covered, "applicable_duties": gd}
+
+
+def _duty_stems(text):
+    """Crude word stems (singularized, stop-words/short tokens dropped) for title/sub-title matching."""
+    out = set()
+    for t in re.findall(r"[a-z]+", (text or "").lower()):
+        if len(t) < 4 or t in ("and", "the", "for", "with"):
+            continue
+        out.add(t[:-1] if t.endswith("s") else t)
+    return out
+
+
+def finder_noc_analysis(applicant_duties: list, code: str, role_hint: str = "") -> dict | None:
+    """NOC-side duty analysis for the Finder — the SAME basis as the Employment Letter Auditor.
+
+    Coverage = (official NOC duties demonstrated) / (total official NOC duties), scoped to the
+    applicant's sub-occupation for multi-title NOC groups (e.g. 51114 -> Interpreters only). The
+    per-applicant-duty breakdown and the uncovered official duties (gaps) are computed against the
+    SAME scoped duty set, so the gauge, gaps, and breakdown can never contradict each other.
+
+    Returns {coverage, sub_title, covered, total, duties_breakdown:[{letter_duty,noc_duty,match}],
+    key_gaps:[official duty,...]} or None when the embedding signal is unavailable.
+    """
+    entry = get_noc_entry(code)
+    if not entry:
+        return None
+    appd = [d.strip() for d in (applicant_duties or []) if d and d.strip()][:15]
+    if not appd or code not in _DUTY_RANGES or _DUTY_EMB_MATRIX is None or not openai_client:
+        return None
+    groups = entry.get("duty_groups") or []
+    # Flattened official duties, aligned with the embedding-matrix rows for this code.
+    flat = [d.strip() for g in groups for d in (g.get("duties") or []) if d and d.strip()] if groups else []
+    if not flat:
+        flat = [d.strip() for d in (entry.get("duties") or []) if d and d.strip()]
+    start, end = _DUTY_RANGES[code]
+    if (end - start) != len(flat):
+        return None  # structure/embedding mismatch — bail safely
+    try:
+        resp = openai_client.embeddings.create(model="text-embedding-3-small", input=appd)
+    except Exception as e:
+        print(f"[finder_noc_analysis] embedding failed: {e}")
+        return None
+    A = np.array([d.embedding for d in resp.data], dtype=np.float32)
+    A /= (np.linalg.norm(A, axis=1, keepdims=True) + 1e-9)
+    Dall = _DUTY_EMB_MATRIX[start:end].astype(np.float32)
+    Dall /= (np.linalg.norm(Dall, axis=1, keepdims=True) + 1e-9)
+
+    # ── Scope to the applicant's sub-occupation for MULTI-TITLE NOCs ─────────────────────────
+    # Title is the primary signal (an "Interpreter" -> the Interpreters sub-group); embedding
+    # precision is the tiebreaker/fallback — identical logic to scoped_duty_coverage.
+    if len(groups) > 1:
+        role_stems = _duty_stems(role_hint)
+        cands, off = [], 0
+        for g in groups:
+            gd = [x.strip() for x in (g.get("duties") or []) if x and x.strip()]
+            n = len(g.get("duties") or [])
+            if not gd:
+                off += n
+                continue
+            Dg = Dall[off:off + len(gd)]
+            off += n
+            precision = float((A @ Dg.T).max(axis=1).mean())
+            sub_stems = _duty_stems(g.get("sub_title", ""))
+            title_score = (len(sub_stems & role_stems) / len(sub_stems)) if sub_stems else 0.0
+            cands.append({"precision": precision, "title_score": title_score,
+                          "sub_title": g.get("sub_title", ""), "duties": gd, "Dg": Dg})
+        if not cands:
+            return None
+        best_t = max(c["title_score"] for c in cands)
+        chosen = (max((c for c in cands if c["title_score"] == best_t), key=lambda c: c["precision"])
+                  if best_t > 0 else max(cands, key=lambda c: c["precision"]))
+        set_duties, Dset, sub_title = chosen["duties"], chosen["Dg"], chosen["sub_title"]
+    else:
+        set_duties, Dset, sub_title = flat, Dall, ""
+
+    # NOC-side, NOC-centric breakdown (same orientation as the Auditor): for each OFFICIAL duty,
+    # find the applicant's best evidence and grade it strong/partial/weak/missing by similarity.
+    # Coverage = (strong + partial) / total — identical formula to the Auditor. This is the SEMANTIC
+    # fallback used only when the LLM grader is unavailable.
+    noc_to_app = (Dset @ A.T)  # (n_set, n_app)
+    total = len(set_duties)
+    breakdown, covered, key_gaps = [], 0, []
+    for i, nd in enumerate(set_duties):
+        j = int(noc_to_app[i].argmax())
+        s = float(noc_to_app[i][j])
+        if s >= STRONG_DUTY_SIM:      # 0.40
+            m = "strong"
+        elif s >= 0.30:
+            m = "partial"
+        elif s >= 0.22:
+            m = "weak"
+        else:
+            m = "missing"
+        if m in ("strong", "partial"):
+            covered += 1
+        else:
+            key_gaps.append(nd)
+        breakdown.append({"noc_duty": nd, "letter_evidence": appd[j] if m != "missing" else "", "match": m})
+    coverage = int(round(100 * covered / total)) if total else 0
+
+    return {"coverage": coverage, "sub_title": sub_title, "covered": covered, "total": total,
+            "set_duties": set_duties, "duties_breakdown": breakdown, "key_gaps": key_gaps}
+
+
+def grade_scoped_duties_llm(letter_text: str, set_duties: list) -> list | None:
+    """LLM evidence-grade each official NOC duty against the letter — the SAME methodology as the
+    Employment Letter Auditor, so the Finder's coverage matches it. Returns one entry per official
+    duty: [{noc_duty, letter_evidence, match}] with match in strong/partial/weak/missing, or None."""
+    if not openai_client or not set_duties or not letter_text:
+        return None
+    duties_block = "\n".join(f"{i + 1}. {d}" for i, d in enumerate(set_duties))
+    # Used for TEXT input (typed duties), where the full Auditor rejects the input as "not a letter".
+    # Mirrors the Auditor's persona + rubric (ai_service _build_prompt_text) as closely as possible and
+    # uses gpt-4o so the coverage converges with what the Auditor would produce for the same content.
+    system = (
+        "You are a STRICT, SKEPTICAL, and FAIR Canadian Immigration Officer auditing work experience "
+        "under Express Entry (Canadian Experience Class). Verify, do NOT trust — the burden of proof is "
+        "on the applicant, and you do NOT assume a duty was performed unless the text shows it.\n\n"
+        "For EACH numbered official NOC main duty, set match strength against the applicant's text:\n"
+        "- strong: clear semantic alignment, with specific evidence in the text\n"
+        "- partial: related language but vague or incomplete\n"
+        "- weak: only tangentially related\n"
+        "- missing: no evidence at all\n"
+        "PARTIAL = RISK: if the evidence is vague, generic, or merely implied/plausible, it is 'weak' or "
+        "'missing', never 'partial'. Match on the SEMANTIC FUNCTION performed, not on shared keywords.\n"
+        'Return JSON: {"duties":[{"i":<duty number>,"match":"strong|partial|weak|missing",'
+        '"evidence":"<short quote from the text, or empty if missing>"}]} — exactly one entry per duty.'
+    )
+    user = f"=== OFFICIAL NOC MAIN DUTIES ===\n{duties_block}\n\n=== APPLICANT'S WORK EXPERIENCE ===\n{letter_text}"
+    try:
+        comp = openai_client.chat.completions.create(
+            model="gpt-4o", temperature=0.0, seed=42,
+            response_format={"type": "json_object"},
+            messages=[{"role": "system", "content": system}, {"role": "user", "content": user}],
+        )
+        items = json.loads(comp.choices[0].message.content).get("duties", [])
+    except Exception as e:
+        print(f"[grade_scoped_duties_llm] failed: {e}")
+        return None
+    by_i = {}
+    for it in items:
+        if isinstance(it, dict):
+            try:
+                by_i[int(it.get("i", 0))] = it
+            except (TypeError, ValueError):
+                pass
+    out = []
+    for idx, nd in enumerate(set_duties, start=1):
+        it = by_i.get(idx, {})
+        m = str(it.get("match", "missing")).lower()
+        if m not in ("strong", "partial", "weak", "missing"):
+            m = "missing"
+        out.append({"noc_duty": nd, "letter_evidence": (it.get("evidence") or "") if m != "missing" else "", "match": m})
+    return out
+
+
+# When the NOC Finder runs the full Auditor internally (document path), we stash the complete audit
+# here so that clicking "Audit my letter" on the Finder result reuses it instead of paying for a second
+# identical audit. Keyed by (finder evaluation/stored_file_id, NOC code); in-memory, one-shot.
+_FINDER_AUDIT_CACHE = {}
+_FINDER_AUDIT_CACHE_MAX = 200
+
+def cache_finder_audit(file_id: str, code: str, audit: dict) -> None:
+    if not file_id or not code or not audit:
+        return
+    if len(_FINDER_AUDIT_CACHE) >= _FINDER_AUDIT_CACHE_MAX:
+        _FINDER_AUDIT_CACHE.pop(next(iter(_FINDER_AUDIT_CACHE)), None)
+    _FINDER_AUDIT_CACHE[(file_id, str(code))] = audit
+
+def pop_finder_audit(file_id: str, code: str) -> dict | None:
+    return _FINDER_AUDIT_CACHE.pop((file_id, str(code)), None)
+
+
+def audit_duty_coverage(letter_text: str, code: str) -> dict | None:
+    """Run the FULL Employment Letter Auditor against a fixed NOC code and return its duty coverage +
+    breakdown — the EXACT same computation/prompt the Auditor uses, so the Finder converges with it.
+    Returns {coverage, sub_title, duties_breakdown:[{noc_duty,letter_evidence,match}], key_gaps} or None
+    (None when there is no model, the code is unknown, or the Auditor rejects the input as not a letter)."""
+    if not openai_client or not letter_text or not code or code not in NOC_CODE_TO_ENTRY:
+        return None
+    try:
+        top = semantic_search_nocs(letter_text)
+    except Exception:
+        top = {}
+    top[code] = NOC_CODE_TO_ENTRY[code]                       # ensure the locked code is in the reference
+    system = _build_prompt_text(json.dumps(top, ensure_ascii=False), code)
+    try:
+        res = audit_document_with_openai(system, letter_text, None, auto_detected_noc=code)
+    except Exception as e:
+        print(f"[audit_duty_coverage] auditor failed: {e}")
+        return None
+    na = res.get("noc_analysis") or {}
+    if not na.get("applicable", True):
+        return None                                          # Auditor rejected the input — let caller fall back
+    breakdown = []
+    for d in (na.get("duties_match") or []):
+        ms = str(d.get("match_strength", "missing")).lower()
+        if ms not in ("strong", "partial", "weak", "missing"):
+            ms = "missing"
+        breakdown.append({
+            "noc_duty": d.get("noc_duty", "") or "",
+            "letter_evidence": (d.get("letter_evidence", "") or "") if ms != "missing" else "",
+            "match": ms,
+        })
+    if not breakdown:
+        return None
+    cov = na.get("duty_coverage_percentage")
+    if cov is None:
+        cov = round(100 * sum(1 for b in breakdown if b["match"] in ("strong", "partial")) / len(breakdown))
+    gaps = na.get("missing_critical_duties") or [b["noc_duty"] for b in breakdown if b["match"] in ("weak", "missing")]
+    return {"coverage": int(round(cov)), "sub_title": na.get("coverage_subtitle", "") or "",
+            "duties_breakdown": breakdown, "key_gaps": [g for g in gaps if g],
+            "_full_audit": res}  # complete Auditor result, for "Audit my letter" reuse
 
 
 def _call_openai_structured(system_prompt: str, user_content: str, page_images: list[tuple[bytes, str]], response_format, label: str = "AI", seed: int = 42) -> dict:
@@ -1419,7 +1655,8 @@ def audit_document_with_openai(system_prompt: str, user_content: str, page_image
 
         # (b) Duty coverage — for MULTI-TITLE NOC groups, scope to the applicant's sub-occupation
         # so a perfect (e.g.) interpreter isn't penalized for not doing translator/terminologist duties.
-        scoped = scoped_duty_coverage(applicant_duties, detected, na.get("duties_match"))
+        scoped = scoped_duty_coverage(applicant_duties, detected, na.get("duties_match"),
+                                      role_hint=(result.get("role_name") or na.get("detected_title") or ""))
         if scoped is not None:
             old_cov = na.get("duty_coverage_percentage")
             na["duty_coverage_percentage"] = scoped["coverage"]
