@@ -1,13 +1,14 @@
 """Import community Express Entry case data (Immitracker export) into immitracker_cases.
 
-Run monthly when a fresh export is provided:
-    ./venv/Scripts/python.exe import_immitracker.py path/to/cases.json [--replace]
+Run monthly when a fresh export is provided (JSON or CSV):
+    ./venv/Scripts/python.exe import_immitracker.py path/to/cases.csv [--replace]
 
 Idempotent: upserts by Case ID. Pass --replace to wipe the table first for a clean reload.
 The full source row is stored in `raw` for fidelity; cohort dims + milestone day-deltas are
 extracted into typed columns that power the tracker's processing-time predictions.
 """
 import sys
+import csv
 import json
 import datetime
 
@@ -83,13 +84,21 @@ def row_to_fields(r: dict) -> dict:
     return f
 
 
+def _load(path):
+    """Load records from a CSV (DictReader) or JSON export as a list of dicts."""
+    if path.lower().endswith(".csv"):
+        with open(path, encoding="utf-8-sig", newline="") as fh:
+            return list(csv.DictReader(fh))
+    with open(path, encoding="utf-8") as fh:
+        return json.load(fh)
+
+
 def main():
     args = [a for a in sys.argv[1:] if not a.startswith("--")]
     replace = "--replace" in sys.argv
     path = args[0] if args else r"C:\Users\yildi\.gemini\antigravity\scratch\immitracker-scraper\immitracker_cases_since_june_2025.json"
 
-    with open(path, encoding="utf-8") as fh:
-        data = json.load(fh)
+    data = _load(path)
     print(f"Loaded {len(data)} records from {path}")
 
     db = database.SessionLocal()
