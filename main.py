@@ -423,15 +423,19 @@ def get_current_user_optional(credentials: Optional[HTTPAuthorizationCredentials
     except Exception:
         return "anonymous"
 
+# New signed-in users get this many free FULL NOC Finder reports before the result is gated
+# to a teaser (code + confidence + summary) with the full breakdown behind Optimize.
+NEW_USER_FINDER_CREDITS = 2
+
 def ensure_user_exists(user_id: str, db: Session):
     """Create a UserAccount row if one doesn't exist yet (idempotent).
     Must be called before inserting any row with a FK to users.user_id.
-    New users receive 5 free AI Assistant credits."""
+    New users receive their free NOC Finder reports + 5 free AI Assistant credits."""
     if not user_id or user_id == "anonymous":
         return
     existing = db.query(db_models.UserAccount).filter_by(user_id=user_id).first()
     if not existing:
-        db.add(db_models.UserAccount(user_id=user_id, find_noc_credits=0, audit_letter_credits=0, profile_builder_credits=5))
+        db.add(db_models.UserAccount(user_id=user_id, find_noc_credits=NEW_USER_FINDER_CREDITS, audit_letter_credits=0, profile_builder_credits=5))
         db.commit()
 
 @app.post("/api/v1/evaluations")
@@ -513,13 +517,39 @@ def get_evaluations(
     db: Session = Depends(database.get_db)
 ):
     audit_records = db.query(db_models.Evaluation).filter_by(evaluation_type='audit', user_id=user_id).all()
-    
+
     noc_records = db.query(db_models.Evaluation).filter_by(evaluation_type='noc_finder', user_id=user_id).all()
 
     crs_records = db.query(db_models.Evaluation).filter_by(evaluation_type='crs_calculator', user_id=user_id).all()
-    
+
     all_records = audit_records + noc_records + crs_records
-    
+
+    # Current entitlement: paid tiers see every saved report in full; free users only see the
+    # NOC reports that were unlocked when created (is_premium_unlocked). Locked NOC reports are
+    # gated here too, so the history view can't be used to bypass the paywall.
+    ua = db.query(db_models.UserAccount).filter_by(user_id=user_id).first()
+    is_paid = bool(ua and ua.subscription_tier in ("starter", "complete"))
+
+    def _gate_noc_payload(r):
+        payload = r.payload
+        if not isinstance(payload, dict):
+            return payload
+        # Never send the stored full Auditor result to the Finder client (it's reused server-side only).
+        if "_audit_full" in payload:
+            payload = {k: v for k, v in payload.items() if k != "_audit_full"}
+        if r.evaluation_type != 'noc_finder' or is_paid or r.is_premium_unlocked:
+            return payload
+        gated = dict(payload)
+        gated["gaps_count"] = len(gated.get("key_gaps") or [])
+        gated["alt_count"] = len(gated.get("alternatives") or [])
+        gated["breakdown_count"] = len(gated.get("duties_breakdown") or [])
+        gated["key_gaps"] = []
+        gated["alternatives"] = []
+        gated["duties_breakdown"] = []
+        gated["gated"] = True
+        gated["gate_reason"] = "upgrade"
+        return gated
+
     result = []
     for r in all_records:
         result.append({
@@ -532,7 +562,7 @@ def get_evaluations(
             "compliance_status": r.compliance_status,
             "is_premium_unlocked": bool(r.is_premium_unlocked),
             "timestamp": (r.timestamp_utc.isoformat() + 'Z') if r.timestamp_utc else None,
-            "payload": r.payload,
+            "payload": _gate_noc_payload(r),
         })
         
     # Sort in memory descending by timestamp
@@ -675,24 +705,15 @@ def reevaluate_document(
             
             try:
                 import openai
-                if not req.target_noc:
-                    # Auto-detection: multi-agent pipeline
-                    import noc_finder_v2
-                    result_json = noc_finder_v2.run_noc_finder_v2(user_content, page_images if page_images else None)
-                else:
-                    # Targeted evaluation: existing single-prompt path
-                    top_nocs = ai_service.semantic_search_nocs(user_content)
-                    target_data = ai_service.NOC_CODE_TO_ENTRY.get(req.target_noc)
-                    if target_data:
-                        top_nocs[req.target_noc] = target_data
-                    noc_reference = json.dumps(top_nocs, ensure_ascii=False)
-                    system_prompt = ai_service.build_noc_finder_prompt(noc_reference, req.target_noc)
-                    result_json = ai_service.find_noc_with_openai(
-                        system_prompt=system_prompt,
-                        user_content=f"=== USER INPUT ===\n{user_content}",
-                        page_images=page_images if page_images else None,
-                        ranked_candidates=top_nocs
-                    )
+                # Re-evaluation always runs against a stored uploaded document (from_document=True).
+                # Targeted (target_noc) and auto-detect both go through the v2 pipeline so the result
+                # (semantic confidence + duty coverage + duty-by-duty) is consistent with a fresh search.
+                import noc_finder_v2
+                _tgt = req.target_noc if (req.target_noc and req.target_noc != 'auto') else None
+                result_json = noc_finder_v2.run_noc_finder_v2(
+                    user_content, page_images if page_images else None,
+                    target_noc=_tgt, from_document=True,
+                )
             except openai.RateLimitError:
                 raise HTTPException(status_code=429, detail="OpenAI Rate Limit Exceeded. Please try again later.")
             except openai.APIError as e:
@@ -751,13 +772,33 @@ def reevaluate_document(
                     
             noc_reference = json.dumps(top_nocs, ensure_ascii=False)
             system_prompt = ai_service._build_prompt_text(noc_reference, effective_target)
-            
-            result_json = ai_service.audit_document_with_openai(
-                system_prompt=system_prompt,
-                user_content=user_content,
-                page_images=page_images if page_images else None,
-                auto_detected_noc=auto_detected
-            )
+
+            # Reuse the audit the NOC Finder already computed for this exact file + NOC (the user clicked
+            # "Audit my letter" on a Finder result) — avoids paying for a second, identical audit. Try the
+            # in-memory cache first (same session), then the persisted Finder payload (works from a past
+            # NOC check in the dashboard, across restarts).
+            def _audit_matches_target(a):
+                # Only reuse a cached/stored audit if it was actually computed against the requested NOC.
+                return (isinstance(a, dict) and effective_target
+                        and ((a.get("noc_analysis") or {}).get("detected_code") == effective_target))
+
+            result_json = ai_service.pop_finder_audit(req.file_id, effective_target) if effective_target else None
+            if not _audit_matches_target(result_json):
+                result_json = None
+            if result_json is None and effective_target and isinstance(record.payload, dict):
+                stored_audit = record.payload.get("_audit_full")
+                if _audit_matches_target(stored_audit):
+                    result_json = stored_audit
+                    print(f"[reevaluate] Reused stored Finder audit (payload) for file={req.file_id} noc={effective_target}")
+            if result_json is None:
+                result_json = ai_service.audit_document_with_openai(
+                    system_prompt=system_prompt,
+                    user_content=user_content,
+                    page_images=page_images if page_images else None,
+                    auto_detected_noc=auto_detected
+                )
+            else:
+                print(f"[reevaluate] Reused NOC Finder's audit for file={req.file_id} noc={effective_target}")
             
             # Generate a unique file_id for this reevaluation so it doesn't collide
             # with the original record during UPSERT. Keep original file_id as reference.
@@ -828,6 +869,26 @@ async def noc_finder_endpoint(
         if not document and not (job_title and duties_description):
             raise HTTPException(status_code=400, detail="Provide either a document upload OR both job_title & duties_description.")
 
+        # ── Pre-flight entitlement gate (saves API cost) ──────────────────────
+        # A signed-in FREE user with no finder credits cannot run the pipeline — we return the
+        # payment gate WITHOUT calling any model. Anonymous users still get one run (the funnel),
+        # and paid / credit-holding users run normally. After a successful purchase the frontend
+        # re-runs the search (credits now > 0) so the report is produced then.
+        is_signed_in = bool(user_id and user_id != "anonymous")
+        if is_signed_in:
+            _ua = db.query(db_models.UserAccount).filter_by(user_id=user_id).first()
+            _tier = ((_ua.subscription_tier if _ua else "free") or "free")
+            _paid = _tier in ("starter", "complete")
+            _credits = (_ua.find_noc_credits if _ua else 0) or 0
+            if not _paid and _credits <= 0:
+                return {
+                    "document_valid": True, "rejection_reason": "",
+                    "gated": True, "gate_reason": "upgrade", "requires_payment": True,
+                    "recommended_noc": None, "result_type": "NO_MATCH",
+                    "finder_credits_remaining": 0, "tier": _tier,
+                    "is_signed_in": 1,
+                }
+
         user_content = ""
         is_hybrid = False
         page_images = []
@@ -887,24 +948,15 @@ async def noc_finder_endpoint(
 
         try:
             import openai
-            if not target_noc:
-                # Auto-detection: multi-agent pipeline
-                import noc_finder_v2
-                result = noc_finder_v2.run_noc_finder_v2(user_content, page_images if page_images else None)
-            else:
-                # Targeted evaluation: existing single-prompt path
-                top_nocs = ai_service.semantic_search_nocs(user_content)
-                target_data = ai_service.NOC_CODE_TO_ENTRY.get(target_noc)
-                if target_data:
-                    top_nocs[target_noc] = target_data
-                noc_reference = json.dumps(top_nocs, ensure_ascii=False)
-                system_prompt = ai_service.build_noc_finder_prompt(noc_reference, target_noc)
-                result = ai_service.find_noc_with_openai(
-                    system_prompt=system_prompt,
-                    user_content=f"=== USER INPUT ===\n{user_content}",
-                    page_images=page_images if page_images else None,
-                    ranked_candidates=top_nocs
-                )
+            # Both auto-detect and targeted (alternative click / typed code) go through v2 so the
+            # output is consistent: a targeted code is scored by real semantic precision + duty-by-duty
+            # coverage, not the old single-prompt path that self-reported 100/100.
+            import noc_finder_v2
+            _tgt = target_noc if (target_noc and target_noc != 'auto') else None
+            result = noc_finder_v2.run_noc_finder_v2(
+                user_content, page_images if page_images else None,
+                target_noc=_tgt, from_document=bool(document),
+            )
         except openai.RateLimitError as e:
             print(f"OpenAI RateLimitError details: {e.response.json() if hasattr(e, 'response') else str(e)}")
             raise HTTPException(status_code=429, detail=f"OpenAI Rate Limit Exceeded: {str(e)}")
@@ -914,6 +966,13 @@ async def noc_finder_endpoint(
             print(f"OpenAI processing error: {e}")
             raise HTTPException(status_code=500, detail=f"AI Processing failed: {str(e)}")
         result["stored_file_id"] = evaluation_id
+        # The full Auditor result (if the Finder ran one) is kept in `result` so it PERSISTS in the saved
+        # payload — that lets "Audit my letter" reuse it even from a past NOC check in the dashboard
+        # (and same-session via the in-memory cache). It is stripped from the API RESPONSE after saving,
+        # so the paid audit is never sent to the client.
+        _audit_full = result.get("_audit_full")
+        if _audit_full:
+            ai_service.cache_finder_audit(evaluation_id, (result.get("recommended_noc") or {}).get("code"), _audit_full)
         # NOC Finder is free for signed-in users
         is_signed_in = user_id and user_id != "anonymous"
         result["is_signed_in"] = 1 if is_signed_in else 0
@@ -932,6 +991,27 @@ async def noc_finder_endpoint(
         # Use AI-extracted role/company from the response, fall back to typed input
         saved_role = result.get("role_name") or job_title or "Unknown Role"
         saved_company = result.get("company_name") or "N/A"
+        # ── Monetization gating ──────────────────────────────────────────────
+        # Paid tiers (and free users who still have finder credits) get the FULL report.
+        # Anonymous users and free users out of credits get a TEASER: the matched NOC,
+        # confidence, "why", and aligned duties stay visible, but the gaps + alternative
+        # NOCs are stripped from the RESPONSE (the full version is saved to the DB) and gated
+        # behind sign-in / Optimize. We decide access BEFORE saving so `is_premium_unlocked`
+        # records whether THIS report was unlocked — the history view re-applies the same gate.
+        import copy
+        ua = db.query(db_models.UserAccount).filter_by(user_id=user_id).first() if is_signed_in else None
+        tier = ((ua.subscription_tier if ua else "free") or "free")
+        is_paid = tier in ("starter", "complete")
+        credits = (ua.find_noc_credits if ua else 0) or 0
+        is_new_search = not target_noc  # re-evaluating an alternative NOC does not spend a credit
+
+        full_access = is_paid or (is_signed_in and credits > 0)
+
+        # Spend one free credit on a brand-new full search (never on alternative re-evals)
+        if full_access and not is_paid and is_signed_in and is_new_search and credits > 0:
+            ua.find_noc_credits = credits - 1
+            credits = ua.find_noc_credits
+
         new_record = db_models.Evaluation(
                 evaluation_type='noc_finder',
             user_id=user_id,
@@ -941,16 +1021,98 @@ async def noc_finder_endpoint(
             original_filename=document.filename if document else "Text Input",
             stored_file_id=evaluation_id,
             compliance_status="N/A",
-            is_premium_unlocked=1 if is_signed_in else 0,
+            is_premium_unlocked=1 if full_access else 0,
             payload=result,
         )
         db.add(new_record)
         db.commit()
-        
-        return result
-        
+
+        # Saved to the DB (payload retains _audit_full for reuse); strip it from the API response so the
+        # paid Auditor result is never sent to the Finder client.
+        result.pop("_audit_full", None)
+
+        # Expose counts + balance so the teaser can say "see N gaps / M alternatives"
+        result["gaps_count"] = len(result.get("key_gaps") or [])
+        result["alt_count"] = len(result.get("alternatives") or [])
+        result["breakdown_count"] = len(result.get("duties_breakdown") or [])
+        result["finder_credits_remaining"] = (credits if (is_signed_in and not is_paid) else None)
+        result["tier"] = tier
+
+        if full_access:
+            result["gated"] = False
+            return result
+
+        # Gated view: hide EVERY identifying field (NOC code, title, summary, breakdown, gaps,
+        # alternatives, role/employer) so the matched NOC cannot be learned without paying — only the
+        # duty-coverage gauge remains visible. The full result is saved to the DB and returned by
+        # /noc-finder/reveal once the user is entitled (signed in with a credit, or paid).
+        def _gated_view(reason):
+            g = copy.deepcopy(result)
+            g.update({
+                "gated": True, "gate_reason": reason,
+                "recommended_noc": {"code": "", "title": "", "confidence": 0, "duties_total": 0, "duties_matched": 0},
+                "why_this_noc": "", "key_matches": [], "key_gaps": [], "alternatives": [],
+                "duties_breakdown": [], "coverage_subtitle": "", "role_name": "", "company_name": "",
+            })
+            return g
+
+        if not is_signed_in:
+            return _gated_view("signin")   # anon — sign in to reveal (free users get 2 reports)
+        return _gated_view("upgrade")      # signed-in, out of credits — must upgrade/buy a pack
+
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"NOC Finder failed: {str(e)}")
+
+
+class NocRevealRequest(BaseModel):
+    stored_file_id: str
+
+@app.post("/api/v1/noc-finder/reveal")
+def noc_finder_reveal(
+    req: NocRevealRequest,
+    user_id: str = Depends(get_current_user),
+    db: Session = Depends(database.get_db),
+):
+    """Decide entitlement when a user signs in after an anonymous search — WITHOUT re-running the AI.
+    Paid tiers reveal for free; free users spend ONE finder credit to reveal; users with no credits
+    get the upgrade gate. Also claims the anonymous record and records the unlock state so the
+    history view can't be used to bypass the paywall."""
+    ensure_user_exists(user_id, db)
+    ua = db.query(db_models.UserAccount).filter_by(user_id=user_id).first()
+    tier = ((ua.subscription_tier if ua else "free") or "free")
+    is_paid = tier in ("starter", "complete")
+    credits = (ua.find_noc_credits if ua else 0) or 0
+
+    if is_paid:
+        access = "full"
+    elif credits > 0:
+        ua.find_noc_credits = credits - 1
+        credits = ua.find_noc_credits
+        access = "full"
+    else:
+        access = "gated"
+
+    rec = db.query(db_models.Evaluation).filter_by(
+        evaluation_type='noc_finder', stored_file_id=req.stored_file_id).first()
+    if rec:
+        if rec.user_id == "anonymous":
+            rec.user_id = user_id          # claim the anon record for this user
+        rec.is_premium_unlocked = 1 if access == "full" else 0
+    db.commit()
+
+    # On a full reveal, return the FULL saved result (the gated /noc-finder response had the NOC code
+    # stripped, so the client needs the real data to render the unlocked report). Strip the internal
+    # _audit_full before sending.
+    full = None
+    if access == "full" and rec and isinstance(rec.payload, dict):
+        full = {k: v for k, v in rec.payload.items() if k != "_audit_full"}
+        full["gated"] = False
+        full["gate_reason"] = None
+        full["finder_credits_remaining"] = (None if is_paid else credits)
+        full["tier"] = tier
+        full["is_signed_in"] = 1
+
+    return {"access": access, "finder_credits_remaining": (None if is_paid else credits), "tier": tier, "result": full}
 
 # --- Bank Letter Auditor Tool ---
 
@@ -1225,6 +1387,18 @@ def create_checkout_session(
         # 19.00 CAD
         amount = 1900
         name = "CRS Point Simulator & Draw Matcher Unlock"
+    elif req.pass_type == 'finder_1':
+        # 9.90 CAD — 1 NOC Finder full report
+        amount = 990
+        name = "NOC Finder — 1 Full Report Credit"
+    elif req.pass_type == 'finder_3':
+        # 14.90 CAD — 3 NOC Finder full reports
+        amount = 1490
+        name = "NOC Finder — 3 Full Report Credits"
+    elif req.pass_type == 'finder_5':
+        # 19.90 CAD — 5 NOC Finder full reports
+        amount = 1990
+        name = "NOC Finder — 5 Full Report Credits"
     elif req.pass_type == 'starter':
         # 49.00 CAD — Optimize tier
         amount = 4900
@@ -1323,11 +1497,17 @@ async def stripe_webhook(request: Request, db: Session = Depends(database.get_db
         if client_user_id:
             user = db.query(db_models.UserAccount).filter_by(user_id=client_user_id).first()
             if not user:
-                user = db_models.UserAccount(user_id=client_user_id, find_noc_credits=0, audit_letter_credits=0)
+                user = db_models.UserAccount(user_id=client_user_id, find_noc_credits=NEW_USER_FINDER_CREDITS, audit_letter_credits=0)
                 db.add(user)
             
             if pass_type == 'auditor':
                 user.audit_letter_credits += 1
+            elif pass_type == 'finder_1':
+                user.find_noc_credits += 1
+            elif pass_type == 'finder_3':
+                user.find_noc_credits += 3
+            elif pass_type == 'finder_5':
+                user.find_noc_credits += 5
             elif pass_type == 'letter_builder':
                 user.letter_builder_credits += 1
             elif pass_type == 'ita_strategy':
