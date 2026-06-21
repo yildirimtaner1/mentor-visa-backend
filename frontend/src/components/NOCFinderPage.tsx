@@ -252,11 +252,10 @@ export const NOCFinderPage: FC<NOCFinderPageProps> = ({ onNavigate }) => {
       const token = await getToken();
       if (!token || !cur) return;
       let access: 'full' | 'gated' = 'full';
-      let credits: number | null = null;
       let serverFull: any = null;
       if (cur.stored_file_id) {
         const r = await revealNocResult(token, cur.stored_file_id);
-        access = r.access; credits = r.finder_credits_remaining; serverFull = r.result;
+        access = r.access; serverFull = r.result;
         setUserTier(r.tier);
         setFinderCredits(r.finder_credits_remaining ?? 0);
       }
@@ -512,14 +511,6 @@ export const NOCFinderPage: FC<NOCFinderPageProps> = ({ onNavigate }) => {
       case 'STRONG_MATCH': return { label: 'Strong Match', bg: '#ECFDF5', color: '#059669', border: '#A7F3D0', icon: '✅' };
       case 'MODERATE_MATCH': return { label: 'Moderate Match', bg: '#FFFBEB', color: '#D97706', border: '#FDE68A', icon: '⚠️' };
       default: return { label: 'Weak Match', bg: '#FEF2F2', color: '#DC2626', border: '#FECACA', icon: '❌' };
-    }
-  };
-
-  const getConfidenceColor = (level: string) => {
-    switch (level) {
-      case 'high': return '#059669';
-      case 'medium': return '#D97706';
-      default: return '#DC2626';
     }
   };
 
