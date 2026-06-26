@@ -119,7 +119,7 @@ export function PricingPage() {
           </div>
           <ul className="pricing-features">
             <Feature included>Unlimited CRS Calculator</Feature>
-            <Feature included>Unlimited NOC Code Finder</Feature>
+            <Feature included>2 Free NOC Finder Reports</Feature>
             <Feature included>Eligibility Check</Feature>
             <Feature included>12 Common Mistakes Guide</Feature>
             <Feature included>GCKey Setup Guide</Feature>
@@ -147,6 +147,7 @@ export function PricingPage() {
           </div>
           <ul className="pricing-features">
             <Feature included>Everything in Explore</Feature>
+            <Feature included highlight>Unlimited NOC Code Finder</Feature>
             <Feature included highlight>Unlimited Employment Letter Audits</Feature>
             <Feature included highlight>Smart Post-ITA Milestone Tracker &amp; Predictor</Feature>
             <Feature included highlight>Unlimited CRS Point Simulator (What-If Scenarios)</Feature>

@@ -47,13 +47,15 @@ interface TrackerState {
 const FALLBACK_STREAMS = ['CEC', 'FSW-Outland', 'FSW-Inland', 'PNP-Inland', 'PNP-Outland'];
 const FALLBACK_CATEGORIES = ['General', 'CEC', 'PNP', 'French', 'Healthcare', 'STEM', 'Trades', 'Transport', 'Agriculture', 'Education'];
 
+// Ordered for the tracker decision: lead with the tracker/predictor (the feature being unlocked
+// here), then the rest of the Optimize toolkit. Mirrors the pricing page contents.
 const OPTIMIZE_FEATURES = [
-  'Unlimited Employment Letter Audits',
   'Smart Post-ITA Milestone Tracker & Predictor',
+  'Unlimited NOC Code Finder',
+  'Unlimited Employment Letter Audits',
   'Unlimited CRS Point Simulator (What-If Scenarios)',
   '20 Question Credits — Express Entry AI Assistant',
-  'Personalized Document Checklist',
-  'Document Expiry Tracker',
+  'Personalized Document Checklist & Expiry Tracker',
 ];
 
 // ─── Milestone config ──────────────────────────────────────────────────────────

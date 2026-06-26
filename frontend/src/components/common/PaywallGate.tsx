@@ -34,12 +34,12 @@ const TIER_PRICES: Record<string, string> = {
 
 const TIER_FEATURES: Record<string, string[]> = {
   starter: [
+    'Unlimited NOC Code Finder',
     'Unlimited Employment Letter Audits',
     'Smart Post-ITA Milestone Tracker & Predictor',
     'Unlimited CRS Point Simulator (What-If Scenarios)',
     '20 Question Credits — Express Entry AI Assistant',
-    'Personalized Document Checklist',
-    'Document Expiry Tracker',
+    'Personalized Document Checklist & Expiry Tracker',
   ],
   complete: [
     'Everything in Optimize',

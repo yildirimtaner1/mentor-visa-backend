@@ -1557,49 +1557,61 @@ def auto_detect_noc(user_content: str, page_images: list[tuple[bytes, str]] = No
         return None
 
 
-def audit_document_with_openai(system_prompt: str, user_content: str, page_images: list[tuple[bytes, str]] = None, auto_detected_noc: str = None) -> dict:
+def audit_document_with_openai(system_prompt: str, user_content: str, page_images: list[tuple[bytes, str]] = None, auto_detected_noc: str = None, forced_noc: str = None) -> dict:
     """Employment Auditor: returns AnalysisResponse.
-    
+
     Args:
         auto_detected_noc: If set, this NOC was auto-detected (not user-specified).
             Employer NOC references will be stripped from the text to prevent
             the model from overriding the detected target.
+        forced_noc: If set, the user EXPLICITLY requested an audit against this NOC
+            (e.g. a re-evaluation against a clicked alternative or a manually typed code).
+            Like auto_detected_noc, employer NOC references are stripped and the result's
+            detected_code is hard-locked to this code — but the NOC-match confidence is
+            computed fresh (we did not run auto-detection, so there is no cached score).
     """
-    if auto_detected_noc:
-        # Strip employer NOC claims to prevent the model from ignoring the auto-detected target.
-        # Example: employer writes "NOC 42201" but auto-detect found 41321 is the correct match.
+    # The NOC the result must end up locked to (explicit user request wins over auto-detection).
+    target_noc = forced_noc or auto_detected_noc
+    if target_noc:
+        # Strip employer NOC claims so the model can't anchor to the employer's stated NOC and
+        # ignore the target. Example: employer writes "NOC 42201" but we are auditing against 41321.
         cleaned_content, stripped = strip_employer_noc_references(user_content)
         if stripped:
-            print(f"[Auditor] Stripped employer NOC references (auto-detected target: {auto_detected_noc})")
+            print(f"[Auditor] Stripped employer NOC references (target NOC: {target_noc})")
         user_content = cleaned_content
-    
+
     from models import AnalysisResponse
     result = _call_openai_structured(system_prompt, user_content, page_images, AnalysisResponse, "Auditor")
-    
-    # Post-process: If we auto-detected a target NOC but the model overrode it
-    # (e.g., because the employer's NOC claim is visible in page images),
-    # force-correct the detected_code to match the auto-detected target.
-    if auto_detected_noc and result.get("noc_analysis", {}).get("detected_code") != auto_detected_noc:
+
+    # Post-process: if a target NOC was determined (auto-detected OR explicitly requested) but the
+    # model returned a different detected_code (e.g. the employer's NOC claim leaked via page images,
+    # or the model "second-guessed" the requested code), force-correct it to the intended target.
+    if target_noc and result.get("noc_analysis", {}).get("detected_code") != target_noc:
         noc_analysis = result.get("noc_analysis", {})
         model_code = noc_analysis.get("detected_code")
         model_title = noc_analysis.get("detected_title")
-        print(f"[Auditor] Correcting detected_code: model said {model_code}, auto-detect said {auto_detected_noc}")
-        
+        print(f"[Auditor] Correcting detected_code: model said {model_code}, target is {target_noc}")
+
         # Get the correct title from the index
-        target_entry = NOC_CODE_TO_ENTRY.get(auto_detected_noc)
-        target_title = target_entry.get("title", "") if target_entry else auto_detected_noc
-        
-        noc_analysis["detected_code"] = auto_detected_noc
+        target_entry = NOC_CODE_TO_ENTRY.get(target_noc)
+        target_title = target_entry.get("title", "") if target_entry else target_noc
+
+        noc_analysis["detected_code"] = target_noc
         noc_analysis["detected_title"] = target_title
         
         # Preserve the model's original pick as an alternative so nothing is lost
         alts = noc_analysis.get("alternative_nocs", [])
         if model_code and not any(a.get("noc_code") == model_code for a in alts):
+            reason = (f"This audit was explicitly run against NOC {target_noc} ({target_title}) at your "
+                      f"request. The model's own best guess was NOC {model_code} — kept here as an alternative."
+                      if forced_noc else
+                      f"Employer's stated NOC. Overridden by duty-level analysis which found {target_noc} "
+                      f"({target_title}) as a better match.")
             alts.append({
                 "noc_code": model_code,
                 "noc_title": model_title or model_code,
                 "fit_assessment": "moderate",
-                "reason": f"Employer's stated NOC. Overridden by duty-level analysis which found {auto_detected_noc} ({target_title}) as a better match."
+                "reason": reason,
             })
             noc_analysis["alternative_nocs"] = alts
         

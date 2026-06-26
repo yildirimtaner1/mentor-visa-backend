@@ -791,11 +791,16 @@ def reevaluate_document(
                     result_json = stored_audit
                     print(f"[reevaluate] Reused stored Finder audit (payload) for file={req.file_id} noc={effective_target}")
             if result_json is None:
+                # An explicit target (clicked alternative / typed code) must be hard-locked, not just
+                # requested via the prompt — pass it as forced_noc so the result's detected_code can't
+                # drift to the employer's stated NOC or the model's own second guess.
+                explicit_target = req.target_noc if (req.target_noc and req.target_noc != 'auto') else None
                 result_json = ai_service.audit_document_with_openai(
                     system_prompt=system_prompt,
                     user_content=user_content,
                     page_images=page_images if page_images else None,
-                    auto_detected_noc=auto_detected
+                    auto_detected_noc=auto_detected,
+                    forced_noc=explicit_target,
                 )
             else:
                 print(f"[reevaluate] Reused NOC Finder's audit for file={req.file_id} noc={effective_target}")

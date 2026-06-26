@@ -3,6 +3,7 @@ import { useUser, SignInButton, SignUpButton, useAuth } from '@clerk/clerk-react
 import { usePDF } from 'react-to-pdf';
 import type { AnalysisResponse, KeyRisk } from '../types';
 import { reevaluateDocument, fetchUserCredits, createCheckoutSession, consumeCreditToUnlock, saveEvaluation } from '../services/api';
+import { DynamicLoader } from './common/DynamicLoader';
 import { CheckCircle2, X } from 'lucide-react';
 import '../components/common/PaywallGate.css';
 import './PricingPage.css';
@@ -42,6 +43,22 @@ export const Dashboard: FC<DashboardProps> = ({ data, onReset, onUpdate }) => {
   const [showToast, setShowToast] = useState(false);
   const [toastDismissed, setToastDismissed] = useState(false);
   const [isReevaluating, setIsReevaluating] = useState<string | null>(null);
+
+  // Manual re-evaluation: let the user audit against any 5-digit NOC they choose (mirrors the NOC Finder).
+  const [manualNoc, setManualNoc] = useState('');
+  const [nocTitles, setNocTitles] = useState<Record<string, string>>({});
+  useEffect(() => {
+    fetch('/noc-directory.json')
+      .then(r => r.json())
+      .then((list: { code: string; title: string }[]) => {
+        const m: Record<string, string> = {};
+        for (const n of list) m[n.code] = n.title;
+        setNocTitles(m);
+      })
+      .catch(() => {});
+  }, []);
+  const manualNocTitle = nocTitles[manualNoc] || '';
+  const manualNocValid = /^\d{5}$/.test(manualNoc) && !!manualNocTitle;
   
   // Monetization State
   const [credits, setCredits] = useState<number>(0);
@@ -304,13 +321,11 @@ export const Dashboard: FC<DashboardProps> = ({ data, onReset, onUpdate }) => {
   };
 
   if (isReevaluating) {
+    // Re-use the exact same animated loader as the first audit run so re-evaluation never looks
+    // static/primitive — keeps the user from dropping off mid-analysis.
     return (
-      <div style={{ maxWidth: '900px', margin: '40px auto', padding: '40px', background: 'white', borderRadius: '12px', boxShadow: '0 4px 24px rgba(0,0,0,0.06)', textAlign: 'center' }}>
-         <div style={{ display: 'inline-block', width: '50px', height: '50px', border: '3px solid var(--primary-light)', borderTopColor: 'var(--primary-color)', borderRadius: '50%', animation: 'spin 1s linear infinite', marginBottom: '20px' }} />
-         <h2 style={{ fontSize: '1.5rem', fontWeight: 700, color: 'var(--text-main)', marginBottom: '12px' }}>
-           Re-evaluating explicitly against NOC {isReevaluating}...
-         </h2>
-         <p style={{ color: 'var(--text-muted)' }}>We are securely re-analyzing your original file against the {isReevaluating} structural guidelines.</p>
+      <div style={{ maxWidth: '720px', margin: '40px auto' }}>
+        <DynamicLoader tool="audit" />
       </div>
     );
   }
@@ -672,44 +687,13 @@ export const Dashboard: FC<DashboardProps> = ({ data, onReset, onUpdate }) => {
                     </div>
                   </div>
                   <div>
-                    {/* Alternative NOCs */}
-                    <div className="card">
-                      {data.noc_analysis.alternative_nocs && data.noc_analysis.alternative_nocs.length > 0 && (
-                        <div style={{ background: 'white', borderRadius: '6px', border: '1px dashed var(--border-color)' }}>
-                          <h4 style={{ fontSize: '0.85rem', fontWeight: 'bold', marginBottom: '8px', color: 'var(--text-muted)' }}>ALTERNATIVE NOC CODES:</h4>
-                          <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginBottom: '12px' }}>Want to apply under one of these instead? Click a NOC below to run the audit against it.</p>
-                          <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                            {data.noc_analysis.alternative_nocs.map((alt, i) => {
-                              const label = alt.match_score >= 75 ? 'Strong Match' : alt.match_score >= 50 ? 'Moderate' : 'Weak';
-                              const labelColor = alt.match_score >= 75 ? '#059669' : alt.match_score >= 50 ? '#D97706' : '#9CA3AF';
-                              const labelBg = alt.match_score >= 75 ? '#ECFDF5' : alt.match_score >= 50 ? '#FFFBEB' : '#F9FAFB';
-                              return (
-                              <div 
-                                key={i} 
-                                onClick={() => handleReevaluate(alt.noc_code)}
-                                className="alternative-noc-card"
-                                style={{ background: '#F8FAFC', padding: '16px', borderRadius: '8px', border: '1px solid var(--border-color)', cursor: 'pointer' }}
-                              >
-                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: alt.explanation ? '8px' : '0' }}>
-                                  <div style={{ fontWeight: 600, fontSize: '0.95rem' }}>NOC {alt.noc_code} — {alt.noc_title}</div>
-                                  <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                                    <span style={{ fontWeight: 600, color: labelColor, fontSize: '0.8rem', background: labelBg, padding: '4px 10px', borderRadius: '6px' }}>{label} ({alt.match_score}%)</span>
-                                    {onUpdate && (
-                                      <span style={{ fontSize: '0.8rem', color: 'var(--primary-color)', fontWeight: 600 }} className="target-btn">Re-evaluate →</span>
-                                    )}
-                                  </div>
-                                </div>
-                                {alt.explanation && (
-                                  <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', lineHeight: 1.5, margin: 0 }}>{alt.explanation}</p>
-                                )}
-                              </div>
-                              );
-                            })}
-                          </div>
-                        </div>
-                      )}
-                      <p style={{ fontSize: '0.9rem', color: 'var(--text-muted)', marginTop: '12px' }}>{data.noc_analysis.notes}</p>
-                    </div>
+                    {/* NOC analysis notes (alternative NOCs + manual re-evaluate now live in their own
+                        always-visible card below, mirroring the NOC Finder). */}
+                    {data.noc_analysis.notes && (
+                      <div className="card">
+                        <p style={{ fontSize: '0.9rem', color: 'var(--text-muted)', margin: 0 }}>{data.noc_analysis.notes}</p>
+                      </div>
+                    )}
 
                     {/* Suggested Wording */}
                     {data.suggested_wording && data.suggested_wording.length > 0 && (
@@ -827,11 +811,15 @@ export const Dashboard: FC<DashboardProps> = ({ data, onReset, onUpdate }) => {
                               </>
                             ) : (
                               <>
-                                <Feature included>20 Question Credits - Express Entry AI Assistant</Feature>
-                                <Feature included>Unlimited Employment Letter Audits</Feature>
+                                {/* Ordered for the auditor decision: lead with unlimited audits (they're
+                                    auditing a letter right now), then the companion NOC tools, then the
+                                    wider toolkit. */}
+                                <Feature included highlight>Unlimited Employment Letter Audits</Feature>
+                                <Feature included highlight>Unlimited NOC Code Finder</Feature>
+                                <Feature included>Smart Post-ITA Milestone Tracker &amp; Predictor</Feature>
                                 <Feature included>Unlimited CRS Point Simulator (What-If Scenarios)</Feature>
-                                <Feature included>Personalized Document Checklist</Feature>
-                                <Feature included>Document Expiry Tracking</Feature>
+                                <Feature included>20 Question Credits — Express Entry AI Assistant</Feature>
+                                <Feature included>Personalized Document Checklist &amp; Expiry Tracker</Feature>
                               </>
                             )}
                           </ul>
@@ -863,6 +851,92 @@ export const Dashboard: FC<DashboardProps> = ({ data, onReset, onUpdate }) => {
                 </div>
               )}
             </div>
+
+            {/* Re-evaluate against another NOC — alternatives + manual code entry. Shown once the audit
+                is unlocked (mirrors the NOC Finder, where re-eval appears only with report access).
+                Switching the target NOC never costs an extra credit: the backend re-audits the same
+                file and inherits this record's unlocked status (main.py reevaluate: audit_unlocked). */}
+            {isPremiumUnlocked && onUpdate && (
+              <div data-html2canvas-ignore="true" className="card" style={{ marginTop: '24px' }}>
+                <h3 className="card-title" style={{ marginBottom: '4px' }}>🔁 Re-evaluate against another NOC</h3>
+                <p style={{ fontSize: '0.88rem', color: 'var(--text-muted)', marginTop: 0, marginBottom: '16px' }}>
+                  Not sure NOC {data.noc_analysis.detected_code} is the best fit? Re-run this audit against a suggested alternative or any code you choose.
+                </p>
+
+                {/* Alternative NOC suggestions */}
+                {data.noc_analysis.alternative_nocs && data.noc_analysis.alternative_nocs.length > 0 && (
+                  <div style={{ marginBottom: '20px' }}>
+                    <h4 style={{ fontSize: '0.85rem', fontWeight: 700, marginBottom: '12px' }}>Suggested alternatives</h4>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                      {data.noc_analysis.alternative_nocs.map((alt, i) => {
+                        const label = alt.match_score >= 75 ? 'Strong Match' : alt.match_score >= 50 ? 'Moderate' : 'Weak';
+                        const labelColor = alt.match_score >= 75 ? '#059669' : alt.match_score >= 50 ? '#D97706' : '#9CA3AF';
+                        const labelBg = alt.match_score >= 75 ? '#ECFDF5' : alt.match_score >= 50 ? '#FFFBEB' : '#F9FAFB';
+                        return (
+                          <div
+                            key={i}
+                            onClick={() => handleReevaluate(alt.noc_code)}
+                            className="alternative-noc-card"
+                            style={{ background: '#F8FAFC', padding: '16px', borderRadius: '8px', border: '1px solid var(--border-color)', cursor: 'pointer' }}
+                          >
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '10px', flexWrap: 'wrap', marginBottom: alt.explanation ? '8px' : '0' }}>
+                              <div style={{ fontWeight: 600, fontSize: '0.95rem' }}>NOC {alt.noc_code} — {alt.noc_title}</div>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                                <span style={{ fontWeight: 600, color: labelColor, fontSize: '0.8rem', background: labelBg, padding: '4px 10px', borderRadius: '6px' }}>{label} ({alt.match_score}%)</span>
+                                <span style={{ fontSize: '0.8rem', color: 'var(--primary-color)', fontWeight: 600 }} className="target-btn">Re-evaluate →</span>
+                              </div>
+                            </div>
+                            {alt.explanation && (
+                              <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', lineHeight: 1.5, margin: 0 }}>{alt.explanation}</p>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+
+                {/* Manual NOC entry */}
+                <div style={{ padding: '16px', background: '#F8FAFC', borderRadius: '10px', border: '1px solid var(--border-color)' }}>
+                  <div style={{ fontSize: '0.9rem', fontWeight: 700, marginBottom: '4px' }}>Have a specific NOC in mind?</div>
+                  <p style={{ fontSize: '0.82rem', color: 'var(--text-muted)', margin: '0 0 10px' }}>
+                    Enter any 5-digit NOC 2021 code to audit your letter against it.
+                  </p>
+                  <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                    <input
+                      type="text"
+                      inputMode="numeric"
+                      maxLength={5}
+                      value={manualNoc}
+                      onChange={(e) => setManualNoc(e.target.value.replace(/\D/g, '').slice(0, 5))}
+                      onKeyDown={(e) => { if (e.key === 'Enter' && manualNocValid) handleReevaluate(manualNoc); }}
+                      placeholder="e.g. 21300"
+                      style={{ flex: '1 1 120px', minWidth: 0, padding: '10px 12px', borderRadius: '8px', border: '1px solid var(--border-color)', fontSize: '0.95rem' }}
+                    />
+                    <button
+                      className="btn btn-outline"
+                      disabled={!manualNocValid}
+                      onClick={() => manualNocValid && handleReevaluate(manualNoc)}
+                      style={{ padding: '10px 18px', whiteSpace: 'nowrap', opacity: manualNocValid ? 1 : 0.5 }}
+                    >
+                      Re-evaluate →
+                    </button>
+                  </div>
+                  {/* Live feedback: confirm the typed code resolves to a real NOC title (avoids typos) */}
+                  {manualNoc.length === 5 && (
+                    manualNocTitle ? (
+                      <div style={{ marginTop: '8px', fontSize: '0.85rem', color: '#047857', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                        <span>✅</span> NOC {manualNoc} — <strong>{manualNocTitle}</strong>
+                      </div>
+                    ) : (
+                      <div style={{ marginTop: '8px', fontSize: '0.85rem', color: '#DC2626' }}>
+                        ⚠️ No NOC 2021 code matches "{manualNoc}". Check the number.
+                      </div>
+                    )
+                  )}
+                </div>
+              </div>
+            )}
 
             {/* NOC Alignment Sheet (for PDF download — same structure as before) */}
             {data.noc_analysis?.duties_match && data.noc_analysis.duties_match.length > 0 && (

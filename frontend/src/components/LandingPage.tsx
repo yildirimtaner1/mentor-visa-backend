@@ -304,7 +304,7 @@ export const LandingPage: FC<LandingPageProps> = ({ onNavigate }) => {
             <ul className="pricing-features">
               <li className="pricing-feature"><CheckCircle2 size={16} className="feature-check" /><span>Eligibility Assessment</span></li>
               <li className="pricing-feature"><CheckCircle2 size={16} className="feature-check" /><span>CRS Calculator — unlimited</span></li>
-              <li className="pricing-feature"><CheckCircle2 size={16} className="feature-check" /><span>NOC Finder — unlimited</span></li>
+              <li className="pricing-feature"><CheckCircle2 size={16} className="feature-check" /><span>NOC Finder — 2 free reports</span></li>
               <li className="pricing-feature"><CheckCircle2 size={16} className="feature-check" /><span>12 Mistakes Guide</span></li>
             </ul>
             <div className="pricing-card-footer">
@@ -322,6 +322,7 @@ export const LandingPage: FC<LandingPageProps> = ({ onNavigate }) => {
             </div>
             <ul className="pricing-features">
               <li className="pricing-feature"><CheckCircle2 size={16} className="feature-check" /><span>Everything in Explore</span></li>
+              <li className="pricing-feature highlight"><CheckCircle2 size={16} className="feature-check" /><span>Unlimited NOC Finder</span></li>
               <li className="pricing-feature highlight"><CheckCircle2 size={16} className="feature-check" /><span>Unlimited Employment Letter Audits</span></li>
               <li className="pricing-feature highlight"><CheckCircle2 size={16} className="feature-check" /><span>Smart Post-ITA Milestone Tracker &amp; Predictor</span></li>
               <li className="pricing-feature highlight"><CheckCircle2 size={16} className="feature-check" /><span>Unlimited CRS Point Simulator (What-If Scenarios)</span></li>

@@ -149,8 +149,8 @@ export const NOCFinderPage: FC<NOCFinderPageProps> = ({ onNavigate }) => {
       <div style={{ fontSize: '2.2rem', marginBottom: '6px' }}>🔓</div>
       <h3 style={{ fontSize: '1.25rem', fontWeight: 800, marginBottom: '4px' }}>Unlock your full NOC report</h3>
       <p style={{ color: 'var(--text-muted)', marginBottom: '16px', lineHeight: 1.5, fontSize: '0.9rem' }}>{subtext}</p>
-      <div style={{ fontSize: '0.72rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '8px', textAlign: 'left' }}>Just need your NOC?</div>
-      <div style={{ display: 'grid', gap: '8px', marginBottom: '18px' }}>
+      <div style={{ fontSize: '0.72rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '8px', textAlign: 'left' }}>Just need your NOC? Pick a pack to continue</div>
+      <div style={{ display: 'grid', gap: '8px', marginBottom: '12px' }}>
         {[
           { pt: 'finder_1' as const, credits: 1, price: 9.90 },
           { pt: 'finder_3' as const, credits: 3, price: 14.90, best: true },
@@ -162,14 +162,22 @@ export const NOCFinderPage: FC<NOCFinderPageProps> = ({ onNavigate }) => {
             <span style={{ fontWeight: 700, fontSize: '0.92rem' }}>
               {p.credits} full report{p.credits > 1 ? 's' : ''} {p.best && <span style={{ fontSize: '0.66rem', color: '#4338CA', background: '#E0E7FF', padding: '2px 6px', borderRadius: '999px', marginLeft: '4px' }}>BEST VALUE</span>}
             </span>
-            <span style={{ fontWeight: 800, color: 'var(--primary-color)' }}>{checkingOut === p.pt ? '…' : `$${p.price.toFixed(2)}`}</span>
+            <span style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <span style={{ fontWeight: 800, color: 'var(--primary-color)' }}>{`$${p.price.toFixed(2)}`}</span>
+              <span style={{ fontSize: '0.78rem', fontWeight: 700, color: 'white', background: 'var(--primary-color)', padding: '5px 12px', borderRadius: '999px', whiteSpace: 'nowrap' }}>
+                {checkingOut === p.pt ? 'Redirecting…' : 'Continue →'}
+              </span>
+            </span>
           </button>
         ))}
       </div>
+      <p style={{ fontSize: '0.74rem', color: 'var(--text-muted)', margin: '0 0 16px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '5px' }}>
+        🔒 You'll be taken to our secure Stripe checkout to pay.
+      </p>
       <div style={{ borderTop: '1px solid var(--border-color)', paddingTop: '14px', textAlign: 'left' }}>
         <div style={{ fontSize: '0.72rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '8px' }}>Doing the whole application?</div>
         <button className="btn btn-primary" style={{ width: '100%', padding: '13px', fontSize: '1rem' }} onClick={() => handleCheckout('starter', 49)} disabled={!!checkingOut}>
-          {checkingOut === 'starter' ? 'Redirecting…' : 'Get Optimize — $49 · unlimited everything'}
+          {checkingOut === 'starter' ? 'Redirecting…' : 'Get Optimize — $49 · unlimited everything →'}
         </button>
         <p style={{ fontSize: '0.74rem', color: 'var(--text-muted)', margin: '8px 0 0', lineHeight: 1.45 }}>
           Unlimited NOC reports + Employment Letter Auditor + Smart Tracker + CRS Simulator + AI Assistant + Document tools.
