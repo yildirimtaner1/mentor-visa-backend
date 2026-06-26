@@ -2013,7 +2013,15 @@ def assemble_letter_text(employment_details: dict, noc_code: str, noc_title: str
 def get_draw_context_string() -> str:
     """Loads the draw results JSON from the frontend and returns a context string for the AI prompt."""
     try:
-        json_path = os.path.join(os.path.dirname(__file__), '..', 'frontend', 'src', 'data', 'draw_results.json')
+        # Prefer the backend-local copy (present in the deployed Render tree); fall back to the
+        # monorepo frontend source for local dev. The frontend file is the source of truth — keep
+        # backend/draw_results.json synced when draws are added.
+        here = os.path.dirname(__file__)
+        candidates = [
+            os.path.join(here, 'draw_results.json'),
+            os.path.join(here, '..', 'frontend', 'src', 'data', 'draw_results.json'),
+        ]
+        json_path = next((p for p in candidates if os.path.exists(p)), candidates[0])
         with open(json_path, 'r', encoding='utf-8') as f:
             draws = json.load(f)
 
