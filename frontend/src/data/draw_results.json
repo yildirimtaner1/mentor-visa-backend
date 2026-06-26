@@ -1,5 +1,30 @@
 [
   {
+    "date": "2026-06-25",
+    "drawType": "Healthcare",
+    "crsScore": 475,
+    "itasIssued": 4000
+  },
+  {
+    "date": "2026-06-24",
+    "drawType": "Physicians",
+    "crsScore": 223,
+    "itasIssued": 271
+  },
+  {
+    "date": "2026-06-23",
+    "drawType": "CEC",
+    "crsScore": 516,
+    "itasIssued": 4000
+  },
+  {
+    "date": "2026-06-22",
+    "drawType": "PNP",
+    "crsScore": 730,
+    "itasIssued": 955,
+    "notes": "Largest PNP round of 2026 and lowest PNP cut-off of the year; first draw since May 28."
+  },
+  {
     "date": "2026-05-28",
     "drawType": "French",
     "crsScore": 409,
