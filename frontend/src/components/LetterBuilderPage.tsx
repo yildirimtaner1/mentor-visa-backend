@@ -666,6 +666,7 @@ export const LetterBuilderPage: FC = () => {
                           <Feature included>Unlimited CRS Point Simulator (What-If Scenarios)</Feature>
                           <Feature included>Personalized Document Checklist</Feature>
                           <Feature included>Document Expiry Tracking</Feature>
+                          <Feature included>1 Free GCMS Notes Order ($19.90 value)</Feature>
                         </ul>
                         <div className="pricing-card-footer">
                           <button className="pricing-btn primary" style={{ width: '100%' }} onClick={() => window.location.href = '/pricing?upgrade=complete'}>

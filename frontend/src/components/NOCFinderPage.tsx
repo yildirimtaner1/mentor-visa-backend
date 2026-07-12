@@ -180,7 +180,7 @@ export const NOCFinderPage: FC<NOCFinderPageProps> = ({ onNavigate }) => {
           {checkingOut === 'starter' ? 'Redirecting…' : 'Get Optimize — $49 · unlimited everything →'}
         </button>
         <p style={{ fontSize: '0.74rem', color: 'var(--text-muted)', margin: '8px 0 0', lineHeight: 1.45 }}>
-          Unlimited NOC reports + Employment Letter Auditor + Smart Tracker + CRS Simulator + AI Assistant + Document tools.
+          Unlimited NOC reports + Employment Letter Auditor + Smart Tracker + CRS Simulator + AI Assistant + Document tools + 1 free GCMS notes order.
         </p>
       </div>
       <p style={{ fontSize: '0.72rem', color: 'var(--text-muted)', marginTop: '12px', marginBottom: 0 }}>One-time payment · 3-day money-back guarantee · credits are non-refundable once used</p>

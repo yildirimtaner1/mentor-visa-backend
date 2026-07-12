@@ -1544,19 +1544,20 @@ async def stripe_webhook(request: Request, db: Session = Depends(database.get_db
                     order.status = 'awaiting_consent'
             elif pass_type == 'starter':
                 user.subscription_tier = 'starter'
-                # Starter tier includes some credits
+                # Starter (Optimize) tier includes some credits
                 user.audit_letter_credits += 2
                 user.ita_strategy_credits += 2
                 user.profile_builder_credits += 20  # 20 AI Assistant questions
+                user.gcms_credits += 1              # 1 free GCMS notes order
             elif pass_type == 'complete':
                 # Grant differential credits based on whether upgrading from starter
                 was_starter = user.subscription_tier == 'starter'
                 user.subscription_tier = 'complete'
                 if was_starter:
                     # Upgrading from Starter — grant only the difference
-                    # Starter gave: 2 audit + 2 strategy + 20 profile builder
-                    # Complete total: 5 audit + 3 builder + 5 strategy + unlimited profile builder
-                    # Difference: 3 audit + 3 builder + 3 strategy (profile builder is unlimited for complete)
+                    # Starter gave: 2 audit + 2 strategy + 20 profile builder + 1 GCMS
+                    # Complete total: 5 audit + 3 builder + 5 strategy + unlimited profile builder + 1 GCMS
+                    # Difference: 3 audit + 3 builder + 3 strategy (GCMS + profile builder already granted at Starter)
                     user.audit_letter_credits += 3
                     user.letter_builder_credits += 3
                     user.ita_strategy_credits += 3
@@ -1565,6 +1566,7 @@ async def stripe_webhook(request: Request, db: Session = Depends(database.get_db
                     user.audit_letter_credits += 5
                     user.letter_builder_credits += 3
                     user.ita_strategy_credits += 5
+                    user.gcms_credits += 1          # 1 free GCMS notes order
             else:
                 user.find_noc_credits += 1
                 

@@ -428,6 +428,7 @@ export function CRSWarRoom({ userScore, tier: _tier, hasWarRoomAccess = false, c
                         <Feature included>Unlimited CRS Point Simulator (What-If Scenarios)</Feature>
                         <Feature included>Personalized Document Checklist</Feature>
                         <Feature included>Document Expiry Tracking</Feature>
+                        <Feature included>1 Free GCMS Notes Order ($19.90 value)</Feature>
                       </ul>
                       <div className="pricing-card-footer">
                         <button 

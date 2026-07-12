@@ -38,7 +38,7 @@ const faqSchema = JSON.stringify({
       "name": "What do I get for free vs. paid?",
       "acceptedAnswer": {
         "@type": "Answer",
-        "text": "The Eligibility Check, CRS Calculator, NOC Finder, and 12 Mistakes Guide are completely free. The Optimize plan ($49) adds 20 AI Assistant question credits, unlimited employment letter audits, a personalized document checklist with expiry tracking, and the CRS point simulator. The Execute plan ($99) includes everything plus unlimited Express Entry AI Assistant access and priority early access to new features."
+        "text": "The Eligibility Check, CRS Calculator, NOC Finder, and 12 Mistakes Guide are completely free. The Optimize plan ($49) adds 20 AI Assistant question credits, unlimited employment letter audits, a personalized document checklist with expiry tracking, the CRS point simulator, and 1 free GCMS notes order. The Execute plan ($99) includes everything plus unlimited Express Entry AI Assistant access and priority early access to new features."
       }
     },
     {
@@ -329,6 +329,7 @@ export const LandingPage: FC<LandingPageProps> = ({ onNavigate }) => {
               <li className="pricing-feature highlight"><CheckCircle2 size={16} className="feature-check" /><span>20 Question Credits - Express Entry AI Assistant</span></li>
               <li className="pricing-feature highlight"><CheckCircle2 size={16} className="feature-check" /><span>Personalized Document Checklist</span></li>
               <li className="pricing-feature highlight"><CheckCircle2 size={16} className="feature-check" /><span>Document Expiry Tracker</span></li>
+              <li className="pricing-feature highlight"><CheckCircle2 size={16} className="feature-check" /><span>1 Free GCMS Notes Order ($19.90 value)</span></li>
             </ul>
             <div className="pricing-card-footer">
               <button className="pricing-btn primary" onClick={() => onNavigate('pricing')}>Get Optimize — $49</button>
@@ -377,7 +378,7 @@ export const LandingPage: FC<LandingPageProps> = ({ onNavigate }) => {
           </details>
           <details className="faq-item">
             <summary>What do I get for free vs. paid?</summary>
-            <p>The Eligibility Check, CRS Calculator, NOC Finder, and 12 Mistakes Guide are completely free — no payment required. The Optimize plan ($49 CAD) adds 20 AI Assistant question credits, unlimited employment letter audits, a personalized document checklist with expiry tracking, and the CRS point simulator. The Execute plan ($99 CAD) includes everything plus unlimited Express Entry AI Assistant access and priority early access to new features.</p>
+            <p>The Eligibility Check, CRS Calculator, NOC Finder, and 12 Mistakes Guide are completely free — no payment required. The Optimize plan ($49 CAD) adds 20 AI Assistant question credits, unlimited employment letter audits, a personalized document checklist with expiry tracking, the CRS point simulator, and 1 free GCMS notes order. The Execute plan ($99 CAD) includes everything plus unlimited Express Entry AI Assistant access and priority early access to new features.</p>
           </details>
           <details className="faq-item">
             <summary>How accurate is the AI NOC matching?</summary>
