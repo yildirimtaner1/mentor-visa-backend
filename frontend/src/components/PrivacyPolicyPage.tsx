@@ -21,6 +21,7 @@ export const PrivacyPolicyPage: FC = () => (
         <li><strong>Profile &amp; Assessment Data:</strong> Eligibility answers and the CRS factors you enter (age, education, language scores, work experience, marital status, and similar), used to calculate your score, run the simulator, and power the AI Profile Assistant.</li>
         <li><strong>Application Tracker Data:</strong> If you use the Smart Application Tracker, we store the milestone dates you enter, your selected cohort (stream, country of residence, draw category, visa office), and any dependents you add — so your timeline persists and we can generate predictions for you.</li>
         <li><strong>Document Checklist Data:</strong> The documents, statuses, and expiry dates you track for yourself and any dependents you add.</li>
+        <li><strong>GCMS Notes Order Data:</strong> If you order GCMS notes, we collect the details needed to prepare and file an Access to Information (ATIP) request with IRCC on your behalf: the applicant's and any included family members' names, dates of birth, and relationship; your UCI / application number; your <strong>signed IMM 5744 consent form</strong>; and a copy of each person's <strong>government-issued ID</strong> (required by IRCC to verify the consent signatures).</li>
         <li><strong>Payment Information:</strong> When you purchase a pass, payment is processed by Stripe. We do <strong>not</strong> store your credit card number, CVV, or full card details. Stripe handles all payment data under PCI-DSS Level 1 compliance.</li>
       </ul>
 
@@ -37,6 +38,7 @@ export const PrivacyPolicyPage: FC = () => (
         <li>To process your payments and manage your account credits.</li>
         <li>To save and display your past evaluation history.</li>
         <li>To improve our AI analysis accuracy and service quality.</li>
+        <li>To prepare and file Access to Information (ATIP) requests with IRCC on your behalf when you order GCMS notes, and to deliver the released notes to your email.</li>
         <li>To communicate with you regarding your account or service updates.</li>
         <li>To comply with legal obligations.</li>
       </ul>
@@ -62,6 +64,7 @@ export const PrivacyPolicyPage: FC = () => (
         <li><strong>Google (Gemini)</strong> — AI processing for the AI Profile Assistant and the proof-of-funds Bank Letter analysis. The relevant inputs are sent to Google's Gemini API.</li>
         <li><strong>Vercel</strong> — Website hosting and analytics</li>
         <li><strong>Google Analytics</strong> — Anonymized usage analytics</li>
+        <li><strong>Immigration, Refugees and Citizenship Canada (IRCC)</strong> — If you order GCMS notes, your signed IMM 5744 consent form and the applicant details it contains are submitted to IRCC (and, where you request CBSA notes, to the Canada Border Services Agency) as part of your ATIP request. This is the sole purpose for which those documents are used; your ID copies and signed consent are never shared with anyone else.</li>
       </ul>
       <p>These AI providers process your inputs only to return a result to you. We do not authorize them to use your data to train their models, and content you submit is handled under each provider's enterprise/API data-use terms.</p>
       <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>Note: the Smart Application Tracker's timeline predictions are derived from aggregated, community-reported case data we maintain. That reference dataset does not contain your personal information, and your own tracker entries are never shared with other users.</p>
@@ -71,6 +74,7 @@ export const PrivacyPolicyPage: FC = () => (
         <li>Account data is retained for as long as your account is active.</li>
         <li>Evaluation records are retained indefinitely for your reference unless you request deletion.</li>
         <li>Uploaded documents are retained for service functionality and may be deleted upon request.</li>
+        <li><strong>GCMS notes order documents</strong> (signed IMM 5744 consent forms and government-issued ID copies) are stored encrypted and retained for a maximum of <strong>6 years</strong> from the date of your order — consistent with record-keeping expectations for representatives filing requests on a client's behalf — after which they are deleted. You may request earlier deletion at any time once your request has been fulfilled by emailing info@mentorvisa.com.</li>
         <li>Payment records are retained as required by applicable tax and financial regulations.</li>
       </ul>
 

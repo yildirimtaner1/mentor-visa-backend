@@ -72,6 +72,52 @@ function FileSlot({ label, sub, file, onPick, disabled }: {
   );
 }
 
+// 4-stage fulfillment timeline, driven by order.status (received -> filed -> delivered).
+function OrderTimeline({ order }: { order: GCMSOrder }) {
+  const stages = [
+    { label: 'Ordered & paid', sub: null as string | null },
+    { label: 'Documents received', sub: 'Signed consent + ID verified by our team' },
+    { label: 'Submitted to IRCC', sub: 'ATIP request filed on your behalf' },
+    { label: 'GCMS notes sent to your email', sub: 'The day IRCC releases them' },
+  ];
+  const done = order.status === 'delivered' ? 4 : order.status === 'filed' ? 3 : 2;
+  return (
+    <div style={{ textAlign: 'left' }}>
+      {stages.map((s, i) => {
+        const isDone = i < done, isCurrent = i === done;
+        return (
+          <div key={i} style={{ display: 'flex', gap: '12px', alignItems: 'flex-start', opacity: isDone || isCurrent ? 1 : 0.45 }}>
+            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+              <div style={{
+                width: '26px', height: '26px', borderRadius: '50%', flexShrink: 0, fontSize: '0.75rem',
+                display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700, color: 'white',
+                background: isDone ? '#10B981' : isCurrent ? 'var(--primary-color)' : '#CBD5E1',
+              }}>
+                {isDone ? '✓' : isCurrent ? '⋯' : i + 1}
+              </div>
+              {i < stages.length - 1 && <div style={{ width: '2px', height: '26px', background: isDone ? '#10B981' : '#E2E8F0' }} />}
+            </div>
+            <div style={{ paddingTop: '3px' }}>
+              <div style={{ fontWeight: isCurrent ? 700 : 600, fontSize: '0.9rem' }}>
+                {s.label}{isCurrent && <span style={{ color: 'var(--primary-color)', fontWeight: 600 }}> — in progress</span>}
+              </div>
+              {s.sub && <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>{s.sub}</div>}
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+const STATUS_LABELS: Record<GCMSOrder['status'], string> = {
+  awaiting_payment: 'Awaiting payment',
+  awaiting_consent: 'Awaiting documents',
+  received: 'Preparing to file',
+  filed: 'Submitted to IRCC',
+  delivered: 'Notes emailed ✓',
+};
+
 // Age check for the IMM 5744 signing rules (under-16s are listed but don't sign).
 function isUnder16(dob: string): boolean {
   if (!dob) return false;
@@ -143,6 +189,8 @@ export const OrderGCMSNotesPage: FC = () => {
   // Step 3b — documents: the signed form + one government ID per person (applicant first)
   const [docConsent, setDocConsent] = useState<File | null>(null);
   const [docIds, setDocIds] = useState<(File | null)[]>([]);
+  // Completed orders (received/filed/delivered) — shown as trackable history, never block a new order
+  const [pastOrders, setPastOrders] = useState<GCMSOrder[]>([]);
 
   const set = (k: keyof GCMSOrderData) => (e: ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
     const next = { ...form, [k]: e.target.value };
@@ -160,15 +208,17 @@ export const OrderGCMSNotesPage: FC = () => {
     (async () => {
       const token = await getToken();
       if (!token) return;
-      const res = await getGCMSOrders(token); // backend lazily verifies payment with Stripe
+      const res = await getGCMSOrders(token); // backend lazily verifies payment + 24h auto-file
       const orders: GCMSOrder[] = res.orders || [];
-      const active = orders.find(o => o.status !== 'delivered');
-      if (!active) return;
-      setOrder(active);
-      if (active.related_persons?.length) setPersons(active.related_persons);
-      if (active.status === 'awaiting_payment') setStep(2);
-      else if (active.status === 'awaiting_consent') setStep(3);
-      else setStep(4); // received / filed — everything is in our hands
+      // Completed orders become trackable history; only an in-progress order resumes the wizard,
+      // so a returning customer can always start a new order.
+      setPastOrders(orders.filter(o => ['received', 'filed', 'delivered'].includes(o.status)));
+      const active = orders.find(o => o.status === 'awaiting_payment' || o.status === 'awaiting_consent');
+      if (active) {
+        setOrder(active);
+        if (active.related_persons?.length) setPersons(active.related_persons);
+        setStep(active.status === 'awaiting_payment' ? 2 : 3);
+      }
       // Clean the Stripe return params so refreshes don't re-trigger anything.
       const url = new URL(window.location.href);
       if (url.searchParams.has('payment_success') || url.searchParams.has('payment_canceled')) {
@@ -248,6 +298,22 @@ export const OrderGCMSNotesPage: FC = () => {
     } finally { setBusy(false); }
   };
 
+  // After completing an order, let the user immediately start another one.
+  const startNewOrder = () => {
+    if (order) setPastOrders(prev => [order, ...prev.filter(p => p.id !== order.id)]);
+    setOrder(null);
+    setForm(emptyForm);
+    setPersons([]);
+    setFormReady(false);
+    setDocConsent(null);
+    setDocIds([]);
+    setUploadedFile(null);
+    setError('');
+    sessionStorage.removeItem('gcmsOrderForm');
+    setStep(1);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
   const StepBadge = ({ n, label }: { n: number; label: string }) => {
     const done = step > n, active = step === n;
     return (
@@ -309,6 +375,33 @@ export const OrderGCMSNotesPage: FC = () => {
             {error && (
               <div style={{ color: '#DC2626', fontSize: '0.9rem', marginBottom: '16px', padding: '10px 16px', background: '#FEF2F2', borderRadius: '8px', border: '1px solid #FECACA' }}>
                 ⚠️ {error}
+              </div>
+            )}
+
+            {/* ── Previous orders — trackable history, shown while starting a new order ── */}
+            {step === 1 && pastOrders.length > 0 && (
+              <div className="info-card" style={{ padding: '24px 28px', marginBottom: '24px' }}>
+                <h3 style={{ fontSize: '1.05rem', fontWeight: 700, marginBottom: '4px' }}>📦 Your previous orders</h3>
+                <p style={{ fontSize: '0.82rem', color: 'var(--text-muted)', marginBottom: '14px' }}>
+                  We'll email each order's notes to you the day IRCC releases them. Starting a new order below won't affect these.
+                </p>
+                {pastOrders.map(o => (
+                  <details key={o.id} style={{ border: '1px solid var(--border-color)', borderRadius: '10px', padding: '12px 16px', marginBottom: '8px', background: '#F8FAFC' }}>
+                    <summary style={{ cursor: 'pointer', fontSize: '0.9rem', fontWeight: 600, display: 'flex', flexWrap: 'wrap', gap: '8px', alignItems: 'center' }}>
+                      <span>Order #{o.id} — {o.given_name ? `${o.given_name} ${o.family_name || ''}`.trim() : o.full_name}</span>
+                      <span style={{ fontSize: '0.75rem', fontWeight: 700, padding: '2px 10px', borderRadius: '999px',
+                        background: o.status === 'delivered' ? '#ECFDF5' : '#EEF2FF',
+                        color: o.status === 'delivered' ? '#065F46' : '#4338CA',
+                        border: o.status === 'delivered' ? '1px solid #6EE7B7' : '1px solid #C7D2FE' }}>
+                        {STATUS_LABELS[o.status]}
+                      </span>
+                      {o.created_at && <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontWeight: 400 }}>{new Date(o.created_at).toLocaleDateString('en-CA')}</span>}
+                    </summary>
+                    <div style={{ marginTop: '14px' }}>
+                      <OrderTimeline order={o} />
+                    </div>
+                  </details>
+                ))}
               </div>
             )}
 
@@ -559,8 +652,9 @@ export const OrderGCMSNotesPage: FC = () => {
                     <div style={{ background: '#F0F9FF', border: '1px solid #BAE6FD', borderRadius: '10px', padding: '12px 16px', fontSize: '0.82rem', color: '#0C4A6E', lineHeight: 1.6, marginBottom: '16px' }}>
                       🔒 <strong>Why we ask for ID:</strong> IRCC only processes an ATIP request when the consent
                       signature can be verified against government-issued identification for each person. Your
-                      documents are stored encrypted, used solely to file this request with IRCC, and never shared
-                      with anyone else.
+                      documents are stored encrypted, used solely to file this request with IRCC, never shared with
+                      anyone else, and retained for a maximum of 6 years ({' '}
+                      <a href="/privacy-policy" target="_blank" style={{ color: '#0369A1', fontWeight: 600 }}>privacy policy</a>).
                     </div>
 
                     <button className="btn btn-primary btn-lg" style={{ width: '100%' }}
@@ -594,42 +688,11 @@ export const OrderGCMSNotesPage: FC = () => {
                 </p>
 
                 {/* Status timeline */}
-                <div style={{ maxWidth: '420px', margin: '0 auto 24px', textAlign: 'left' }}>
+                <div style={{ maxWidth: '420px', margin: '0 auto 24px' }}>
                   <div style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '10px', textAlign: 'center' }}>
                     Order #{order.id} — status
                   </div>
-                  {(() => {
-                    const stages = [
-                      { label: 'Ordered & paid', sub: null },
-                      { label: 'Documents received', sub: 'Signed consent + ID verified by our team' },
-                      { label: 'Submitted to IRCC', sub: 'ATIP request filed on your behalf' },
-                      { label: 'GCMS notes sent to your email', sub: 'The day IRCC releases them' },
-                    ];
-                    const done = order.status === 'delivered' ? 4 : order.status === 'filed' ? 3 : 2;
-                    return stages.map((s, i) => {
-                      const isDone = i < done, isCurrent = i === done;
-                      return (
-                        <div key={i} style={{ display: 'flex', gap: '12px', alignItems: 'flex-start', opacity: isDone || isCurrent ? 1 : 0.45 }}>
-                          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-                            <div style={{
-                              width: '26px', height: '26px', borderRadius: '50%', flexShrink: 0, fontSize: '0.75rem',
-                              display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700, color: 'white',
-                              background: isDone ? '#10B981' : isCurrent ? 'var(--primary-color)' : '#CBD5E1',
-                            }}>
-                              {isDone ? '✓' : isCurrent ? '⋯' : i + 1}
-                            </div>
-                            {i < stages.length - 1 && <div style={{ width: '2px', height: '26px', background: isDone ? '#10B981' : '#E2E8F0' }} />}
-                          </div>
-                          <div style={{ paddingTop: '3px' }}>
-                            <div style={{ fontWeight: isCurrent ? 700 : 600, fontSize: '0.9rem' }}>
-                              {s.label}{isCurrent && <span style={{ color: 'var(--primary-color)', fontWeight: 600 }}> — in progress</span>}
-                            </div>
-                            {s.sub && <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>{s.sub}</div>}
-                          </div>
-                        </div>
-                      );
-                    });
-                  })()}
+                  <OrderTimeline order={order} />
                 </div>
                 <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', maxWidth: '460px', margin: '0 auto 24px' }}>
                   🔒 Your signed form and ID are stored encrypted, used only to file this request with IRCC,
@@ -638,6 +701,7 @@ export const OrderGCMSNotesPage: FC = () => {
                 <div style={{ display: 'flex', gap: '12px', justifyContent: 'center', flexWrap: 'wrap' }}>
                   <a href="/track-my-application" className="btn btn-primary" style={{ textDecoration: 'none' }}>📅 Track my application meanwhile</a>
                   <a href="/audit-employment-letter" className="btn btn-outline" style={{ textDecoration: 'none' }}>📄 Audit my employment letter</a>
+                  <button className="btn btn-outline" onClick={startNewOrder}>➕ Order notes for another application</button>
                 </div>
               </div>
             )}

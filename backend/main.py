@@ -1659,6 +1659,57 @@ def _send_gcms_order_email(order: db_models.GCMSOrder, consent_url: str | None =
         print(f"[GCMS] Failed to send notification email for order #{order.id}: {e}")
 
 
+def _send_gcms_customer_email(order: db_models.GCMSOrder):
+    """Confirmation to the customer once their documents are in. Same SMTP setup as the
+    fulfillment email; logs and skips quietly if SMTP is not configured."""
+    host = os.getenv("SMTP_HOST")
+    smtp_user = os.getenv("SMTP_USER")
+    smtp_pass = os.getenv("SMTP_PASS")
+    if not (host and smtp_user and smtp_pass):
+        print(f"[GCMS] SMTP not configured — customer confirmation for order #{order.id} NOT sent.")
+        return
+    try:
+        import smtplib
+        from email.message import EmailMessage
+        first_name = (order.given_name or order.full_name or "there").split(" ")[0]
+        n_people = 1 + len(order.related_persons or [])
+        msg = EmailMessage()
+        msg["Subject"] = f"We've received everything — your GCMS notes request is being filed (order #{order.id})"
+        msg["From"] = f"Mentor Visa <{smtp_user}>"
+        msg["To"] = order.email
+        msg["Reply-To"] = "info@mentorvisa.com"
+        msg.set_content(f"""Hi {first_name},
+
+Good news — your signed consent form and identity document{'s' if n_people > 1 else ''} for {n_people} person{'s' if n_people > 1 else ''} arrived safely, and your GCMS notes order is complete.
+
+What happens next:
+
+  1. We verify your documents and file your ATIP request with IRCC within 1 business day.
+  2. IRCC typically releases GCMS notes within 30-40 days.
+  3. The day your notes arrive, we email the complete file to this address.
+
+You can check your order status any time at https://mentorvisa.com/order-gcms-notes
+
+While you wait, most applicants find these useful:
+  - How to read your GCMS notes: https://mentorvisa.com/how-to-read-gcms-notes
+  - Track your application milestones: https://mentorvisa.com/track-my-application
+
+A note on your documents: your signed form and ID are stored encrypted, used only to file this request with IRCC, never shared with anyone else, and retained no longer than required for record-keeping (maximum 6 years).
+
+Questions? Just reply to this email.
+
+Mentor Visa
+info@mentorvisa.com · mentorvisa.com""")
+        port = int(os.getenv("SMTP_PORT", "587"))
+        with smtplib.SMTP(host, port, timeout=20) as s:
+            s.starttls()
+            s.login(smtp_user, smtp_pass)
+            s.send_message(msg)
+        print(f"[GCMS] Customer confirmation sent for order #{order.id} to {order.email}")
+    except Exception as e:
+        print(f"[GCMS] Failed to send customer confirmation for order #{order.id}: {e}")
+
+
 class GCMSOrderRequest(BaseModel):
     family_name: str = ""         # surname, as on passport
     given_name: str = ""          # given name(s), as on passport
@@ -1737,6 +1788,11 @@ def list_gcms_orders(
                     changed = True
             except Exception as e:
                 print(f"[GCMS] Stripe verify failed for order #{o.id}: {e}")
+        # Documents in hand for 24h -> the ATIP request has been filed (our 1-business-day SLA).
+        elif (o.status == 'received' and o.received_at
+              and (datetime.datetime.utcnow() - o.received_at).total_seconds() > 24 * 3600):
+            o.status = 'filed'
+            changed = True
     if changed:
         db.commit()
     return {"orders": [_gcms_order_dict(o) for o in orders]}
@@ -1808,10 +1864,12 @@ async def upload_gcms_consent(
     order.id_files = id_records
     if order.status in ('awaiting_consent', 'received'):
         order.status = 'received'
+        order.received_at = datetime.datetime.utcnow()
     db.commit()
     db.refresh(order)
 
     _send_gcms_order_email(order, consent_url, id_urls)
+    _send_gcms_customer_email(order)
     return _gcms_order_dict(order)
 
 
