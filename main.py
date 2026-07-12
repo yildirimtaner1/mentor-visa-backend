@@ -1588,6 +1588,9 @@ def _gcms_order_dict(o: db_models.GCMSOrder) -> dict:
         "id": o.id,
         "status": o.status,
         "full_name": o.full_name,
+        "family_name": o.family_name,
+        "given_name": o.given_name,
+        "related_persons": o.related_persons or [],
         "email": o.email,
         "date_of_birth": o.date_of_birth,
         "country_of_residence": o.country_of_residence,
@@ -1632,6 +1635,12 @@ def _send_gcms_order_email(order: db_models.GCMSOrder, consent_url: str | None =
             f"Application type:     {order.application_type or '-'}",
             f"Notes type:           {(order.notes_type or 'ircc').upper()}",
             f"Extra notes:          {order.extra_notes or '-'}",
+        ]
+        for i, p in enumerate(order.related_persons or [], 1):
+            lines.append(f"Related person {i}:    {p.get('given_name','')} {p.get('family_name','')} "
+                         f"({p.get('date_of_birth','')}, {p.get('relationship','') or '?'}"
+                         f"{', under 16' if p.get('under_16') else ''})")
+        lines += [
             "",
             f"Consent form (7-day link): {consent_url or 'stored as ' + (order.consent_file_id or '?')}",
         ]
@@ -1647,7 +1656,9 @@ def _send_gcms_order_email(order: db_models.GCMSOrder, consent_url: str | None =
 
 
 class GCMSOrderRequest(BaseModel):
-    full_name: str
+    family_name: str = ""         # surname, as on passport
+    given_name: str = ""          # given name(s), as on passport
+    full_name: str = ""           # legacy — derived from the two above when absent
     email: str
     date_of_birth: str            # YYYY-MM-DD
     country_of_residence: Optional[str] = None
@@ -1666,8 +1677,14 @@ def create_gcms_order(
 ):
     """Step 1 — save the applicant info and open an order awaiting payment."""
     ensure_user_exists(user_id, db)
+    # Derive the legacy full_name from the split fields (or split a legacy full_name).
+    if req.family_name.strip() or req.given_name.strip():
+        req.full_name = f"{req.given_name.strip()} {req.family_name.strip()}".strip()
+    elif req.full_name.strip():
+        parts = req.full_name.strip().rsplit(" ", 1)
+        req.given_name, req.family_name = (parts[0], parts[1]) if len(parts) == 2 else ("", parts[0])
     if not req.full_name.strip() or not req.email.strip() or "@" not in req.email:
-        raise HTTPException(status_code=422, detail="Please provide your full name and a valid email.")
+        raise HTTPException(status_code=422, detail="Please provide your name and a valid email.")
     if not req.date_of_birth.strip():
         raise HTTPException(status_code=422, detail="Please provide your date of birth.")
     if req.notes_type not in ("ircc", "cbsa"):
@@ -1766,6 +1783,71 @@ async def upload_gcms_consent(
 
     _send_gcms_order_email(order, consent_url)
     return _gcms_order_dict(order)
+
+
+class GCMSPersonsRequest(BaseModel):
+    # [{family_name, given_name, date_of_birth, relationship, under_16}]
+    persons: list = []
+
+
+@app.put("/api/v1/gcms/orders/{order_id}/persons")
+def set_gcms_persons(
+    order_id: int,
+    req: GCMSPersonsRequest,
+    user_id: str = Depends(get_current_user),
+    db: Session = Depends(database.get_db),
+):
+    """Step 3a — record the other people included on the application (IMM 5744 sec. 2.1-2.3)."""
+    import gcms_form
+    order = db.query(db_models.GCMSOrder).filter_by(id=order_id, user_id=user_id).first()
+    if not order:
+        raise HTTPException(status_code=404, detail="Order not found.")
+    if len(req.persons) > gcms_form.MAX_RELATED:
+        raise HTTPException(status_code=422,
+                            detail=f"IMM 5744 fits the applicant plus {gcms_form.MAX_RELATED} people. "
+                                   "Add the rest in the notes and we'll prepare a second form.")
+    cleaned = []
+    for p in req.persons:
+        fam = (p.get("family_name") or "").strip()
+        giv = (p.get("given_name") or "").strip()
+        dob = (p.get("date_of_birth") or "").strip()
+        if not (fam and giv and dob):
+            raise HTTPException(status_code=422, detail="Each person needs a surname, given name(s), and date of birth.")
+        cleaned.append({
+            "family_name": fam, "given_name": giv, "date_of_birth": dob,
+            "relationship": (p.get("relationship") or "").strip(),
+            "under_16": bool(p.get("under_16")),
+        })
+    order.related_persons = cleaned
+    db.commit()
+    db.refresh(order)
+    return _gcms_order_dict(order)
+
+
+@app.get("/api/v1/gcms/orders/{order_id}/consent-form")
+def download_gcms_consent_form(
+    order_id: int,
+    user_id: str = Depends(get_current_user),
+    db: Session = Depends(database.get_db),
+):
+    """Step 3b — the pre-filled, flattened IMM 5744 ready to print, sign in blue ink, and scan."""
+    import gcms_form
+    from fastapi.responses import Response
+    order = db.query(db_models.GCMSOrder).filter_by(id=order_id, user_id=user_id).first()
+    if not order:
+        raise HTTPException(status_code=404, detail="Order not found.")
+    if order.status == 'awaiting_payment':
+        raise HTTPException(status_code=402, detail="Please complete payment first.")
+    try:
+        pdf_bytes = gcms_form.fill_imm5744(order)
+    except Exception as e:
+        print(f"[GCMS] IMM 5744 generation failed for order #{order.id}: {e}")
+        raise HTTPException(status_code=500, detail="Could not generate the consent form. Please try again.")
+    return Response(
+        content=pdf_bytes,
+        media_type="application/pdf",
+        headers={"Content-Disposition": f'attachment; filename="IMM5744_prefilled_order{order.id}.pdf"'},
+    )
 
 
 class UnlockRequest(BaseModel):
