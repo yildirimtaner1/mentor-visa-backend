@@ -100,6 +100,9 @@ class GCMSOrder(Base):
     # Step 2/3 — payment + consent artifacts
     stripe_session_id = Column(String, index=True, nullable=True)
     consent_file_id = Column(String, nullable=True)      # stored filename in the documents bucket
+    # Government-issued ID copies, one per person (IRCC needs identity proof to process an
+    # ATIP request): [{person, stored_name}]
+    id_files = Column(JSON, nullable=True)
 
     timestamp_utc = Column(DateTime, default=datetime.datetime.utcnow)
     timestamp_toronto = Column(DateTime, default=get_toronto_now)

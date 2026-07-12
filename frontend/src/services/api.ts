@@ -229,9 +229,10 @@ export async function downloadGCMSConsentForm(orderId: number, token: string) {
   URL.revokeObjectURL(url);
 }
 
-export async function uploadGCMSConsent(orderId: number, file: File, token: string) {
+export async function uploadGCMSConsent(orderId: number, file: File, token: string, idFiles: File[] = []) {
   const formData = new FormData();
   formData.append('consent', file);
+  for (const f of idFiles) formData.append('ids', f);
   const response = await fetch(`${API_BASE_URL}/api/v1/gcms/orders/${orderId}/consent`, {
     method: 'POST',
     headers: { 'Authorization': `Bearer ${token}` },

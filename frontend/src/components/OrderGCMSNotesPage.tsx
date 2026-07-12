@@ -1,11 +1,10 @@
-import { useState, useEffect, useRef, type FC, type ChangeEvent } from 'react';
+import { useState, useEffect, type FC, type ChangeEvent } from 'react';
 import { useAuth, SignInButton } from '@clerk/clerk-react';
 import { SEO } from './common/SEO';
 import { createGCMSOrder, getGCMSOrders, uploadGCMSConsent, createCheckoutSession, setGCMSPersons, downloadGCMSConsentForm, type GCMSOrderData, type GCMSRelatedPerson } from '../services/api';
 import ReactGA from 'react-ga4';
 
 const PRICE = 19.90;
-const CONSENT_FORM_URL = 'https://www.canada.ca/en/immigration-refugees-citizenship/services/application/application-forms-guides/imm5744.html';
 
 const APPLICATION_TYPES = [
   'Express Entry — Permanent Residence',
@@ -45,6 +44,33 @@ const emptyForm: GCMSOrderData = {
 
 const RELATIONSHIPS = ['Spouse', 'Common-law partner', 'Son', 'Daughter', 'Father', 'Mother', 'Other'];
 const emptyPerson: GCMSRelatedPerson = { family_name: '', given_name: '', date_of_birth: '', relationship: 'Spouse', under_16: false };
+
+// One labelled upload slot (signed form / per-person government ID).
+function FileSlot({ label, sub, file, onPick, disabled }: {
+  label: string; sub: string; file: File | null; onPick: (f: File) => void; disabled: boolean;
+}) {
+  return (
+    <label style={{
+      display: 'flex', alignItems: 'center', gap: '12px', padding: '12px 16px',
+      border: file ? '1px solid #6EE7B7' : '2px dashed var(--border-color)',
+      background: file ? '#ECFDF5' : 'white', borderRadius: '10px',
+      cursor: disabled ? 'default' : 'pointer',
+    }}>
+      <input type="file" accept=".pdf,.jpg,.jpeg,.png" style={{ display: 'none' }} disabled={disabled}
+        onChange={e => { const f = e.target.files?.[0]; if (f) onPick(f); }} />
+      <span style={{ fontSize: '1.3rem', flexShrink: 0 }}>{file ? '✅' : '📎'}</span>
+      <span style={{ minWidth: 0 }}>
+        <span style={{ display: 'block', fontWeight: 600, fontSize: '0.9rem' }}>{label}</span>
+        <span style={{ display: 'block', fontSize: '0.78rem', color: file ? '#065F46' : 'var(--text-muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+          {file ? file.name : sub}
+        </span>
+      </span>
+      <span style={{ marginLeft: 'auto', fontSize: '0.8rem', fontWeight: 600, color: 'var(--primary-color)', flexShrink: 0 }}>
+        {file ? 'Change' : 'Choose file'}
+      </span>
+    </label>
+  );
+}
 
 // Age check for the IMM 5744 signing rules (under-16s are listed but don't sign).
 function isUnder16(dob: string): boolean {
@@ -98,7 +124,6 @@ const labelStyle: React.CSSProperties = {
 
 export const OrderGCMSNotesPage: FC = () => {
   const { isSignedIn, getToken } = useAuth();
-  const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Wizard: 1 = info, 2 = payment, 3 = consent upload, 4 = done
   const [step, setStep] = useState(1);
@@ -115,6 +140,9 @@ export const OrderGCMSNotesPage: FC = () => {
   // Step 3a — other people on the application (IMM 5744 fits applicant + 3)
   const [persons, setPersons] = useState<GCMSRelatedPerson[]>([]);
   const [formReady, setFormReady] = useState(false); // pre-filled IMM 5744 generated & downloaded
+  // Step 3b — documents: the signed form + one government ID per person (applicant first)
+  const [docConsent, setDocConsent] = useState<File | null>(null);
+  const [docIds, setDocIds] = useState<(File | null)[]>([]);
 
   const set = (k: keyof GCMSOrderData) => (e: ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
     const next = { ...form, [k]: e.target.value };
@@ -196,21 +224,22 @@ export const OrderGCMSNotesPage: FC = () => {
       const updated = await setGCMSPersons(order.id, withAge, token);
       setOrder(updated);
       await downloadGCMSConsentForm(order.id, token);
+      setDocIds(new Array(1 + withAge.length).fill(null)); // one ID slot per person
       setFormReady(true);
     } catch (e: any) {
       setError(e.message || 'Could not generate the form. Please try again.');
     } finally { setBusy(false); }
   };
 
-  const uploadConsent = async (file: File) => {
-    if (!order) return;
+  const submitDocuments = async () => {
+    if (!order || !docConsent || docIds.some(f => !f)) return;
     setError(''); setBusy(true);
     try {
       const token = await getToken();
       if (!token) return;
-      const updated = await uploadGCMSConsent(order.id, file, token);
+      const updated = await uploadGCMSConsent(order.id, docConsent, token, docIds as File[]);
       setOrder(updated);
-      setUploadedFile(file);
+      setUploadedFile(docConsent);
       setStep(4);
       sessionStorage.removeItem('gcmsOrderForm');
       window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -487,13 +516,12 @@ export const OrderGCMSNotesPage: FC = () => {
                       {busy ? 'Preparing your form…' : '📄 Generate my pre-filled IMM 5744 →'}
                     </button>
                     <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', textAlign: 'center', marginTop: '10px', marginBottom: 0 }}>
-                      Prefer to fill it yourself? The blank form is on the{' '}
-                      <a href={CONSENT_FORM_URL} target="_blank" rel="noopener noreferrer" style={{ color: 'var(--primary-color)' }}>IRCC website</a>.
+                      🔒 These details go only onto IRCC's consent form (IMM 5744) — nothing is shared beyond IRCC.
                     </p>
                   </>
                 ) : (
                   <>
-                    <h3 style={{ fontSize: '1.2rem', fontWeight: 700, marginBottom: '4px' }}>Almost done — sign &amp; upload</h3>
+                    <h3 style={{ fontSize: '1.2rem', fontWeight: 700, marginBottom: '4px' }}>Almost done — sign &amp; upload your documents</h3>
                     <p style={{ fontSize: '0.9rem', color: 'var(--text-muted)', marginBottom: '16px', lineHeight: 1.6 }}>
                       Your pre-filled IMM 5744 just downloaded
                       (<button type="button" onClick={generateForm} disabled={busy} style={{ background: 'none', border: 'none', padding: 0, color: 'var(--primary-color)', fontWeight: 600, cursor: 'pointer', fontSize: 'inherit' }}>download again</button>).
@@ -502,49 +530,111 @@ export const OrderGCMSNotesPage: FC = () => {
                     <ol style={{ paddingLeft: '20px', fontSize: '0.92rem', lineHeight: 1.9, marginBottom: '20px' }}>
                       <li><strong>Print</strong> the form (page 1 is enough)</li>
                       <li>Everyone <strong>16 or older</strong> signs in their box — <strong style={{ color: '#1D4ED8' }}>handwritten, in BLUE ink</strong> (IRCC rejects electronic signatures)</li>
-                      <li>Write the <strong>date (YYYY-MM-DD)</strong> next to each signature</li>
+                      <li>The <strong>date is already filled in</strong> next to each signature — please sign today so they match</li>
                       {(order.related_persons || []).some(p => p.under_16) && (
                         <li>For children under 16: they don't sign — <strong>both parents</strong> sign the form instead</li>
                       )}
-                      <li><strong>Scan or photograph</strong> it — colour, well-lit, 300dpi or a sharp phone photo</li>
+                      <li><strong>Scan or photograph</strong> everything — colour, well-lit, 300dpi or a sharp phone photo</li>
                     </ol>
 
-                    <div
-                      onClick={() => !busy && fileInputRef.current?.click()}
-                      style={{
-                        border: '2px dashed var(--border-color)', borderRadius: '12px', padding: '36px 20px',
-                        textAlign: 'center', cursor: busy ? 'default' : 'pointer', background: 'white',
-                      }}>
-                      <input type="file" accept=".pdf,.jpg,.jpeg,.png" ref={fileInputRef} style={{ display: 'none' }} disabled={busy}
-                        onChange={(e) => { const f = e.target.files?.[0]; if (f) uploadConsent(f); }} />
-                      <div style={{ fontSize: '2rem', marginBottom: '10px' }}>✍️</div>
-                      <div style={{ fontWeight: 600, marginBottom: '4px' }}>{busy ? 'Uploading…' : 'Upload your signed IMM 5744'}</div>
-                      <div style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>PDF, JPG, or PNG · max 10MB</div>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginBottom: '16px' }}>
+                      <FileSlot
+                        label="Signed IMM 5744 consent form"
+                        sub="The form you just printed and signed"
+                        file={docConsent} disabled={busy}
+                        onPick={f => setDocConsent(f)}
+                      />
+                      {[`${order.given_name || ''} ${order.family_name || order.full_name}`.trim(),
+                        ...(order.related_persons || []).map(p => `${p.given_name} ${p.family_name}`.trim())
+                      ].map((name, i) => (
+                        <FileSlot key={i}
+                          label={`Government-issued ID — ${name}`}
+                          sub="Passport bio page or ID card showing their name and signature"
+                          file={docIds[i] ?? null} disabled={busy}
+                          onPick={f => setDocIds(prev => prev.map((x, j) => j === i ? f : x))}
+                        />
+                      ))}
                     </div>
+
+                    <div style={{ background: '#F0F9FF', border: '1px solid #BAE6FD', borderRadius: '10px', padding: '12px 16px', fontSize: '0.82rem', color: '#0C4A6E', lineHeight: 1.6, marginBottom: '16px' }}>
+                      🔒 <strong>Why we ask for ID:</strong> IRCC only processes an ATIP request when the consent
+                      signature can be verified against government-issued identification for each person. Your
+                      documents are stored encrypted, used solely to file this request with IRCC, and never shared
+                      with anyone else.
+                    </div>
+
+                    <button className="btn btn-primary btn-lg" style={{ width: '100%' }}
+                      disabled={busy || !docConsent || docIds.some(f => !f)} onClick={submitDocuments}>
+                      {busy ? 'Uploading…' : `Submit ${1 + docIds.length} document${docIds.length ? 's' : ''} — finish my order →`}
+                    </button>
                     <p style={{ fontSize: '0.78rem', color: 'var(--text-muted)', textAlign: 'center', marginTop: '12px', marginBottom: 0 }}>
-                      Stuck? Email support@mentorvisa.com and we'll walk you through it.
+                      Stuck? Email info@mentorvisa.com and we'll walk you through it.
                     </p>
                   </>
                 )}
               </div>
             )}
 
-            {/* ── STEP 4 — Done / status ── */}
+            {/* ── STEP 4 — Done / status timeline ── */}
             {step === 4 && order && (
               <div className="info-card" style={{ padding: '36px 28px', textAlign: 'center' }}>
-                <div style={{ fontSize: '3rem', marginBottom: '12px' }}>🎉</div>
+                <div style={{ fontSize: '3rem', marginBottom: '12px' }}>{order.status === 'delivered' ? '📬' : '🎉'}</div>
                 <h3 style={{ fontSize: '1.35rem', fontWeight: 800, marginBottom: '10px' }}>
-                  {order.status === 'filed' ? 'Your ATIP request has been filed!' : "We've got everything we need!"}
+                  {order.status === 'delivered' ? 'Your GCMS notes have been sent!'
+                    : order.status === 'filed' ? 'Your ATIP request is with IRCC.'
+                    : "We've got everything we need!"}
                 </h3>
                 <p style={{ fontSize: '0.95rem', color: 'var(--text-muted)', lineHeight: 1.7, maxWidth: '520px', margin: '0 auto 20px' }}>
-                  {uploadedFile ? <>Your signed consent form <strong>{uploadedFile.name}</strong> was received. </> : null}
-                  We file your {order.notes_type === 'cbsa' ? 'CBSA' : 'GCMS'} request within 1 business day.
-                  IRCC typically responds within <strong>30–40 days</strong>, and we'll email your complete notes to{' '}
-                  <strong>{order.email}</strong> the day they arrive.
+                  {uploadedFile ? <>Your signed consent form and ID document(s) were received securely. </> : null}
+                  {order.status === 'delivered'
+                    ? <>Check <strong>{order.email}</strong> — your complete notes are in your inbox.</>
+                    : <>We file your {order.notes_type === 'cbsa' ? 'CBSA' : 'GCMS'} request within 1 business day.
+                      IRCC typically responds within <strong>30–40 days</strong>, and we'll email your complete notes to{' '}
+                      <strong>{order.email}</strong> the day they arrive.</>}
                 </p>
-                <div style={{ display: 'inline-block', padding: '8px 18px', borderRadius: '999px', background: '#EEF2FF', border: '1px solid #C7D2FE', fontSize: '0.85rem', fontWeight: 700, color: '#4338CA', marginBottom: '24px' }}>
-                  Order #{order.id} · {order.status === 'filed' ? 'Filed with IRCC' : 'Received — preparing your request'}
+
+                {/* Status timeline */}
+                <div style={{ maxWidth: '420px', margin: '0 auto 24px', textAlign: 'left' }}>
+                  <div style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '10px', textAlign: 'center' }}>
+                    Order #{order.id} — status
+                  </div>
+                  {(() => {
+                    const stages = [
+                      { label: 'Ordered & paid', sub: null },
+                      { label: 'Documents received', sub: 'Signed consent + ID verified by our team' },
+                      { label: 'Submitted to IRCC', sub: 'ATIP request filed on your behalf' },
+                      { label: 'GCMS notes sent to your email', sub: 'The day IRCC releases them' },
+                    ];
+                    const done = order.status === 'delivered' ? 4 : order.status === 'filed' ? 3 : 2;
+                    return stages.map((s, i) => {
+                      const isDone = i < done, isCurrent = i === done;
+                      return (
+                        <div key={i} style={{ display: 'flex', gap: '12px', alignItems: 'flex-start', opacity: isDone || isCurrent ? 1 : 0.45 }}>
+                          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+                            <div style={{
+                              width: '26px', height: '26px', borderRadius: '50%', flexShrink: 0, fontSize: '0.75rem',
+                              display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700, color: 'white',
+                              background: isDone ? '#10B981' : isCurrent ? 'var(--primary-color)' : '#CBD5E1',
+                            }}>
+                              {isDone ? '✓' : isCurrent ? '⋯' : i + 1}
+                            </div>
+                            {i < stages.length - 1 && <div style={{ width: '2px', height: '26px', background: isDone ? '#10B981' : '#E2E8F0' }} />}
+                          </div>
+                          <div style={{ paddingTop: '3px' }}>
+                            <div style={{ fontWeight: isCurrent ? 700 : 600, fontSize: '0.9rem' }}>
+                              {s.label}{isCurrent && <span style={{ color: 'var(--primary-color)', fontWeight: 600 }}> — in progress</span>}
+                            </div>
+                            {s.sub && <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>{s.sub}</div>}
+                          </div>
+                        </div>
+                      );
+                    });
+                  })()}
                 </div>
+                <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', maxWidth: '460px', margin: '0 auto 24px' }}>
+                  🔒 Your signed form and ID are stored encrypted, used only to file this request with IRCC,
+                  and never shared with anyone else. Questions? info@mentorvisa.com
+                </p>
                 <div style={{ display: 'flex', gap: '12px', justifyContent: 'center', flexWrap: 'wrap' }}>
                   <a href="/track-my-application" className="btn btn-primary" style={{ textDecoration: 'none' }}>📅 Track my application meanwhile</a>
                   <a href="/audit-employment-letter" className="btn btn-outline" style={{ textDecoration: 'none' }}>📄 Audit my employment letter</a>

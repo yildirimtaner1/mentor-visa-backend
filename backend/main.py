@@ -1600,18 +1600,20 @@ def _gcms_order_dict(o: db_models.GCMSOrder) -> dict:
         "notes_type": o.notes_type,
         "extra_notes": o.extra_notes,
         "has_consent": bool(o.consent_file_id),
+        "id_count": len(o.id_files or []),
         "created_at": o.timestamp_utc.isoformat() if o.timestamp_utc else None,
     }
 
 
-def _send_gcms_order_email(order: db_models.GCMSOrder, consent_url: str | None = None):
-    """Notify the fulfillment inbox that a GCMS order is complete (paid + consent uploaded).
+def _send_gcms_order_email(order: db_models.GCMSOrder, consent_url: str | None = None,
+                           id_urls: list | None = None):
+    """Notify the fulfillment inbox that a GCMS order is complete (paid + documents uploaded).
     Uses SMTP env vars (SMTP_HOST/SMTP_PORT/SMTP_USER/SMTP_PASS); logs and skips if unset
     so a missing mail setup never breaks the order flow."""
     host = os.getenv("SMTP_HOST")
     smtp_user = os.getenv("SMTP_USER")
     smtp_pass = os.getenv("SMTP_PASS")
-    notify_to = os.getenv("GCMS_NOTIFY_EMAIL", "yildirim.taner1@gmail.com")
+    notify_to = os.getenv("GCMS_NOTIFY_EMAIL", "info@mentorvisa.com")
     if not (host and smtp_user and smtp_pass):
         print(f"[GCMS] SMTP not configured — order #{order.id} complete; NOT emailed. "
               f"Set SMTP_HOST/SMTP_USER/SMTP_PASS to enable notifications.")
@@ -1644,6 +1646,8 @@ def _send_gcms_order_email(order: db_models.GCMSOrder, consent_url: str | None =
             "",
             f"Consent form (7-day link): {consent_url or 'stored as ' + (order.consent_file_id or '?')}",
         ]
+        for label, url in (id_urls or []):
+            lines.append(f"Government ID — {label or 'person'}: {url}")
         msg.set_content("\n".join(lines))
         port = int(os.getenv("SMTP_PORT", "587"))
         with smtplib.SMTP(host, port, timeout=20) as s:
@@ -1738,50 +1742,76 @@ def list_gcms_orders(
     return {"orders": [_gcms_order_dict(o) for o in orders]}
 
 
+async def _store_gcms_upload(upload: UploadFile, stored_name_prefix: str, order_id: int) -> tuple:
+    """Validate + store one GCMS document (Supabase bucket or local fallback).
+    Returns (stored_name, signed_url_or_None)."""
+    ext = os.path.splitext(upload.filename or "")[1].lower()
+    if ext not in GCMS_CONSENT_EXTENSIONS:
+        raise HTTPException(status_code=422, detail=f"'{upload.filename}': please upload PDF, JPG, or PNG files.")
+    content = await upload.read()
+    if len(content) > 10 * 1024 * 1024:
+        raise HTTPException(status_code=422, detail=f"'{upload.filename}' is too large (max 10MB).")
+    stored_name = f"{stored_name_prefix}_{order_id}_{uuid.uuid4().hex[:8]}{ext}"
+    url = None
+    if supabase:
+        supabase.storage.from_("documents").upload(
+            stored_name, content,
+            {"content-type": upload.content_type or "application/octet-stream"},
+        )
+        try:
+            signed = supabase.storage.from_("documents").create_signed_url(stored_name, 7 * 24 * 3600)
+            url = signed.get("signedURL") or signed.get("signedUrl")
+        except Exception as e:
+            print(f"[GCMS] Could not create signed URL for {stored_name}: {e}")
+    else:
+        with open(UPLOADS_DIR / stored_name, "wb") as f:
+            f.write(content)
+    return stored_name, url
+
+
 @app.post("/api/v1/gcms/orders/{order_id}/consent")
 async def upload_gcms_consent(
     order_id: int,
     consent: UploadFile = File(...),
+    ids: list[UploadFile] = File(default=[]),
     user_id: str = Depends(get_current_user),
     db: Session = Depends(database.get_db),
 ):
-    """Step 3 — store the signed consent form (IMM 5744) and mark the order complete."""
+    """Step 3 — store the signed IMM 5744 plus one government-issued ID per person
+    (IRCC requires identity proof to process an ATIP request), then mark the order complete."""
     order = db.query(db_models.GCMSOrder).filter_by(id=order_id, user_id=user_id).first()
     if not order:
         raise HTTPException(status_code=404, detail="Order not found.")
     if order.status == 'awaiting_payment':
-        raise HTTPException(status_code=402, detail="Please complete payment before uploading the consent form.")
+        raise HTTPException(status_code=402, detail="Please complete payment before uploading documents.")
 
-    ext = os.path.splitext(consent.filename or "")[1].lower()
-    if ext not in GCMS_CONSENT_EXTENSIONS:
-        raise HTTPException(status_code=422, detail="Please upload the signed form as a PDF, JPG, or PNG.")
-    content = await consent.read()
-    if len(content) > 10 * 1024 * 1024:
-        raise HTTPException(status_code=422, detail="File is too large (max 10MB).")
+    expected_ids = 1 + len(order.related_persons or [])
+    if len(ids) < expected_ids:
+        raise HTTPException(status_code=422,
+                            detail=f"Please attach a government-issued ID for each of the {expected_ids} "
+                                   "person(s) on the application.")
 
-    stored_name = f"gcms_consent_{order.id}_{uuid.uuid4().hex[:8]}{ext}"
-    consent_url = None
-    if supabase:
-        supabase.storage.from_("documents").upload(
-            stored_name, content,
-            {"content-type": consent.content_type or "application/octet-stream"},
-        )
-        try:
-            signed = supabase.storage.from_("documents").create_signed_url(stored_name, 7 * 24 * 3600)
-            consent_url = signed.get("signedURL") or signed.get("signedUrl")
-        except Exception as e:
-            print(f"[GCMS] Could not create signed URL: {e}")
-    else:
-        with open(UPLOADS_DIR / stored_name, "wb") as f:
-            f.write(content)
+    consent_name, consent_url = await _store_gcms_upload(consent, "gcms_consent", order.id)
 
-    order.consent_file_id = stored_name
+    # Label each ID by person (applicant first, then related in order).
+    person_labels = [f"{order.given_name or ''} {order.family_name or order.full_name}".strip()]
+    person_labels += [f"{p.get('given_name','')} {p.get('family_name','')}".strip()
+                      for p in (order.related_persons or [])]
+    id_records, id_urls = [], []
+    for i, f in enumerate(ids):
+        label = person_labels[i] if i < len(person_labels) else f"Person {i + 1}"
+        stored, url = await _store_gcms_upload(f, "gcms_id", order.id)
+        id_records.append({"person": label, "stored_name": stored})
+        id_urls.append((label, url or stored))
+
+    order.consent_file_id = consent_name
+    order.id_files = id_records
     if order.status in ('awaiting_consent', 'received'):
         order.status = 'received'
     db.commit()
     db.refresh(order)
 
-    _send_gcms_order_email(order, consent_url)
+    _send_gcms_order_email(order, consent_url, id_urls)
     return _gcms_order_dict(order)
 
 
