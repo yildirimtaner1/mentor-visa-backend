@@ -103,6 +103,7 @@ class GCMSOrder(Base):
     # Government-issued ID copies, one per person (IRCC needs identity proof to process an
     # ATIP request): [{person, stored_name}]
     id_files = Column(JSON, nullable=True)
+    received_at = Column(DateTime, nullable=True)  # when documents arrived; drives the 24h auto-advance to 'filed'
 
     timestamp_utc = Column(DateTime, default=datetime.datetime.utcnow)
     timestamp_toronto = Column(DateTime, default=get_toronto_now)
