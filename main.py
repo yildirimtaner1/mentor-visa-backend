@@ -1328,6 +1328,7 @@ def get_user_credits(
         "letter_builder_credits": user.letter_builder_credits,
         "ita_strategy_credits": user.ita_strategy_credits,
         "profile_builder_credits": user.profile_builder_credits,
+        "gcms_credits": user.gcms_credits or 0,
         "subscription_tier": user.subscription_tier or "free"
     }
 
@@ -1363,6 +1364,7 @@ class CheckoutRequest(BaseModel):
     pass_type: str # 'finder' or 'auditor'
     return_path: Optional[str] = None
     return_url: Optional[str] = None
+    order_id: Optional[int] = None  # GCMS order to tie the payment to (pass_type='gcms')
 
 @app.post("/api/v1/create-checkout-session")
 def create_checkout_session(
@@ -1404,6 +1406,10 @@ def create_checkout_session(
         # 19.90 CAD — 5 NOC Finder full reports
         amount = 1990
         name = "NOC Finder — 5 Full Report Credits"
+    elif req.pass_type == 'gcms':
+        # 19.90 CAD — GCMS notes order (ATIP request filed on the applicant's behalf)
+        amount = 1990
+        name = "GCMS Notes Order — Full IRCC File Request"
     elif req.pass_type == 'starter':
         # 49.00 CAD — Optimize tier
         amount = 4900
@@ -1448,10 +1454,11 @@ def create_checkout_session(
             cancel_url=cancel_url,
             client_reference_id=user_id, # Safely tie purchase to user explicitly
             metadata={
-                "pass_type": req.pass_type
+                "pass_type": req.pass_type,
+                **({"order_id": str(req.order_id)} if req.order_id else {}),
             }
         )
-        
+
         # LOG Payment Initialization
         db = database.SessionLocal()
         try:
@@ -1462,6 +1469,12 @@ def create_checkout_session(
                 pass_type=req.pass_type
             )
             db.add(pe)
+            # Tie the Stripe session to the GCMS order so we can verify payment even if the
+            # webhook is delayed (the GET orders endpoint lazily re-checks the session).
+            if req.pass_type == 'gcms' and req.order_id:
+                order = db.query(db_models.GCMSOrder).filter_by(id=req.order_id, user_id=user_id).first()
+                if order:
+                    order.stripe_session_id = session.id
             db.commit()
         except Exception as log_e:
             print(f"Warning: failed to log payment init: {log_e}")
@@ -1519,6 +1532,16 @@ async def stripe_webhook(request: Request, db: Session = Depends(database.get_db
                 user.ita_strategy_credits += 1
             elif pass_type == 'war_room':
                 user.ita_strategy_credits += 1
+            elif pass_type == 'gcms':
+                # Mark the GCMS order paid -> next step is the signed consent upload.
+                order_id = meta.get("order_id") if isinstance(meta, dict) else getattr(meta, "order_id", None)
+                order = None
+                if order_id:
+                    order = db.query(db_models.GCMSOrder).filter_by(id=int(order_id), user_id=client_user_id).first()
+                if not order:
+                    order = db.query(db_models.GCMSOrder).filter_by(stripe_session_id=session.id).first()
+                if order and order.status == 'awaiting_payment':
+                    order.status = 'awaiting_consent'
             elif pass_type == 'starter':
                 user.subscription_tier = 'starter'
                 # Starter tier includes some credits
@@ -1548,6 +1571,200 @@ async def stripe_webhook(request: Request, db: Session = Depends(database.get_db
             db.commit()
 
     return {"status": "success"}
+
+
+# ── GCMS Notes Orders ─────────────────────────────────────────────────────────
+# Flow: create order (step 1 info) -> Stripe payment (pass_type='gcms') -> signed
+# consent (IMM 5744) upload. Fulfilled manually via an ATIP request; a notification
+# email goes out when an order is complete (paid + consent received).
+
+GCMS_CONSENT_EXTENSIONS = {'.pdf', '.jpg', '.jpeg', '.png'}
+
+
+def _gcms_order_dict(o: db_models.GCMSOrder) -> dict:
+    return {
+        "id": o.id,
+        "status": o.status,
+        "full_name": o.full_name,
+        "email": o.email,
+        "date_of_birth": o.date_of_birth,
+        "country_of_residence": o.country_of_residence,
+        "uci": o.uci,
+        "application_number": o.application_number,
+        "application_type": o.application_type,
+        "notes_type": o.notes_type,
+        "extra_notes": o.extra_notes,
+        "has_consent": bool(o.consent_file_id),
+        "created_at": o.timestamp_utc.isoformat() if o.timestamp_utc else None,
+    }
+
+
+def _send_gcms_order_email(order: db_models.GCMSOrder, consent_url: str | None = None):
+    """Notify the fulfillment inbox that a GCMS order is complete (paid + consent uploaded).
+    Uses SMTP env vars (SMTP_HOST/SMTP_PORT/SMTP_USER/SMTP_PASS); logs and skips if unset
+    so a missing mail setup never breaks the order flow."""
+    host = os.getenv("SMTP_HOST")
+    smtp_user = os.getenv("SMTP_USER")
+    smtp_pass = os.getenv("SMTP_PASS")
+    notify_to = os.getenv("GCMS_NOTIFY_EMAIL", "yildirim.taner1@gmail.com")
+    if not (host and smtp_user and smtp_pass):
+        print(f"[GCMS] SMTP not configured — order #{order.id} complete; NOT emailed. "
+              f"Set SMTP_HOST/SMTP_USER/SMTP_PASS to enable notifications.")
+        return
+    try:
+        import smtplib
+        from email.message import EmailMessage
+        msg = EmailMessage()
+        msg["Subject"] = f"[Mentor Visa] GCMS order #{order.id} ready to file — {order.full_name}"
+        msg["From"] = smtp_user
+        msg["To"] = notify_to
+        lines = [
+            f"GCMS notes order #{order.id} is PAID and the signed consent form has been uploaded.",
+            "",
+            f"Applicant:            {order.full_name}",
+            f"Email:                {order.email}",
+            f"Date of birth:        {order.date_of_birth}",
+            f"Country of residence: {order.country_of_residence or '-'}",
+            f"UCI:                  {order.uci or '-'}",
+            f"Application number:   {order.application_number or '-'}",
+            f"Application type:     {order.application_type or '-'}",
+            f"Notes type:           {(order.notes_type or 'ircc').upper()}",
+            f"Extra notes:          {order.extra_notes or '-'}",
+            "",
+            f"Consent form (7-day link): {consent_url or 'stored as ' + (order.consent_file_id or '?')}",
+        ]
+        msg.set_content("\n".join(lines))
+        port = int(os.getenv("SMTP_PORT", "587"))
+        with smtplib.SMTP(host, port, timeout=20) as s:
+            s.starttls()
+            s.login(smtp_user, smtp_pass)
+            s.send_message(msg)
+        print(f"[GCMS] Notification email sent for order #{order.id}")
+    except Exception as e:
+        print(f"[GCMS] Failed to send notification email for order #{order.id}: {e}")
+
+
+class GCMSOrderRequest(BaseModel):
+    full_name: str
+    email: str
+    date_of_birth: str            # YYYY-MM-DD
+    country_of_residence: Optional[str] = None
+    uci: Optional[str] = None
+    application_number: Optional[str] = None
+    application_type: Optional[str] = None
+    notes_type: str = "ircc"      # 'ircc' or 'cbsa'
+    extra_notes: Optional[str] = None
+
+
+@app.post("/api/v1/gcms/orders")
+def create_gcms_order(
+    req: GCMSOrderRequest,
+    user_id: str = Depends(get_current_user),
+    db: Session = Depends(database.get_db),
+):
+    """Step 1 — save the applicant info and open an order awaiting payment."""
+    ensure_user_exists(user_id, db)
+    if not req.full_name.strip() or not req.email.strip() or "@" not in req.email:
+        raise HTTPException(status_code=422, detail="Please provide your full name and a valid email.")
+    if not req.date_of_birth.strip():
+        raise HTTPException(status_code=422, detail="Please provide your date of birth.")
+    if req.notes_type not in ("ircc", "cbsa"):
+        raise HTTPException(status_code=422, detail="notes_type must be 'ircc' or 'cbsa'.")
+
+    # Reuse an identical unpaid order instead of stacking duplicates (double-clicks, refreshes).
+    order = (db.query(db_models.GCMSOrder)
+             .filter_by(user_id=user_id, status='awaiting_payment')
+             .order_by(db_models.GCMSOrder.id.desc()).first())
+    if order:
+        for k, v in req.model_dump().items():
+            setattr(order, k, v.strip() if isinstance(v, str) else v)
+    else:
+        order = db_models.GCMSOrder(user_id=user_id, status='awaiting_payment',
+                                    **{k: (v.strip() if isinstance(v, str) else v) for k, v in req.model_dump().items()})
+        db.add(order)
+
+    # Prepaid GCMS credit (granted manually / promotions): consume it and skip the payment step.
+    user = db.query(db_models.UserAccount).filter_by(user_id=user_id).first()
+    if user and (user.gcms_credits or 0) > 0:
+        user.gcms_credits -= 1
+        order.status = 'awaiting_consent'
+        print(f"[GCMS] Consumed 1 prepaid credit for {user_id} (order pre-paid; {user.gcms_credits} left)")
+
+    db.commit()
+    db.refresh(order)
+    return _gcms_order_dict(order)
+
+
+@app.get("/api/v1/gcms/orders")
+def list_gcms_orders(
+    user_id: str = Depends(get_current_user),
+    db: Session = Depends(database.get_db),
+):
+    """List the caller's GCMS orders (newest first). Lazily verifies payment with Stripe for
+    orders still awaiting payment, so a delayed/failed webhook can't strand a paid order."""
+    orders = (db.query(db_models.GCMSOrder).filter_by(user_id=user_id)
+              .order_by(db_models.GCMSOrder.id.desc()).all())
+    changed = False
+    for o in orders:
+        if o.status == 'awaiting_payment' and o.stripe_session_id:
+            try:
+                session = stripe.checkout.Session.retrieve(o.stripe_session_id)
+                if getattr(session, "payment_status", None) == 'paid':
+                    o.status = 'awaiting_consent'
+                    changed = True
+            except Exception as e:
+                print(f"[GCMS] Stripe verify failed for order #{o.id}: {e}")
+    if changed:
+        db.commit()
+    return {"orders": [_gcms_order_dict(o) for o in orders]}
+
+
+@app.post("/api/v1/gcms/orders/{order_id}/consent")
+async def upload_gcms_consent(
+    order_id: int,
+    consent: UploadFile = File(...),
+    user_id: str = Depends(get_current_user),
+    db: Session = Depends(database.get_db),
+):
+    """Step 3 — store the signed consent form (IMM 5744) and mark the order complete."""
+    order = db.query(db_models.GCMSOrder).filter_by(id=order_id, user_id=user_id).first()
+    if not order:
+        raise HTTPException(status_code=404, detail="Order not found.")
+    if order.status == 'awaiting_payment':
+        raise HTTPException(status_code=402, detail="Please complete payment before uploading the consent form.")
+
+    ext = os.path.splitext(consent.filename or "")[1].lower()
+    if ext not in GCMS_CONSENT_EXTENSIONS:
+        raise HTTPException(status_code=422, detail="Please upload the signed form as a PDF, JPG, or PNG.")
+    content = await consent.read()
+    if len(content) > 10 * 1024 * 1024:
+        raise HTTPException(status_code=422, detail="File is too large (max 10MB).")
+
+    stored_name = f"gcms_consent_{order.id}_{uuid.uuid4().hex[:8]}{ext}"
+    consent_url = None
+    if supabase:
+        supabase.storage.from_("documents").upload(
+            stored_name, content,
+            {"content-type": consent.content_type or "application/octet-stream"},
+        )
+        try:
+            signed = supabase.storage.from_("documents").create_signed_url(stored_name, 7 * 24 * 3600)
+            consent_url = signed.get("signedURL") or signed.get("signedUrl")
+        except Exception as e:
+            print(f"[GCMS] Could not create signed URL: {e}")
+    else:
+        with open(UPLOADS_DIR / stored_name, "wb") as f:
+            f.write(content)
+
+    order.consent_file_id = stored_name
+    if order.status in ('awaiting_consent', 'received'):
+        order.status = 'received'
+    db.commit()
+    db.refresh(order)
+
+    _send_gcms_order_email(order, consent_url)
+    return _gcms_order_dict(order)
+
 
 class UnlockRequest(BaseModel):
     file_id: str

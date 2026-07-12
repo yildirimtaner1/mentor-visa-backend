@@ -17,6 +17,7 @@ class UserAccount(Base):
     letter_builder_credits = Column(Integer, default=0, nullable=False)
     ita_strategy_credits = Column(Integer, default=0, nullable=False)
     profile_builder_credits = Column(Integer, default=0, nullable=False)
+    gcms_credits = Column(Integer, default=0, nullable=False)  # prepaid GCMS notes orders (skip payment step)
     subscription_tier = Column(String, default="free", nullable=False)  # "free", "starter", "complete"
 
 
@@ -67,6 +68,36 @@ def _populate_detected_noc_code(mapper, connection, target):
     code = _noc_code_from_payload(target.payload)
     if code:
         target.detected_noc_code = code
+
+
+class GCMSOrder(Base):
+    """A GCMS/ATIP notes order: applicant info (step 1) -> Stripe payment (step 2)
+    -> signed consent form upload (step 3). Fulfilled manually via an ATIP request."""
+    __tablename__ = "gcms_orders"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(String, ForeignKey("users.user_id"), index=True, nullable=False)
+
+    # 'awaiting_payment' -> 'awaiting_consent' -> 'received' -> 'filed' -> 'delivered'
+    status = Column(String, default="awaiting_payment", nullable=False)
+
+    # Step 1 — applicant details
+    full_name = Column(String, nullable=False)
+    email = Column(String, nullable=False)
+    date_of_birth = Column(String, nullable=False)       # YYYY-MM-DD (string keeps it timezone-proof)
+    country_of_residence = Column(String, nullable=True)
+    uci = Column(String, nullable=True)                  # Unique Client Identifier (if known)
+    application_number = Column(String, nullable=True)   # e.g. E000123456 (if known)
+    application_type = Column(String, nullable=True)     # Express Entry PR / study / work / etc.
+    notes_type = Column(String, default="ircc", nullable=False)  # 'ircc' (GCMS) or 'cbsa'
+    extra_notes = Column(String, nullable=True)
+
+    # Step 2/3 — payment + consent artifacts
+    stripe_session_id = Column(String, index=True, nullable=True)
+    consent_file_id = Column(String, nullable=True)      # stored filename in the documents bucket
+
+    timestamp_utc = Column(DateTime, default=datetime.datetime.utcnow)
+    timestamp_toronto = Column(DateTime, default=get_toronto_now)
 
 
 class PaymentEvent(Base):
