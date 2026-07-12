@@ -12,8 +12,17 @@ handwritten signatures in blue ink (form page 2).
 """
 import os
 import io
+import datetime
 
 import fitz  # PyMuPDF
+
+def _today_toronto() -> str:
+    """Generation date for the signature-date cells (Toronto time when tzdata is available)."""
+    try:
+        from zoneinfo import ZoneInfo
+        return datetime.datetime.now(ZoneInfo("America/Toronto")).strftime("%Y-%m-%d")
+    except Exception:  # no tzdata (e.g. bare Windows) — local date is close enough
+        return datetime.date.today().isoformat()
 
 TEMPLATE_PATH = os.path.join(os.path.dirname(__file__), "templates", "imm5744e.pdf")
 
@@ -51,14 +60,14 @@ _REL1 = _P + "AppIndividSub[0].IndividSub[0]."      # Section 2.1
 _REL2 = _P + "Individual45Sub[0].Individual4Sub[0]."  # Section 2.2
 _REL3 = _P + "Individual45Sub[0].Individual5Sub[0]."  # Section 2.3
 
-# Related-individual blocks: (family, given, dob, relationship) field names.
+# Related-individual blocks: (family, given, dob, relationship, signature_date) field names.
 _REL_BLOCKS = [
     (_REL1 + "Family_name[0]", _REL1 + "Given_name[0]", _REL1 + "Firm[0]",  # 'Firm' cell is visually the 2.1 DOB box
-     _REL1 + "RelationShip[0]"),
+     _REL1 + "RelationShip[0]", _REL1 + "signature[0].SignatureDate[0]"),
     (_REL2 + "Family_name[0]", _REL2 + "Given_name[0]", _REL2 + "DateBirth[0]",
-     _REL2 + "TelephoneSub[0].RelationShip[0]"),
+     _REL2 + "TelephoneSub[0].RelationShip[0]", _REL2 + "signature[0].SignatureDate[0]"),
     (_REL3 + "Family_name[0]", _REL3 + "Given_name[0]", _REL3 + "DateBirth[0]",
-     _REL3 + "TelephoneSub[0].RelationShip[0]"),
+     _REL3 + "TelephoneSub[0].RelationShip[0]", _REL3 + "signature[0].SignatureDate[0]"),
 ]
 
 MAX_RELATED = len(_REL_BLOCKS)  # form fits applicant + 3 (page 2: "Up to four people")
@@ -80,14 +89,16 @@ def fill_imm5744(order) -> bytes:
         _DR2 + "CountryPostalCode[0].TelephoneNo[0]": dr["country"],   # Country cell
         _DR2 + "CountryPostalCode[0].otherTelephoneNo[0]": dr["postal_code"],  # Postal cell
         _DR2 + "EmailAddress[0]": dr["email"],
-        # Section 2 — applicant (signature/date left blank: blue-ink rule)
+        # Section 2 — applicant. Signature stays blank (handwritten blue ink only);
+        # the DATE cell is pre-filled with the generation date so IRCC gets a dated consent.
         _APP + "Family_name[0]": (order.family_name or order.full_name or "").strip(),
         _APP + "Given_name[0]": (order.given_name or "").strip(),
         _APP + "DateBirth[0]": order.date_of_birth or "",
+        _APP + "signature[0].SignatureDate[0]": _today_toronto(),
     }
 
     related = (order.related_persons or [])[:MAX_RELATED]
-    for person, (f_fam, f_giv, f_dob, f_rel) in zip(related, _REL_BLOCKS):
+    for person, (f_fam, f_giv, f_dob, f_rel, f_sigdate) in zip(related, _REL_BLOCKS):
         values[f_fam] = (person.get("family_name") or "").strip()
         values[f_giv] = (person.get("given_name") or "").strip()
         values[f_dob] = (person.get("date_of_birth") or "").strip()
@@ -95,6 +106,7 @@ def fill_imm5744(order) -> bytes:
         if person.get("under_16"):
             rel = (rel + " (under 16 — parents sign)").strip()
         values[f_rel] = rel
+        values[f_sigdate] = _today_toronto()  # date next to each signature = generation date
 
     doc = fitz.open(TEMPLATE_PATH)
     filled = 0
