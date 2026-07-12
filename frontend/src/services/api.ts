@@ -155,8 +155,17 @@ export async function createCheckoutSession(passType: 'finder' | 'finder_1' | 'f
 
 // ── GCMS Notes Orders ──
 
+export interface GCMSRelatedPerson {
+  family_name: string;
+  given_name: string;
+  date_of_birth: string;
+  relationship: string;
+  under_16: boolean;
+}
+
 export interface GCMSOrderData {
-  full_name: string;
+  family_name: string;
+  given_name: string;
   email: string;
   date_of_birth: string;
   country_of_residence?: string;
@@ -186,6 +195,38 @@ export async function getGCMSOrders(token: string) {
   });
   if (!response.ok) return { orders: [] };
   return response.json();
+}
+
+export async function setGCMSPersons(orderId: number, persons: GCMSRelatedPerson[], token: string) {
+  const response = await fetch(`${API_BASE_URL}/api/v1/gcms/orders/${orderId}/persons`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+    body: JSON.stringify({ persons }),
+  });
+  if (!response.ok) {
+    const err = await response.json().catch(() => ({}));
+    throw new Error(err.detail || 'Failed to save the family members.');
+  }
+  return response.json();
+}
+
+export async function downloadGCMSConsentForm(orderId: number, token: string) {
+  const response = await fetch(`${API_BASE_URL}/api/v1/gcms/orders/${orderId}/consent-form`, {
+    headers: { 'Authorization': `Bearer ${token}` },
+  });
+  if (!response.ok) {
+    const err = await response.json().catch(() => ({}));
+    throw new Error(err.detail || 'Could not generate the consent form.');
+  }
+  const blob = await response.blob();
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `IMM5744_prefilled_order${orderId}.pdf`;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
 }
 
 export async function uploadGCMSConsent(orderId: number, file: File, token: string) {

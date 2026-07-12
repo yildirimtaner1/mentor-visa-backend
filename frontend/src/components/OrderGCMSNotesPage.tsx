@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, type FC, type ChangeEvent } from 'react';
 import { useAuth, SignInButton } from '@clerk/clerk-react';
 import { SEO } from './common/SEO';
-import { createGCMSOrder, getGCMSOrders, uploadGCMSConsent, createCheckoutSession, type GCMSOrderData } from '../services/api';
+import { createGCMSOrder, getGCMSOrders, uploadGCMSConsent, createCheckoutSession, setGCMSPersons, downloadGCMSConsentForm, type GCMSOrderData, type GCMSRelatedPerson } from '../services/api';
 import ReactGA from 'react-ga4';
 
 const PRICE = 19.90;
@@ -22,6 +22,9 @@ interface GCMSOrder {
   id: number;
   status: 'awaiting_payment' | 'awaiting_consent' | 'received' | 'filed' | 'delivered';
   full_name: string;
+  family_name?: string;
+  given_name?: string;
+  related_persons?: GCMSRelatedPerson[];
   email: string;
   date_of_birth: string;
   country_of_residence?: string;
@@ -35,10 +38,22 @@ interface GCMSOrder {
 }
 
 const emptyForm: GCMSOrderData = {
-  full_name: '', email: '', date_of_birth: '', country_of_residence: '',
+  family_name: '', given_name: '', email: '', date_of_birth: '', country_of_residence: '',
   uci: '', application_number: '', application_type: APPLICATION_TYPES[0],
   notes_type: 'ircc', extra_notes: '',
 };
+
+const RELATIONSHIPS = ['Spouse', 'Common-law partner', 'Son', 'Daughter', 'Father', 'Mother', 'Other'];
+const emptyPerson: GCMSRelatedPerson = { family_name: '', given_name: '', date_of_birth: '', relationship: 'Spouse', under_16: false };
+
+// Age check for the IMM 5744 signing rules (under-16s are listed but don't sign).
+function isUnder16(dob: string): boolean {
+  if (!dob) return false;
+  const d = new Date(dob + 'T00:00:00');
+  const cutoff = new Date();
+  cutoff.setFullYear(cutoff.getFullYear() - 16);
+  return d > cutoff;
+}
 
 // FAQ — rendered on-page and injected as FAQPage JSON-LD for SEO.
 const FAQ: { q: string; a: string }[] = [
@@ -97,6 +112,9 @@ export const OrderGCMSNotesPage: FC = () => {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [uploadedFile, setUploadedFile] = useState<File | null>(null);
+  // Step 3a — other people on the application (IMM 5744 fits applicant + 3)
+  const [persons, setPersons] = useState<GCMSRelatedPerson[]>([]);
+  const [formReady, setFormReady] = useState(false); // pre-filled IMM 5744 generated & downloaded
 
   const set = (k: keyof GCMSOrderData) => (e: ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
     const next = { ...form, [k]: e.target.value };
@@ -104,7 +122,9 @@ export const OrderGCMSNotesPage: FC = () => {
     sessionStorage.setItem('gcmsOrderForm', JSON.stringify(next));
   };
 
-  const formValid = form.full_name.trim().length > 1 && /\S+@\S+\.\S+/.test(form.email) && !!form.date_of_birth;
+  const formValid = form.family_name.trim().length > 0 && form.given_name.trim().length > 0
+    && /\S+@\S+\.\S+/.test(form.email) && !!form.date_of_birth;
+  const personsValid = persons.every(p => p.family_name.trim() && p.given_name.trim() && p.date_of_birth);
 
   // On sign-in / return from Stripe: resume the latest in-progress order at the right step.
   useEffect(() => {
@@ -117,6 +137,7 @@ export const OrderGCMSNotesPage: FC = () => {
       const active = orders.find(o => o.status !== 'delivered');
       if (!active) return;
       setOrder(active);
+      if (active.related_persons?.length) setPersons(active.related_persons);
       if (active.status === 'awaiting_payment') setStep(2);
       else if (active.status === 'awaiting_consent') setStep(3);
       else setStep(4); // received / filed — everything is in our hands
@@ -162,6 +183,23 @@ export const OrderGCMSNotesPage: FC = () => {
       setError(e.message || 'Could not start checkout. Please try again.');
       setBusy(false);
     }
+  };
+
+  const generateForm = async () => {
+    if (!order) return;
+    if (!personsValid) { setError('Please complete surname, given name(s), and date of birth for each person.'); return; }
+    setError(''); setBusy(true);
+    try {
+      const token = await getToken();
+      if (!token) return;
+      const withAge = persons.map(p => ({ ...p, under_16: isUnder16(p.date_of_birth) }));
+      const updated = await setGCMSPersons(order.id, withAge, token);
+      setOrder(updated);
+      await downloadGCMSConsentForm(order.id, token);
+      setFormReady(true);
+    } catch (e: any) {
+      setError(e.message || 'Could not generate the form. Please try again.');
+    } finally { setBusy(false); }
   };
 
   const uploadConsent = async (file: File) => {
@@ -255,8 +293,12 @@ export const OrderGCMSNotesPage: FC = () => {
 
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: '16px', marginBottom: '16px' }}>
                   <div>
-                    <label style={labelStyle}>Full legal name *</label>
-                    <input style={inputStyle} value={form.full_name} onChange={set('full_name')} placeholder="As shown on your passport" />
+                    <label style={labelStyle}>Surname / family name *</label>
+                    <input style={inputStyle} value={form.family_name} onChange={set('family_name')} placeholder="As shown on your passport" />
+                  </div>
+                  <div>
+                    <label style={labelStyle}>Given name(s) *</label>
+                    <input style={inputStyle} value={form.given_name} onChange={set('given_name')} placeholder="First + middle names, as on passport" />
                   </div>
                   <div>
                     <label style={labelStyle}>Email (we send your notes here) *</label>
@@ -341,7 +383,7 @@ export const OrderGCMSNotesPage: FC = () => {
 
                 <div style={{ background: '#F8FAFC', borderRadius: '12px', border: '1px solid var(--border-color)', padding: '18px 20px', marginBottom: '20px' }}>
                   {[
-                    ['Applicant', order.full_name],
+                    ['Applicant', order.given_name && order.family_name ? `${order.given_name} ${order.family_name.toUpperCase()}` : order.full_name],
                     ['Email', order.email],
                     ['Date of birth', order.date_of_birth],
                     ['Notes requested', order.notes_type === 'cbsa' ? 'CBSA (security screening & border records)' : 'IRCC — GCMS notes'],
@@ -372,42 +414,118 @@ export const OrderGCMSNotesPage: FC = () => {
               </div>
             )}
 
-            {/* ── STEP 3 — Consent upload ── */}
+            {/* ── STEP 3 — Consent form: household -> pre-filled download -> sign -> upload ── */}
             {step === 3 && order && (
               <div className="info-card" style={{ padding: '32px 28px' }}>
                 <div style={{ padding: '12px 16px', background: '#ECFDF5', border: '1px solid #6EE7B7', borderRadius: '10px', marginBottom: '20px', fontSize: '0.9rem', color: '#065F46', fontWeight: 600 }}>
                   ✅ Payment received — one last step and we can file your request.
                 </div>
-                <h3 style={{ fontSize: '1.2rem', fontWeight: 700, marginBottom: '4px' }}>Step 3 — Upload your signed consent form</h3>
-                <p style={{ fontSize: '0.9rem', color: 'var(--text-muted)', marginBottom: '20px', lineHeight: 1.6 }}>
-                  IRCC requires your written authorization before we can request your file. This is the standard
-                  consent form used by every GCMS service.
-                </p>
 
-                <ol style={{ paddingLeft: '20px', fontSize: '0.92rem', lineHeight: 1.9, marginBottom: '20px' }}>
-                  <li>
-                    Download IRCC form <a href={CONSENT_FORM_URL} target="_blank" rel="noopener noreferrer" style={{ color: 'var(--primary-color)', fontWeight: 600 }}>
-                    IMM 5744 — Consent for an Access to Information Request</a>
-                  </li>
-                  <li>Fill in your details and <strong>sign it</strong> (digital or printed &amp; scanned — both accepted)</li>
-                  <li>Upload the signed form below (PDF, JPG, or PNG)</li>
-                </ol>
+                {!formReady ? (
+                  <>
+                    <h3 style={{ fontSize: '1.2rem', fontWeight: 700, marginBottom: '4px' }}>Step 3 — We prepare your consent form</h3>
+                    <p style={{ fontSize: '0.9rem', color: 'var(--text-muted)', marginBottom: '20px', lineHeight: 1.6 }}>
+                      IRCC requires a signed consent form (IMM 5744) before we can request your file.
+                      Tell us who's on the application and <strong>we'll fill the entire form for you</strong> — you just print, sign, and upload.
+                    </p>
 
-                <div
-                  onClick={() => !busy && fileInputRef.current?.click()}
-                  style={{
-                    border: '2px dashed var(--border-color)', borderRadius: '12px', padding: '36px 20px',
-                    textAlign: 'center', cursor: busy ? 'default' : 'pointer', background: 'white',
-                  }}>
-                  <input type="file" accept=".pdf,.jpg,.jpeg,.png" ref={fileInputRef} style={{ display: 'none' }} disabled={busy}
-                    onChange={(e) => { const f = e.target.files?.[0]; if (f) uploadConsent(f); }} />
-                  <div style={{ fontSize: '2rem', marginBottom: '10px' }}>✍️</div>
-                  <div style={{ fontWeight: 600, marginBottom: '4px' }}>{busy ? 'Uploading…' : 'Click to upload your signed IMM 5744'}</div>
-                  <div style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>PDF, JPG, or PNG · max 10MB</div>
-                </div>
-                <p style={{ fontSize: '0.78rem', color: 'var(--text-muted)', textAlign: 'center', marginTop: '12px', marginBottom: 0 }}>
-                  Stuck on the form? Email us at support@mentorvisa.com and we'll walk you through it.
-                </p>
+                    <label style={labelStyle}>Is anyone else included in your application? (spouse, children…)</label>
+                    <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginBottom: '16px' }}>
+                      {[0, 1, 2, 3].map(n => (
+                        <button key={n} type="button"
+                          onClick={() => setPersons(prev => {
+                            const next = prev.slice(0, n);
+                            while (next.length < n) next.push({ ...emptyPerson });
+                            return next;
+                          })}
+                          style={{
+                            padding: '9px 16px', borderRadius: '10px', cursor: 'pointer', fontSize: '0.88rem', fontWeight: 600,
+                            border: persons.length === n ? '2px solid var(--primary-color)' : '1px solid var(--border-color)',
+                            background: persons.length === n ? '#EEF2FF' : 'white',
+                          }}>
+                          {n === 0 ? 'Just me' : `Me + ${n}`}
+                        </button>
+                      ))}
+                    </div>
+                    <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '-8px', marginBottom: '16px' }}>
+                      One IMM 5744 fits up to 4 people. More than 4? Mention it in an email — we'll prepare a second form at no charge.
+                    </p>
+
+                    {persons.map((p, i) => (
+                      <div key={i} style={{ background: '#F8FAFC', border: '1px solid var(--border-color)', borderRadius: '12px', padding: '16px', marginBottom: '12px' }}>
+                        <div style={{ fontSize: '0.8rem', fontWeight: 700, marginBottom: '10px', color: 'var(--primary-color)' }}>
+                          Person {i + 2} {isUnder16(p.date_of_birth) && <span style={{ color: '#B45309' }}>· under 16 — listed on the form, parents sign for them</span>}
+                        </div>
+                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '10px' }}>
+                          <div>
+                            <label style={labelStyle}>Surname *</label>
+                            <input style={inputStyle} value={p.family_name}
+                              onChange={e => setPersons(prev => prev.map((x, j) => j === i ? { ...x, family_name: e.target.value } : x))} />
+                          </div>
+                          <div>
+                            <label style={labelStyle}>Given name(s) *</label>
+                            <input style={inputStyle} value={p.given_name}
+                              onChange={e => setPersons(prev => prev.map((x, j) => j === i ? { ...x, given_name: e.target.value } : x))} />
+                          </div>
+                          <div>
+                            <label style={labelStyle}>Date of birth *</label>
+                            <input style={inputStyle} type="date" value={p.date_of_birth}
+                              onChange={e => setPersons(prev => prev.map((x, j) => j === i ? { ...x, date_of_birth: e.target.value } : x))} />
+                          </div>
+                          <div>
+                            <label style={labelStyle}>Relationship to you</label>
+                            <select style={inputStyle} value={p.relationship}
+                              onChange={e => setPersons(prev => prev.map((x, j) => j === i ? { ...x, relationship: e.target.value } : x))}>
+                              {RELATIONSHIPS.map(r => <option key={r} value={r}>{r}</option>)}
+                            </select>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+
+                    <button className="btn btn-primary btn-lg" style={{ width: '100%', marginTop: '8px' }} disabled={busy || !personsValid} onClick={generateForm}>
+                      {busy ? 'Preparing your form…' : '📄 Generate my pre-filled IMM 5744 →'}
+                    </button>
+                    <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', textAlign: 'center', marginTop: '10px', marginBottom: 0 }}>
+                      Prefer to fill it yourself? The blank form is on the{' '}
+                      <a href={CONSENT_FORM_URL} target="_blank" rel="noopener noreferrer" style={{ color: 'var(--primary-color)' }}>IRCC website</a>.
+                    </p>
+                  </>
+                ) : (
+                  <>
+                    <h3 style={{ fontSize: '1.2rem', fontWeight: 700, marginBottom: '4px' }}>Almost done — sign &amp; upload</h3>
+                    <p style={{ fontSize: '0.9rem', color: 'var(--text-muted)', marginBottom: '16px', lineHeight: 1.6 }}>
+                      Your pre-filled IMM 5744 just downloaded
+                      (<button type="button" onClick={generateForm} disabled={busy} style={{ background: 'none', border: 'none', padding: 0, color: 'var(--primary-color)', fontWeight: 600, cursor: 'pointer', fontSize: 'inherit' }}>download again</button>).
+                      IRCC is strict about signatures, so follow these exactly:
+                    </p>
+                    <ol style={{ paddingLeft: '20px', fontSize: '0.92rem', lineHeight: 1.9, marginBottom: '20px' }}>
+                      <li><strong>Print</strong> the form (page 1 is enough)</li>
+                      <li>Everyone <strong>16 or older</strong> signs in their box — <strong style={{ color: '#1D4ED8' }}>handwritten, in BLUE ink</strong> (IRCC rejects electronic signatures)</li>
+                      <li>Write the <strong>date (YYYY-MM-DD)</strong> next to each signature</li>
+                      {(order.related_persons || []).some(p => p.under_16) && (
+                        <li>For children under 16: they don't sign — <strong>both parents</strong> sign the form instead</li>
+                      )}
+                      <li><strong>Scan or photograph</strong> it — colour, well-lit, 300dpi or a sharp phone photo</li>
+                    </ol>
+
+                    <div
+                      onClick={() => !busy && fileInputRef.current?.click()}
+                      style={{
+                        border: '2px dashed var(--border-color)', borderRadius: '12px', padding: '36px 20px',
+                        textAlign: 'center', cursor: busy ? 'default' : 'pointer', background: 'white',
+                      }}>
+                      <input type="file" accept=".pdf,.jpg,.jpeg,.png" ref={fileInputRef} style={{ display: 'none' }} disabled={busy}
+                        onChange={(e) => { const f = e.target.files?.[0]; if (f) uploadConsent(f); }} />
+                      <div style={{ fontSize: '2rem', marginBottom: '10px' }}>✍️</div>
+                      <div style={{ fontWeight: 600, marginBottom: '4px' }}>{busy ? 'Uploading…' : 'Upload your signed IMM 5744'}</div>
+                      <div style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>PDF, JPG, or PNG · max 10MB</div>
+                    </div>
+                    <p style={{ fontSize: '0.78rem', color: 'var(--text-muted)', textAlign: 'center', marginTop: '12px', marginBottom: 0 }}>
+                      Stuck? Email support@mentorvisa.com and we'll walk you through it.
+                    </p>
+                  </>
+                )}
               </div>
             )}
 

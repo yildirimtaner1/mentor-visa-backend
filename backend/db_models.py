@@ -82,9 +82,14 @@ class GCMSOrder(Base):
     status = Column(String, default="awaiting_payment", nullable=False)
 
     # Step 1 — applicant details
-    full_name = Column(String, nullable=False)
+    full_name = Column(String, nullable=False)           # computed "given family" (kept for emails/summaries)
+    family_name = Column(String, nullable=True)          # surname, as on passport (IMM 5744 sec. 2)
+    given_name = Column(String, nullable=True)           # given name(s), as on passport
     email = Column(String, nullable=False)
     date_of_birth = Column(String, nullable=False)       # YYYY-MM-DD (string keeps it timezone-proof)
+    # Other people on the application (IMM 5744 sec. 2.1-2.3, max 3):
+    # [{family_name, given_name, date_of_birth, relationship, under_16}]
+    related_persons = Column(JSON, nullable=True)
     country_of_residence = Column(String, nullable=True)
     uci = Column(String, nullable=True)                  # Unique Client Identifier (if known)
     application_number = Column(String, nullable=True)   # e.g. E000123456 (if known)
