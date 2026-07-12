@@ -26,6 +26,8 @@ import { ProfilePage } from './components/ProfilePage';
 import ProfileBuilderPage from './components/ProfileBuilderPage';
 import { ApplicationTrackerPage } from './components/ApplicationTrackerPage';
 import { ProcessingTimesPage } from './components/ProcessingTimesPage';
+import { OrderGCMSNotesPage } from './components/OrderGCMSNotesPage';
+import { GCMSNotesGuidePage } from './components/GCMSNotesGuidePage';
 import { useAuth, UserButton } from '@clerk/clerk-react';
 import { saveEvaluation, cancelPaymentEvent } from './services/api';
 import { useJourneySync } from './hooks/useJourneySync';
@@ -387,6 +389,8 @@ function App() {
       <Route path="/draw-results" element={<SharedLayout><DrawResultsPage onNavigate={(p) => navigate(`/${p}`)} /></SharedLayout>} />
       <Route path="/track-my-application" element={<SharedLayout><ApplicationTrackerPage /></SharedLayout>} />
       <Route path="/express-entry-processing-times" element={<SharedLayout><ProcessingTimesPage onNavigate={(p) => navigate(`/${p}`)} /></SharedLayout>} />
+      <Route path="/order-gcms-notes" element={<SharedLayout><OrderGCMSNotesPage /></SharedLayout>} />
+      <Route path="/how-to-read-gcms-notes" element={<SharedLayout><GCMSNotesGuidePage /></SharedLayout>} />
 
       {/* Legal Pages */}
       <Route path="/privacy-policy" element={<SharedLayout><PrivacyPolicyPage /></SharedLayout>} />

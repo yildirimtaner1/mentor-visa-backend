@@ -55,6 +55,14 @@ const PAGE_META: Record<string, { title: string; description: string }> = {
     title: 'Express Entry Draw Results & CRS Scores 2026 | Mentor Visa',
     description: 'Track all Express Entry draw results for 2025-2026. View CRS cutoff scores, ITAs issued, CEC/PNP/category-based draws, and CRS score trends.',
   },
+  '/order-gcms-notes': {
+    title: 'Order Your GCMS Notes — Full IRCC File in 30-40 Days | Mentor Visa',
+    description: 'See exactly why your application is delayed or was refused. We file your ATIP request and email you the complete GCMS notes. $19.90 CAD flat.',
+  },
+  '/how-to-read-gcms-notes': {
+    title: 'How to Read Your GCMS Notes: Codes, Stages & Red Flags Explained | Mentor Visa',
+    description: 'A plain-English guide to interpreting GCMS notes: the AOR-to-PPR pipeline, what R10, A11.2, RFV, ADR and PFL mean, and the red flags that predict delays or refusals.',
+  },
 };
 
 function isBot(ua: string): boolean {

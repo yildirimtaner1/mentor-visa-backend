@@ -3,7 +3,7 @@ import { SignInButton, SignUpButton, useAuth, UserButton } from '@clerk/clerk-re
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useSmartNav } from '../../hooks/useSmartNav';
 import { fetchUserCredits } from '../../services/api';
-import { ChevronDown, FileText, CheckSquare, LineChart, Map, BookOpen, MessageCircle, CalendarClock } from 'lucide-react';
+import { ChevronDown, FileText, CheckSquare, LineChart, Map, BookOpen, MessageCircle, CalendarClock, FolderSearch } from 'lucide-react';
 
 const DropdownMenu = ({ title, items, basePath, columns = 1 }: { title: string, items: any[], basePath?: string, columns?: number }) => {
   const [open, setOpen] = useState(false);
@@ -128,6 +128,7 @@ export const Navbar: FC = () => {
               { path: '/find-my-noc', label: 'Find My NOC', subtext: 'AI-powered duty matching', icon: <FileText size={16} /> },
               { path: '/audit-employment-letter', label: 'Audit Employment Letter', subtext: 'Verify IRCC compliance', icon: <CheckSquare size={16} /> },
               { path: '/track-my-application', label: 'Smart Application Tracker', subtext: 'Track milestones and dates, receive smart predictions', icon: <CalendarClock size={16} /> },
+              { path: '/order-gcms-notes', label: 'Order GCMS Notes', subtext: 'Your complete IRCC file — see what the officer sees', icon: <FolderSearch size={16} /> },
               { path: '/documents', label: '12 Mistakes Checklist', subtext: 'Error prevention guide', icon: <FileText size={16} /> },
             ]}
           />
@@ -137,6 +138,7 @@ export const Navbar: FC = () => {
             items={[
               { path: '/draw-results', label: 'Draw Results', subtext: 'Live Express Entry tracker', icon: <LineChart size={16} /> },
               { path: '/express-entry-processing-times', label: 'Processing Times', subtext: 'AOR to eCOPR, by stream', icon: <CalendarClock size={16} /> },
+              { path: '/how-to-read-gcms-notes', label: 'GCMS Notes Guide', subtext: 'Decode every stage, code & red flag', icon: <FolderSearch size={16} /> },
               { path: '/express-entry-cec-guide', label: 'CEC Guide', subtext: 'Requirements & process', icon: <BookOpen size={16} /> },
               { path: '/cec-checklist', label: 'CEC Checklist', subtext: 'Document checklist generator', icon: <CheckSquare size={16} /> },
               { path: '/noc-codes', label: 'NOC Directory', subtext: 'Browse the 2021 Matrix', icon: <Map size={16} /> },
@@ -213,11 +215,13 @@ export const Navbar: FC = () => {
           <button className="mobile-menu-link" onClick={() => { navigate('/find-my-noc'); setMobileMenuOpen(false); }}>🎯 Find My NOC</button>
           <button className="mobile-menu-link" onClick={() => { navigate('/audit-employment-letter'); setMobileMenuOpen(false); }}>📄 Audit Employment Letter</button>
           <button className="mobile-menu-link" onClick={() => { navigate('/track-my-application'); setMobileMenuOpen(false); }}>📅 Smart Application Tracker</button>
+          <button className="mobile-menu-link" onClick={() => { navigate('/order-gcms-notes'); setMobileMenuOpen(false); }}>📂 Order GCMS Notes</button>
           <button className="mobile-menu-link" onClick={() => { navigate('/documents'); setMobileMenuOpen(false); }}>⚠️ 12 Mistakes Checklist</button>
 
           <div style={{ borderTop: '1px solid var(--border-color)', fontSize: '0.7rem', textTransform: 'uppercase', letterSpacing: '1px', color: 'var(--text-muted)', fontWeight: 700, padding: '12px 8px 8px', marginTop: '8px' }}>Learn</div>
           <button className="mobile-menu-link" onClick={() => { navigate('/draw-results'); setMobileMenuOpen(false); }}>📈 Draw Results</button>
           <button className="mobile-menu-link" onClick={() => { navigate('/express-entry-processing-times'); setMobileMenuOpen(false); }}>⏱️ Processing Times</button>
+          <button className="mobile-menu-link" onClick={() => { navigate('/how-to-read-gcms-notes'); setMobileMenuOpen(false); }}>📖 GCMS Notes Guide</button>
           <button className="mobile-menu-link" onClick={() => { navigate('/express-entry-cec-guide'); setMobileMenuOpen(false); }}>📘 CEC Guide</button>
           <button className="mobile-menu-link" onClick={() => { navigate('/gckey-setup-guide'); setMobileMenuOpen(false); }}>🔑 GCKey Setup Guide</button>
           

@@ -136,7 +136,7 @@ export async function revealNocResult(token: string, storedFileId: string): Prom
   return response.json();
 }
 
-export async function createCheckoutSession(passType: 'finder' | 'finder_1' | 'finder_3' | 'finder_5' | 'auditor' | 'letter_builder' | 'ita_strategy' | 'war_room' | 'starter' | 'complete', token: string, returnPath: string = '/dashboard') {
+export async function createCheckoutSession(passType: 'finder' | 'finder_1' | 'finder_3' | 'finder_5' | 'auditor' | 'letter_builder' | 'ita_strategy' | 'war_room' | 'gcms' | 'starter' | 'complete', token: string, returnPath: string = '/dashboard', orderId?: number) {
   const returnUrl = window.location.origin + returnPath;
   const response = await fetch(`${API_BASE_URL}/api/v1/create-checkout-session`, {
     method: 'POST',
@@ -144,11 +144,61 @@ export async function createCheckoutSession(passType: 'finder' | 'finder_1' | 'f
       'Content-Type': 'application/json',
       'Authorization': `Bearer ${token}`
     },
-    body: JSON.stringify({ pass_type: passType, return_path: returnPath, return_url: returnUrl })
+    body: JSON.stringify({ pass_type: passType, return_path: returnPath, return_url: returnUrl, order_id: orderId })
   });
   if (!response.ok) {
     const err = await response.json().catch(() => ({}));
     throw new Error(err.detail || "Failed to create checkout session");
+  }
+  return response.json();
+}
+
+// ── GCMS Notes Orders ──
+
+export interface GCMSOrderData {
+  full_name: string;
+  email: string;
+  date_of_birth: string;
+  country_of_residence?: string;
+  uci?: string;
+  application_number?: string;
+  application_type?: string;
+  notes_type: 'ircc' | 'cbsa';
+  extra_notes?: string;
+}
+
+export async function createGCMSOrder(data: GCMSOrderData, token: string) {
+  const response = await fetch(`${API_BASE_URL}/api/v1/gcms/orders`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+    body: JSON.stringify(data),
+  });
+  if (!response.ok) {
+    const err = await response.json().catch(() => ({}));
+    throw new Error(err.detail || 'Failed to create your order.');
+  }
+  return response.json();
+}
+
+export async function getGCMSOrders(token: string) {
+  const response = await fetch(`${API_BASE_URL}/api/v1/gcms/orders`, {
+    headers: { 'Authorization': `Bearer ${token}` },
+  });
+  if (!response.ok) return { orders: [] };
+  return response.json();
+}
+
+export async function uploadGCMSConsent(orderId: number, file: File, token: string) {
+  const formData = new FormData();
+  formData.append('consent', file);
+  const response = await fetch(`${API_BASE_URL}/api/v1/gcms/orders/${orderId}/consent`, {
+    method: 'POST',
+    headers: { 'Authorization': `Bearer ${token}` },
+    body: formData,
+  });
+  if (!response.ok) {
+    const err = await response.json().catch(() => ({}));
+    throw new Error(err.detail || 'Failed to upload the consent form.');
   }
   return response.json();
 }

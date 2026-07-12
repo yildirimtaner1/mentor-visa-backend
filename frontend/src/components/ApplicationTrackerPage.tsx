@@ -259,7 +259,7 @@ export const ApplicationTrackerPage: FC = () => {
     <>
       <SEO
         title="Express Entry Application Tracker & Timeline Predictions | Mentor Visa"
-        description="Track every Express Entry PR milestone — AOR, biometrics, medical, background check, final decision, P1/P2, PPR, eCOPR — and get processing-time predictions tailored to your stream, country and category from 900+ real recent applications."
+        description="Track every Express Entry PR milestone — AOR, biometrics, medical, background check, final decision, P1/P2, PPR, eCOPR — and get processing-time predictions tailored to your stream, country and category from 700+ real recent applications."
         keywords="Express Entry processing time, PR application tracker, Express Entry timeline 2026, AOR to PPR, biometrics to PPR, eCOPR timeline, P1 P2 portal, IRCC processing time, Express Entry application tracker"
         canonical="/track-my-application"
         schema={TRACKER_SCHEMA}
@@ -269,7 +269,7 @@ export const ApplicationTrackerPage: FC = () => {
           <div className="page-hero-badge">📊 Built on real Express Entry cases</div>
           <h1>Know Exactly<br /><span className="hero-highlight" style={{ color: 'var(--primary-light)' }}>What Happens Next.</span></h1>
           <p style={{ maxWidth: '720px', margin: '0 auto 24px auto', fontSize: '1.1rem', lineHeight: '1.6' }}>
-            Track every milestone and get timeline predictions <strong>tailored to your stream, country and category</strong> — built on 900+ real, recent Express Entry cases. See if your case is running slower than typical, and know exactly when to raise a webform.
+            Track every milestone and get timeline predictions <strong>tailored to your stream, country and category</strong> — built on 700+ real, recent Express Entry cases. See if your case is running slower than typical, and know exactly when to raise a webform.
           </p>
           {heroCta}
           <div style={{ display: 'flex', justifyContent: 'center', gap: '20px', flexWrap: 'wrap', fontSize: '0.9rem', color: 'var(--text-main)', fontWeight: 600, marginTop: 14 }}>

@@ -1,5 +1,30 @@
 [
   {
+    "date": "2026-07-10",
+    "drawType": "Senior Managers",
+    "crsScore": 392,
+    "itasIssued": 500
+  },
+  {
+    "date": "2026-07-09",
+    "drawType": "French",
+    "crsScore": 420,
+    "itasIssued": 5000
+  },
+  {
+    "date": "2026-07-07",
+    "drawType": "CEC",
+    "crsScore": 517,
+    "itasIssued": 2000
+  },
+  {
+    "date": "2026-07-06",
+    "drawType": "PNP",
+    "crsScore": 708,
+    "itasIssued": 534,
+    "notes": "Lowest PNP cut-off of 2026; first PNP round since June 22."
+  },
+  {
     "date": "2026-06-25",
     "drawType": "Healthcare",
     "crsScore": 475,
