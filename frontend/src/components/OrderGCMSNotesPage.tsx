@@ -162,7 +162,7 @@ const FAQ_SCHEMA = JSON.stringify({
 
 const inputStyle: React.CSSProperties = {
   width: '100%', padding: '11px 14px', borderRadius: '10px',
-  border: '1px solid var(--border-color)', fontSize: '0.95rem', background: 'white',
+  border: '1px solid var(--border-color)', fontSize: '1rem', background: 'white', // ≥16px: stops iOS focus-zoom
 };
 const labelStyle: React.CSSProperties = {
   display: 'block', fontSize: '0.85rem', fontWeight: 600, marginBottom: '6px',

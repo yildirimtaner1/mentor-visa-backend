@@ -1,33 +1,35 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, lazy, Suspense } from 'react';
 import type { AnalysisResponse } from './types';
 import { GridPattern } from './components/ui/grid-pattern';
 import { cn } from './lib/utils';
 import { LandingPage } from './components/LandingPage';
-import { AuditorPage } from './components/AuditorPage';
-import { Dashboard } from './components/Dashboard';
-import { MyEvaluations } from './components/MyEvaluations';
-import { CECGuidePage } from './components/CECGuidePage';
-import { NOCFinderPage } from './components/NOCFinderPage';
-import { CECChecklistPage } from './components/CECChecklistPage';
-import { CRSCalculatorPage } from './components/CRSCalculatorPage';
-import { NOCDirectoryPage } from './components/NOCDirectoryPage';
-import { NOCDetailsPage } from './components/NOCDetailsPage';
-import { PrivacyPolicyPage } from './components/PrivacyPolicyPage';
-import { TermsOfServicePage } from './components/TermsOfServicePage';
-import { RefundPolicyPage } from './components/RefundPolicyPage';
-// import { LetterBuilderPage } from './components/LetterBuilderPage'; // Set aside for redesign
-import { GCKeyGuidePage } from './components/GCKeyGuidePage';
-import { GlossaryPage } from './components/GlossaryPage';
-import { DrawResultsPage } from './components/DrawResultsPage';
-import { EligibilityWizardPage } from './components/EligibilityWizardPage';
-import { DocumentsPage } from './components/DocumentsPage';
-import { PricingPage } from './components/PricingPage';
-import { ProfilePage } from './components/ProfilePage';
-import ProfileBuilderPage from './components/ProfileBuilderPage';
-import { ApplicationTrackerPage } from './components/ApplicationTrackerPage';
-import { ProcessingTimesPage } from './components/ProcessingTimesPage';
-import { OrderGCMSNotesPage } from './components/OrderGCMSNotesPage';
-import { GCMSNotesGuidePage } from './components/GCMSNotesGuidePage';
+// Route-level code splitting: every page except the landing page loads as its own chunk,
+// keeping the initial (mobile) bundle small. Named exports need the .then() shim.
+const AuditorPage = lazy(() => import('./components/AuditorPage').then(m => ({ default: m.AuditorPage })));
+const Dashboard = lazy(() => import('./components/Dashboard').then(m => ({ default: m.Dashboard })));
+const MyEvaluations = lazy(() => import('./components/MyEvaluations').then(m => ({ default: m.MyEvaluations })));
+const CECGuidePage = lazy(() => import('./components/CECGuidePage').then(m => ({ default: m.CECGuidePage })));
+const NOCFinderPage = lazy(() => import('./components/NOCFinderPage').then(m => ({ default: m.NOCFinderPage })));
+const CECChecklistPage = lazy(() => import('./components/CECChecklistPage').then(m => ({ default: m.CECChecklistPage })));
+const CRSCalculatorPage = lazy(() => import('./components/CRSCalculatorPage').then(m => ({ default: m.CRSCalculatorPage })));
+const NOCDirectoryPage = lazy(() => import('./components/NOCDirectoryPage').then(m => ({ default: m.NOCDirectoryPage })));
+const NOCDetailsPage = lazy(() => import('./components/NOCDetailsPage').then(m => ({ default: m.NOCDetailsPage })));
+const PrivacyPolicyPage = lazy(() => import('./components/PrivacyPolicyPage').then(m => ({ default: m.PrivacyPolicyPage })));
+const TermsOfServicePage = lazy(() => import('./components/TermsOfServicePage').then(m => ({ default: m.TermsOfServicePage })));
+const RefundPolicyPage = lazy(() => import('./components/RefundPolicyPage').then(m => ({ default: m.RefundPolicyPage })));
+const GCKeyGuidePage = lazy(() => import('./components/GCKeyGuidePage').then(m => ({ default: m.GCKeyGuidePage })));
+const GlossaryPage = lazy(() => import('./components/GlossaryPage').then(m => ({ default: m.GlossaryPage })));
+const DrawResultsPage = lazy(() => import('./components/DrawResultsPage').then(m => ({ default: m.DrawResultsPage })));
+const DrawDetailPage = lazy(() => import('./components/DrawDetailPage').then(m => ({ default: m.DrawDetailPage })));
+const EligibilityWizardPage = lazy(() => import('./components/EligibilityWizardPage').then(m => ({ default: m.EligibilityWizardPage })));
+const DocumentsPage = lazy(() => import('./components/DocumentsPage').then(m => ({ default: m.DocumentsPage })));
+const PricingPage = lazy(() => import('./components/PricingPage').then(m => ({ default: m.PricingPage })));
+const ProfilePage = lazy(() => import('./components/ProfilePage').then(m => ({ default: m.ProfilePage })));
+const ProfileBuilderPage = lazy(() => import('./components/ProfileBuilderPage'));
+const ApplicationTrackerPage = lazy(() => import('./components/ApplicationTrackerPage').then(m => ({ default: m.ApplicationTrackerPage })));
+const ProcessingTimesPage = lazy(() => import('./components/ProcessingTimesPage').then(m => ({ default: m.ProcessingTimesPage })));
+const OrderGCMSNotesPage = lazy(() => import('./components/OrderGCMSNotesPage').then(m => ({ default: m.OrderGCMSNotesPage })));
+const GCMSNotesGuidePage = lazy(() => import('./components/GCMSNotesGuidePage').then(m => ({ default: m.GCMSNotesGuidePage })));
 import { useAuth, UserButton } from '@clerk/clerk-react';
 import { saveEvaluation, cancelPaymentEvent } from './services/api';
 import { useJourneySync } from './hooks/useJourneySync';
@@ -373,6 +375,12 @@ function App() {
   };
 
   return (
+    <Suspense fallback={
+      <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '60vh' }}>
+        <div style={{ width: '36px', height: '36px', border: '4px solid #E5E7EB', borderTopColor: '#3B82F6', borderRadius: '50%', animation: 'spin 1s linear infinite' }} />
+        <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
+      </div>
+    }>
     <Routes>
       {/* Landing Page Route */}
       <Route path="/" element={<LandingPage onGetStarted={() => navigate('/audit-employment-letter')} onNavigate={(page) => navigate(`/${page}`)} />} />
@@ -398,6 +406,7 @@ function App() {
       <Route path="/noc-codes/:code" element={<SharedLayout><NOCDetailsPage /></SharedLayout>} />
       <Route path="/glossary" element={<SharedLayout><GlossaryPage /></SharedLayout>} />
       <Route path="/draw-results" element={<SharedLayout><DrawResultsPage onNavigate={(p) => navigate(`/${p}`)} /></SharedLayout>} />
+      <Route path="/draw-results/:slug" element={<SharedLayout><DrawDetailPage /></SharedLayout>} />
       <Route path="/track-my-application" element={<SharedLayout><ApplicationTrackerPage /></SharedLayout>} />
       <Route path="/express-entry-processing-times" element={<SharedLayout><ProcessingTimesPage onNavigate={(p) => navigate(`/${p}`)} /></SharedLayout>} />
       <Route path="/order-gcms-notes" element={<SharedLayout><OrderGCMSNotesPage /></SharedLayout>} />
@@ -416,6 +425,7 @@ function App() {
         </AppLayout>
       } />
     </Routes>
+    </Suspense>
   );
 }
 

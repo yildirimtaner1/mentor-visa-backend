@@ -13,6 +13,20 @@ const BOT_AGENTS = [
 const OG_IMAGE = 'https://mentorvisa.com/og-image.png';
 const SITE_NAME = 'Mentor Visa';
 
+// Routes with a dedicated OG card (public/og/<route>.png, from backend/gen_og_images.py).
+const OG_ROUTES = new Set([
+  '/crs-calculator', '/find-my-noc', '/audit-employment-letter', '/track-my-application',
+  '/order-gcms-notes', '/how-to-read-gcms-notes', '/draw-results', '/express-entry-processing-times',
+  '/noc-codes', '/get-started', '/pricing',
+]);
+
+function ogFor(pathname: string): string {
+  if (OG_ROUTES.has(pathname)) return `https://mentorvisa.com/og${pathname}.png`;
+  if (pathname.startsWith('/noc-codes/')) return 'https://mentorvisa.com/og/noc-codes.png';
+  if (pathname.startsWith('/draw-results/')) return 'https://mentorvisa.com/og/draw-results.png';
+  return OG_IMAGE;
+}
+
 // Static page meta data for known routes
 const PAGE_META: Record<string, { title: string; description: string }> = {
   '/': {
@@ -98,7 +112,7 @@ function escapeHtml(str: string): string {
   return str.replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 }
 
-function buildMetaPage(title: string, description: string, url: string): string {
+function buildMetaPage(title: string, description: string, url: string, image: string): string {
   const t = escapeHtml(title);
   const d = escapeHtml(description);
   return `<!DOCTYPE html>
@@ -111,14 +125,14 @@ function buildMetaPage(title: string, description: string, url: string): string 
 <meta property="og:title" content="${t}">
 <meta property="og:description" content="${d}">
 <meta property="og:url" content="${escapeHtml(url)}">
-<meta property="og:image" content="${OG_IMAGE}">
+<meta property="og:image" content="${image}">
 <meta property="og:image:width" content="1200">
 <meta property="og:image:height" content="630">
 <meta property="og:site_name" content="${SITE_NAME}">
 <meta name="twitter:card" content="summary_large_image">
 <meta name="twitter:title" content="${t}">
 <meta name="twitter:description" content="${d}">
-<meta name="twitter:image" content="${OG_IMAGE}">
+<meta name="twitter:image" content="${image}">
 <link rel="canonical" href="${escapeHtml(url)}">
 </head>
 <body><h1>${t}</h1><p>${d}</p></body>
@@ -152,7 +166,7 @@ export default function middleware(request: Request): Response | undefined {
   if (!meta) return undefined;
 
   const fullUrl = `https://mentorvisa.com${pathname}`;
-  return new Response(buildMetaPage(meta.title, meta.description, fullUrl), {
+  return new Response(buildMetaPage(meta.title, meta.description, fullUrl, ogFor(pathname)), {
     status: 200,
     headers: {
       'Content-Type': 'text/html; charset=utf-8',

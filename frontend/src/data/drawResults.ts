@@ -49,6 +49,16 @@ export function getTrend(drawType: string): 'rising' | 'falling' | 'stable' {
   return 'stable';
 }
 
+// URL slug for a draw's detail page, e.g. "2026-07-10-senior-managers".
+// Keep in sync with scripts/prerender.mjs (same formula).
+export function drawSlug(d: DrawResult): string {
+  return `${d.date}-${d.drawType.toLowerCase().replace(/[^a-z0-9]+/g, '-')}`;
+}
+
+export function findDrawBySlug(slug: string): DrawResult | undefined {
+  return ALL_DRAWS.find(d => drawSlug(d) === slug);
+}
+
 // Draw type color mapping
 export const DRAW_TYPE_COLORS: Record<string, string> = {
   'CEC': '#3b82f6',

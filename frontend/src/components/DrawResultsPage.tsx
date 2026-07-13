@@ -1,7 +1,7 @@
 import { type FC, useState, useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import { SEO } from './common/SEO';
-import { ALL_DRAWS, DRAW_TYPE_COLORS, getAverageCutoff, getTrend } from '../data/drawResults';
+import { ALL_DRAWS, DRAW_TYPE_COLORS, getAverageCutoff, getTrend, drawSlug } from '../data/drawResults';
 
 const DRAW_TYPE_LABELS: Record<string, string> = {
   'CEC': 'Canadian Experience Class',
@@ -223,7 +223,7 @@ export const DrawResultsPage: FC<{ onNavigate: (v: string) => void }> = () => {
           <section className="page-section" style={{ paddingBottom: '0' }}>
             <div style={{
               background: 'white', borderRadius: '12px', border: '1px solid var(--border-color)',
-              overflow: 'hidden'
+              overflowX: 'auto', overflowY: 'hidden', WebkitOverflowScrolling: 'touch'
             }}>
               <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.9rem' }}>
                 <thead>
@@ -240,15 +240,17 @@ export const DrawResultsPage: FC<{ onNavigate: (v: string) => void }> = () => {
                       onMouseOver={e => { e.currentTarget.style.background = '#F8FAFC'; }}
                       onMouseOut={e => { e.currentTarget.style.background = 'white'; }}
                     >
-                      <td style={{ padding: '12px 16px', fontWeight: 500, whiteSpace: 'nowrap' }}>{formatDate(d.date)}</td>
+                      <td style={{ padding: '12px 16px', fontWeight: 500, whiteSpace: 'nowrap' }}>
+                        <a href={`/draw-results/${drawSlug(d)}`} style={{ color: 'inherit', textDecoration: 'none' }}>{formatDate(d.date)}</a>
+                      </td>
                       <td style={{ padding: '12px 16px' }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <a href={`/draw-results/${drawSlug(d)}`} style={{ display: 'flex', alignItems: 'center', gap: '8px', color: 'inherit', textDecoration: 'none' }}>
                           <span style={{
                             width: '10px', height: '10px', borderRadius: '50%', flexShrink: 0,
                             background: DRAW_TYPE_COLORS[d.drawType] || '#64748b'
                           }} />
-                          <span>{DRAW_TYPE_LABELS[d.drawType] || d.drawType}</span>
-                        </div>
+                          <span style={{ textDecoration: 'underline', textDecorationColor: '#CBD5E1', textUnderlineOffset: '3px' }}>{DRAW_TYPE_LABELS[d.drawType] || d.drawType}</span>
+                        </a>
                       </td>
                       <td style={{ padding: '12px 16px', textAlign: 'center' }}>
                         <span style={{

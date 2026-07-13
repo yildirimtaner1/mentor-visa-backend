@@ -123,8 +123,22 @@ const TEER_LABELS = {
 // ── Template handling ──────────────────────────────────────────────────────────
 const template = readFileSync(join(DIST, 'index.html'), 'utf-8');
 
+// Routes with a dedicated OG card (public/og/<route>.png, from backend/gen_og_images.py).
+const OG_ROUTES = new Set([
+  '/crs-calculator', '/find-my-noc', '/audit-employment-letter', '/track-my-application',
+  '/order-gcms-notes', '/how-to-read-gcms-notes', '/draw-results', '/express-entry-processing-times',
+  '/noc-codes', '/get-started', '/pricing',
+]);
+function ogFor(path) {
+  if (OG_ROUTES.has(path)) return `${SITE}/og${path}.png`;
+  if (path.startsWith('/noc-codes/')) return `${SITE}/og/noc-codes.png`;
+  if (path.startsWith('/draw-results/')) return `${SITE}/og/draw-results.png`;
+  return OG_IMAGE;
+}
+
 function buildHead({ title, description, path, jsonLd }) {
   const url = `${SITE}${path}`;
+  const og = ogFor(path);
   const tags = [
     `<meta name="description" content="${esc(description)}" data-prerender/>`,
     `<link rel="canonical" href="${esc(url)}" data-prerender/>`,
@@ -132,12 +146,12 @@ function buildHead({ title, description, path, jsonLd }) {
     `<meta property="og:title" content="${esc(title)}" data-prerender/>`,
     `<meta property="og:description" content="${esc(description)}" data-prerender/>`,
     `<meta property="og:url" content="${esc(url)}" data-prerender/>`,
-    `<meta property="og:image" content="${OG_IMAGE}" data-prerender/>`,
+    `<meta property="og:image" content="${og}" data-prerender/>`,
     `<meta property="og:site_name" content="Mentor Visa" data-prerender/>`,
     `<meta name="twitter:card" content="summary_large_image" data-prerender/>`,
     `<meta name="twitter:title" content="${esc(title)}" data-prerender/>`,
     `<meta name="twitter:description" content="${esc(description)}" data-prerender/>`,
-    `<meta name="twitter:image" content="${OG_IMAGE}" data-prerender/>`,
+    `<meta name="twitter:image" content="${og}" data-prerender/>`,
   ];
   if (jsonLd) tags.push(`<script type="application/ld+json" data-prerender>${JSON.stringify(jsonLd)}</script>`);
   return tags.join('\n    ');
@@ -214,7 +228,73 @@ for (const [code, noc] of Object.entries(nocData)) {
   count++;
 }
 
-// ── 3. Homepage fallback meta (data-rh so Helmet replaces per page) ────────────
+// ── 3. Per-draw pages (one URL per Express Entry round) ────────────────────────
+// Slug formula must stay in sync with src/data/drawResults.ts drawSlug().
+const DRAW_LABELS = {
+  CEC: 'Canadian Experience Class', PNP: 'Provincial Nominee Program', French: 'French-Language Proficiency',
+  Healthcare: 'Healthcare & Social Services', Trades: 'Trades', Education: 'Education', General: 'No Program Specified',
+  Physicians: 'Physicians', 'Senior Managers': 'Senior Managers', STEM: 'STEM', Transport: 'Transport',
+  Agriculture: 'Agriculture & Agri-Food',
+};
+const fmtDate = (iso) => new Date(iso + 'T00:00:00').toLocaleDateString('en-CA', { year: 'numeric', month: 'long', day: 'numeric' });
+const draws = JSON.parse(readFileSync(join(ROOT, 'src', 'data', 'draw_results.json'), 'utf-8'));
+const drawSlug = (d) => `${d.date}-${d.drawType.toLowerCase().replace(/[^a-z0-9]+/g, '-')}`;
+const drawPaths = [];
+for (const d of draws) {
+  const slug = drawSlug(d);
+  const path = `/draw-results/${slug}`;
+  drawPaths.push(path);
+  const label = DRAW_LABELS[d.drawType] || d.drawType;
+  const sameType = draws.filter(x => x.drawType === d.drawType);
+  const idx = sameType.findIndex(x => drawSlug(x) === slug);
+  const prev = sameType[idx + 1];
+  const delta = prev ? d.crsScore - prev.crsScore : null;
+  const title = `Express Entry Draw ${fmtDate(d.date)}: ${label} — CRS ${d.crsScore} | Mentor Visa`;
+  const description = `IRCC issued ${d.itasIssued.toLocaleString('en-CA')} ITAs to ${label} candidates on ${fmtDate(d.date)} with a CRS cut-off of ${d.crsScore}${
+    delta !== null ? ` (${delta > 0 ? 'up' : delta < 0 ? 'down' : 'unchanged'}${delta !== 0 ? ` ${Math.abs(delta)} points` : ''} vs the previous ${d.drawType} draw)` : ''
+  }. Full details and CRS trend.`;
+  const body = wrap(
+    `<p style="font-size:.85rem"><a href="/draw-results" style="color:#4f46e5">← All draw results</a></p>` +
+    `<h1>Express Entry Draw — ${esc(fmtDate(d.date))}: ${esc(label)}</h1>` +
+    `<p>IRCC invited <strong>${d.itasIssued.toLocaleString('en-CA')}</strong> ${esc(label)} candidates to apply for permanent residence. ` +
+    `The CRS cut-off was <strong>${d.crsScore}</strong>${delta !== null ? `, ${delta === 0 ? 'unchanged from' : `${Math.abs(delta)} points ${delta > 0 ? 'higher' : 'lower'} than`} the previous ${esc(label)} draw` : ''}.` +
+    `${d.notes ? ` ${esc(d.notes)}` : ''}</p>` +
+    `<p><a href="/crs-calculator" style="color:#4f46e5">Calculate your CRS score</a> · ` +
+    `<a href="/draw-results" style="color:#4f46e5">All draw results</a> · ` +
+    `<a href="/find-my-noc" style="color:#4f46e5">Find your NOC code</a></p>`
+  );
+  const jsonLd = {
+    '@context': 'https://schema.org', '@type': 'Article',
+    headline: `Express Entry ${label} draw — ${fmtDate(d.date)}`,
+    datePublished: d.date, description,
+    author: { '@type': 'Organization', name: 'Mentor Visa', url: SITE },
+    publisher: { '@type': 'Organization', name: 'Mentor Visa', logo: { '@type': 'ImageObject', url: `${SITE}/logo.png` } },
+    mainEntityOfPage: `${SITE}${path}`,
+  };
+  writeRoute(path, renderPage({ title, description, path, jsonLd, bodyHtml: body }));
+  count++;
+}
+
+// ── 4. Sitemap: generated here so it can never drift from the real routes ──────
+{
+  const today = new Date().toISOString().slice(0, 10);
+  const urls = [
+    { loc: '/', freq: 'weekly', pri: '1' },
+    ...Object.keys(ROUTE_META).map(p => ({ loc: p, freq: 'weekly', pri: '0.9' })),
+    ...drawPaths.map(p => ({ loc: p, freq: 'monthly', pri: '0.7' })),
+    ...Object.keys(nocData).map(c => ({ loc: `/noc-codes/${c}`, freq: 'monthly', pri: '0.7' })),
+    { loc: '/privacy-policy', freq: 'yearly', pri: '0.3' },
+    { loc: '/terms-of-service', freq: 'yearly', pri: '0.3' },
+    { loc: '/refund-policy', freq: 'yearly', pri: '0.3' },
+  ];
+  const xml = `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n` +
+    urls.map(u => `  <url>\n    <loc>${SITE}${u.loc}</loc>\n    <lastmod>${today}</lastmod>\n    <changefreq>${u.freq}</changefreq>\n    <priority>${u.pri}</priority>\n  </url>`).join('\n') +
+    `\n</urlset>\n`;
+  writeFileSync(join(DIST, 'sitemap.xml'), xml);
+  console.log(`Sitemap: ${urls.length} URLs written to dist/sitemap.xml`);
+}
+
+// ── 5. Homepage fallback meta (data-rh so Helmet replaces per page) ────────────
 // The SPA fallback (dist/index.html) serves the homepage AND unprerendered app routes;
 // description/OG here are homepage defaults; NO canonical (each page sets its own via Helmet).
 {
@@ -233,4 +313,4 @@ for (const [code, noc] of Object.entries(nocData)) {
   writeFileSync(join(DIST, 'index.html'), template.replace('</head>', `    ${tags}\n  </head>`));
 }
 
-console.log(`Prerendered ${count} routes into dist/ (${Object.keys(nocData).length} NOC pages + ${Object.keys(ROUTE_META).length} content pages) + homepage fallback meta.`);
+console.log(`Prerendered ${count} routes into dist/ (${Object.keys(nocData).length} NOC + ${draws.length} draws + ${Object.keys(ROUTE_META).length} content pages) + homepage fallback meta.`);
