@@ -20,6 +20,11 @@ if (GA_MEASUREMENT_ID) {
   ReactGA.initialize(GA_MEASUREMENT_ID);
 }
 
+// Prerendered pages (scripts/prerender.mjs) ship static head tags for crawlers.
+// Strip them before the app mounts so react-helmet-async's per-page tags are the
+// only ones in the live DOM (Helmet appends rather than adopting foreign tags).
+document.querySelectorAll('[data-prerender]').forEach((el) => el.remove());
+
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
     <ClerkProvider
