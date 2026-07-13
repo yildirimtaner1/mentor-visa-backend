@@ -38,7 +38,7 @@ import './components/LandingPage.css';
 import './components/Pages.css';
 import './App.css';
 
-// A wrapper for pages that share the unified navbar and footer (e.g. NOC Finder, CRS Calc)
+// A wrapper for pages that share the unified navbar and footer (e.g. NOC Finder, CRS Calculator)
 const SharedLayout = ({ children }: { children: React.ReactNode }) => {
   return (
     <div className="landing relative min-h-screen">
