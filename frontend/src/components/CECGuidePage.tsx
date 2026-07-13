@@ -8,10 +8,19 @@ interface CECGuidePageProps {
 export const CECGuidePage: FC<CECGuidePageProps> = ({ onNavigate }) => {
   return (
     <div>
-      <SEO 
-        title="Express Entry Canadian Experience Class (CEC) Document Checklist & Guide" 
+      <SEO
+        title="Express Entry Canadian Experience Class (CEC) Document Checklist & Guide"
         description="Learn exactly what documents IRCC requires for the Canadian Experience Class (CEC) Express Entry program. Avoid application rejection with our official guidelines."
         canonical="/express-entry-cec-guide"
+        schema={JSON.stringify({
+          '@context': 'https://schema.org',
+          '@type': 'Article',
+          headline: 'Express Entry Canadian Experience Class (CEC) Guide',
+          description: 'What documents IRCC requires for the Canadian Experience Class, eligibility rules, and how to avoid application rejection.',
+          author: { '@type': 'Organization', name: 'Mentor Visa', url: 'https://mentorvisa.com' },
+          publisher: { '@type': 'Organization', name: 'Mentor Visa', logo: { '@type': 'ImageObject', url: 'https://mentorvisa.com/logo.png' } },
+          mainEntityOfPage: 'https://mentorvisa.com/express-entry-cec-guide',
+        })}
       />
       {/* Hero */}
       <section className="page-hero">

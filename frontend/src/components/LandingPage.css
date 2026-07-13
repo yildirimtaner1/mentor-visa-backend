@@ -262,17 +262,21 @@
   gap: 24px;
 }
 
-.landing-footer-links button {
+.landing-footer-links button,
+.landing-footer-links a {
   background: none;
   border: none;
   font-family: inherit;
+  font-size: inherit;
   color: var(--text-muted);
   cursor: pointer;
+  text-decoration: none;
   transition: color 0.2s;
   padding: 0;
 }
 
-.landing-footer-links button:hover {
+.landing-footer-links button:hover,
+.landing-footer-links a:hover {
   color: var(--primary-color);
 }
 

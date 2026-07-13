@@ -1,6 +1,7 @@
 import { type FC, useEffect, useState, useMemo } from 'react';
 import { useAuth, useUser } from '@clerk/clerk-react';
 import { getEvaluations } from '../services/api';
+import { SEO } from './common/SEO';
 import './MyEvaluations.css';
 
 interface MyEvaluationsProps {
@@ -90,6 +91,7 @@ export const MyEvaluations: FC<MyEvaluationsProps> = ({ onSelectEvaluation }) =>
 
   return (
     <div className="dashboard-container">
+      <SEO title="My Dashboard — Mentor Visa" description="Your evaluations and credits." noindex />
       {/* Header */}
       <div className="dashboard-header">
         <h1 className="dashboard-title">

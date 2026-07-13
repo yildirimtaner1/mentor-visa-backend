@@ -68,6 +68,17 @@ const SharedLayout = ({ children }: { children: React.ReactNode }) => {
               © 2026 Mentor Visa Services. All rights reserved.<br />
               This tool is for informational purposes only and does not constitute legal or immigration advice.
             </p>
+            {/* Sitewide internal links — real anchors so crawlers can follow them */}
+            <div style={{ display: 'flex', gap: '14px', justifyContent: 'center', fontSize: '12px', flexWrap: 'wrap', marginBottom: '10px' }}>
+              <a href="/crs-calculator" style={{ color: 'var(--text-muted)', textDecoration: 'none' }}>CRS Calculator</a>
+              <a href="/find-my-noc" style={{ color: 'var(--text-muted)', textDecoration: 'none' }}>Find My NOC</a>
+              <a href="/audit-employment-letter" style={{ color: 'var(--text-muted)', textDecoration: 'none' }}>Letter Auditor</a>
+              <a href="/track-my-application" style={{ color: 'var(--text-muted)', textDecoration: 'none' }}>Application Tracker</a>
+              <a href="/order-gcms-notes" style={{ color: 'var(--text-muted)', textDecoration: 'none' }}>Order GCMS Notes</a>
+              <a href="/draw-results" style={{ color: 'var(--text-muted)', textDecoration: 'none' }}>Draw Results</a>
+              <a href="/express-entry-processing-times" style={{ color: 'var(--text-muted)', textDecoration: 'none' }}>Processing Times</a>
+              <a href="/how-to-read-gcms-notes" style={{ color: 'var(--text-muted)', textDecoration: 'none' }}>GCMS Notes Guide</a>
+            </div>
             <div style={{ display: 'flex', gap: '16px', justifyContent: 'center', fontSize: '12px', flexWrap: 'wrap' }}>
               <a href="/glossary" style={{ color: 'var(--text-muted)', textDecoration: 'none' }}>Immigration Glossary</a>
               <a href="/noc-codes" style={{ color: 'var(--text-muted)', textDecoration: 'none' }}>NOC Directory</a>

@@ -218,8 +218,10 @@ export default function ProfileBuilderPage() {
   return (
     <div>
       <SEO
-        title="Express Entry AI Assistant — Mentor Visa"
-        description="AI-powered assistant for creating your Express Entry profile on the IRCC portal."
+        title="Express Entry AI Assistant — Instant IRCC Application Help | Mentor Visa"
+        description="Ask anything about your Express Entry profile or e-APR and get instant, accurate answers. AI help for IRCC portal questions, document fields, and tricky sections."
+        keywords="Express Entry AI assistant, IRCC portal help, Express Entry profile help, e-APR questions, how to fill Express Entry profile"
+        canonical="/ai-profile-assistant"
       />
 
       {/* Hero — shown only in welcome state (no messages yet) */}

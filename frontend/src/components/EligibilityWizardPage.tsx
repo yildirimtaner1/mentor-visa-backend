@@ -305,8 +305,10 @@ export function EligibilityWizardPage() {
   return (
     <div>
       <SEO
-        title="Am I Eligible for Canada PR? | Mentor Visa"
+        title="Am I Eligible for Canada PR? Free Express Entry Check | Mentor Visa"
         description="Free eligibility assessment for Express Entry (FSWP, CEC, FSTP). Find out if you qualify for Canada Permanent Residence in under 3 minutes."
+        keywords="am I eligible for Canada PR, Express Entry eligibility check, FSWP requirements, CEC eligibility, FSTP eligibility, do I qualify for Express Entry"
+        canonical="/get-started"
       />
 
       {/* ── Page Hero ── */}

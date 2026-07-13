@@ -167,6 +167,8 @@ export function DocumentsPage() {
       <SEO
         title="12 Mistakes That Get PR Applications Refused | Mentor Visa"
         description="Don't let a preventable mistake cost you your Canada PR. Learn the 12 most common errors and how to avoid them."
+        keywords="Express Entry mistakes, PR application refused, IRCC refusal reasons, Express Entry rejection, common PR application errors"
+        canonical="/documents"
       />
 
       {/* Journey context bar */}

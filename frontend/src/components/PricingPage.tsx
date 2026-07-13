@@ -67,7 +67,9 @@ export function PricingPage() {
     <div>
       <SEO
         title="Pricing — Mentor Visa Canada PR Platform"
-        description="Choose the plan that fits your PR journey. Free tools, Optimize bundle, or Execute package with AI auditors."
+        description="Choose the plan that fits your PR journey. Free tools, Optimize bundle ($49), or Execute package ($99) with AI auditors. One-time payments, no subscription."
+        keywords="Mentor Visa pricing, Express Entry tools cost, immigration tools Canada, CRS calculator free, employment letter audit price"
+        canonical="/pricing"
       />
 
       <section className="page-hero" style={{ paddingBottom: '40px' }}>

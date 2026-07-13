@@ -409,16 +409,20 @@ export const LandingPage: FC<LandingPageProps> = ({ onNavigate }) => {
             <img src="/logo.png" alt="Mentor Visa" style={{ height: '28px', width: '28px', objectFit: 'contain' }} />
             <span>Mentor Visa</span>
           </div>
-          <div className="landing-footer-links">
-            <button onClick={() => onNavigate('get-started')}>Check Eligibility</button>
-            <button onClick={() => onNavigate('crs-calculator')}>CRS Calculator</button>
-            <button onClick={() => onNavigate('find-my-noc')}>Find My NOC</button>
-            <button onClick={() => onNavigate('audit-employment-letter')}>Letter Auditor</button>
-            <button onClick={() => onNavigate('track-my-application')}>Application Tracker</button>
-            <button onClick={() => onNavigate('documents')}>Documents</button>
-            <button onClick={() => onNavigate('pricing')}>Pricing</button>
-            <button onClick={() => onNavigate('draw-results')}>Draw Results</button>
-            <button onClick={() => onNavigate('noc-codes')}>NOC Directory</button>
+          {/* Real anchors (not buttons) so crawlers can follow homepage footer links */}
+          <div className="landing-footer-links" style={{ flexWrap: 'wrap', justifyContent: 'center' }}>
+            <a href="/get-started">Check Eligibility</a>
+            <a href="/crs-calculator">CRS Calculator</a>
+            <a href="/find-my-noc">Find My NOC</a>
+            <a href="/audit-employment-letter">Letter Auditor</a>
+            <a href="/track-my-application">Application Tracker</a>
+            <a href="/order-gcms-notes">Order GCMS Notes</a>
+            <a href="/how-to-read-gcms-notes">GCMS Notes Guide</a>
+            <a href="/draw-results">Draw Results</a>
+            <a href="/express-entry-processing-times">Processing Times</a>
+            <a href="/noc-codes">NOC Directory</a>
+            <a href="/glossary">Glossary</a>
+            <a href="/pricing">Pricing</a>
           </div>
           <p className="landing-footer-disclaimer">
             © 2026 Mentor Visa Services. All rights reserved.<br />

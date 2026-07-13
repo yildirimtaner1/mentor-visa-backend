@@ -31,9 +31,33 @@ const PAGE_META: Record<string, { title: string; description: string }> = {
     title: 'Free CRS Score Calculator 2026 | Mentor Visa',
     description: 'Calculate your Comprehensive Ranking System score for Express Entry. Get your exact CRS points breakdown in 2 minutes.',
   },
-  '/build-employment-letter': {
-    title: 'AI Employment Letter Builder | Mentor Visa',
-    description: 'Generate an IRCC-aligned employment reference letter from your job details. AI-powered to match NOC duty requirements.',
+  '/track-my-application': {
+    title: 'Express Entry Application Tracker & Timeline Predictions | Mentor Visa',
+    description: 'Track every Express Entry PR milestone and get processing-time predictions tailored to your stream, country and category from 700+ real recent applications.',
+  },
+  '/express-entry-processing-times': {
+    title: 'Express Entry Processing Times 2026 — AOR to eCOPR | Mentor Visa',
+    description: 'How long does each Express Entry milestone actually take? Median timelines from 700+ real recent PR applications, by stream and milestone.',
+  },
+  '/get-started': {
+    title: 'Am I Eligible for Canada PR? Free Express Entry Check | Mentor Visa',
+    description: 'Free eligibility assessment for Express Entry (FSWP, CEC, FSTP). Find out if you qualify for Canada Permanent Residence in under 3 minutes.',
+  },
+  '/ai-profile-assistant': {
+    title: 'Express Entry AI Assistant — Instant IRCC Application Help | Mentor Visa',
+    description: 'Ask anything about your Express Entry profile or e-APR and get instant, accurate answers. AI help for IRCC portal questions.',
+  },
+  '/gckey-setup-guide': {
+    title: 'GCKey Setup Guide — Create Your IRCC Account | Mentor Visa',
+    description: 'Step-by-step guide to creating your GCKey and IRCC secure account for Express Entry. Screenshots, common errors, and fixes.',
+  },
+  '/documents': {
+    title: '12 Mistakes That Get PR Applications Refused | Mentor Visa',
+    description: "Don't let a preventable mistake cost you your Canada PR. Learn the 12 most common errors and how to avoid them.",
+  },
+  '/pricing': {
+    title: 'Pricing — Mentor Visa Canada PR Platform',
+    description: 'Choose the plan that fits your PR journey. Free tools, Optimize bundle ($49), or Execute package ($99). One-time payments, no subscription.',
   },
   '/glossary': {
     title: 'Canadian Immigration Glossary — 70+ Terms | Mentor Visa',

@@ -194,7 +194,7 @@ export const ProfilePage: FC = () => {
   if (!isSignedIn) {
     return (
       <div>
-        <SEO title="My Profile — Mentor Visa" description="View and edit your immigration profile." />
+        <SEO title="My Profile — Mentor Visa" description="View and edit your immigration profile." noindex />
         <section className="page-hero">
           <div className="profile-auth-gate">
             <div className="profile-auth-gate-icon">👤</div>
@@ -233,7 +233,7 @@ export const ProfilePage: FC = () => {
 
   return (
     <div>
-      <SEO title="My Profile — Mentor Visa" description="Your PR Dashboard — track your immigration journey." />
+      <SEO title="My Profile — Mentor Visa" description="Your PR Dashboard — track your immigration journey." noindex />
 
       {/* ── Tier 1: Command Center Hero ── */}
       <section className="profile-hero">

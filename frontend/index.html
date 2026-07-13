@@ -5,26 +5,11 @@
     <link rel="icon" type="image/png" href="/favicon.png" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     
-    <!-- SEO -->
+    <!-- Title/description/OG/Twitter are provided per-page via react-helmet-async (SEO component).
+         Static copies were removed: Helmet cannot replace them, so every page shipped DUPLICATE
+         meta tags and parsers picked the wrong (homepage) og:url. Social crawlers get their meta
+         from the Vercel edge middleware; Googlebot renders the JS. -->
     <title>Mentor Visa — AI-Powered Tools for Canadian Express Entry</title>
-    <meta name="description" content="Free CRS Calculator, NOC Finder, Employment Letter Auditor, and 70+ term Immigration Glossary. AI-powered tools to help you navigate Canadian Express Entry with confidence." />
-    <meta name="keywords" content="Canadian immigration, Express Entry, CEC, NOC code finder, employment letter check, IRCC requirements, CRS calculator, CRS score, immigration glossary, letter builder" />
-    
-    <!-- Open Graph / Facebook / LinkedIn / WhatsApp -->
-    <meta property="og:type" content="website" />
-    <meta property="og:title" content="Mentor Visa — AI-Powered Tools for Canadian Express Entry" />
-    <meta property="og:description" content="Free CRS Calculator, NOC Finder, Employment Letter Auditor, and 70+ term Immigration Glossary. Navigate Canadian Express Entry with confidence." />
-    <meta property="og:url" content="https://mentorvisa.com" />
-    <meta property="og:image" content="https://mentorvisa.com/og-image.png" />
-    <meta property="og:image:width" content="1200" />
-    <meta property="og:image:height" content="630" />
-    <meta property="og:site_name" content="Mentor Visa" />
-
-    <!-- Twitter Card -->
-    <meta name="twitter:card" content="summary_large_image" />
-    <meta name="twitter:title" content="Mentor Visa — AI-Powered Tools for Canadian Express Entry" />
-    <meta name="twitter:description" content="Free CRS Calculator, NOC Finder, Employment Letter Auditor, and Immigration Glossary for Canadian Express Entry." />
-    <meta name="twitter:image" content="https://mentorvisa.com/og-image.png" />
 
     <!-- Organization + WebSite structured data -->
     <script type="application/ld+json">

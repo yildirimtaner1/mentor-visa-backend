@@ -7,9 +7,10 @@ interface SEOProps {
   canonical?: string;
   schema?: string;
   ogImage?: string;
+  noindex?: boolean; // private/app pages: keep out of search results
 }
 
-export const SEO = ({ title, description, keywords, canonical, schema, ogImage }: SEOProps) => {
+export const SEO = ({ title, description, keywords, canonical, schema, ogImage, noindex }: SEOProps) => {
   const defaultOgImage = 'https://mentorvisa.com/og-image.png';
   const imageUrl = ogImage || defaultOgImage;
   const fullUrl = canonical ? `https://mentorvisa.com${canonical}` : 'https://mentorvisa.com';
@@ -20,7 +21,8 @@ export const SEO = ({ title, description, keywords, canonical, schema, ogImage }
       <meta name="description" content={description} />
       {keywords && <meta name="keywords" content={keywords} />}
       {canonical && <link rel="canonical" href={fullUrl} />}
-      
+      {noindex && <meta name="robots" content="noindex, nofollow" />}
+
       {/* Open Graph / Facebook / LinkedIn / WhatsApp */}
       <meta property="og:type" content="website" />
       <meta property="og:title" content={title} />
