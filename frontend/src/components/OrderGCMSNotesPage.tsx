@@ -400,11 +400,27 @@ export const OrderGCMSNotesPage: FC = () => {
               <li>Photograph</li>
               <li>Signature (<strong>your signature MUST be clearly visible</strong>)</li>
             </ul>
-            <img src="/sample-id-specimen.jpg" alt="Sample identity document — passport biodata page (specimen)"
-              onError={e => { (e.target as HTMLImageElement).style.display = 'none'; }}
-              style={{ width: '100%', borderRadius: '10px', border: '1px solid var(--border-color)', marginBottom: '6px' }} />
-            <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', textAlign: 'center', marginBottom: '14px' }}>
-              Sample identity document — passport biodata page (specimen)
+            <p style={{ fontSize: '0.8rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.4px', marginBottom: '8px' }}>
+              Sample identity documents — passport biodata pages (specimens)
+            </p>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: '10px', marginBottom: '14px' }}>
+              {[
+                { src: '/specimens/canada.jpg', label: 'Canada' },
+                { src: '/specimens/india.jpg', label: 'India' },
+                { src: '/specimens/china.jpg', label: 'China' },
+                { src: '/specimens/philippines.jpg', label: 'Philippines' },
+                { src: '/specimens/pakistan.jpg', label: 'Pakistan' },
+              ].map(s => (
+                <figure key={s.label} style={{ margin: 0 }}>
+                  <img src={s.src} alt={`${s.label} passport biodata page (specimen)`} loading="lazy"
+                    onError={e => { ((e.target as HTMLImageElement).closest('figure') as HTMLElement).style.display = 'none'; }}
+                    style={{ width: '100%', borderRadius: '8px', border: '1px solid var(--border-color)' }} />
+                  <figcaption style={{ fontSize: '0.72rem', color: 'var(--text-muted)', textAlign: 'center', marginTop: '3px' }}>{s.label}</figcaption>
+                </figure>
+              ))}
+            </div>
+            <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginBottom: '14px' }}>
+              Any country's valid passport or government-issued ID is accepted — these are illustrative specimens only.
             </p>
             <p style={{ fontSize: '0.9rem', lineHeight: 1.65, marginBottom: '6px' }}>
               <strong>Examples:</strong> passport biodata page, driver's licence, health card, certificate of identity.
