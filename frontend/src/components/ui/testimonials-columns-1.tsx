@@ -93,11 +93,29 @@ const testimonials = [
     name: "Raj Patel",
     role: "Software Engineer — FSWP Approved",
   },
+  {
+    text: "My application sat in 'processing' for 5 months with zero updates from IRCC. Ordered my GCMS notes through Mentor Visa — they showed security screening had already passed and the file was just queued for final review. That one PDF stopped me from panic-reapplying.",
+    image: "https://images.unsplash.com/photo-1544005313-94ddf0286df2?q=80&w=200&auto=format&fit=crop",
+    name: "Ananya Iyer",
+    role: "CEC Applicant — PPR received",
+  },
+  {
+    text: "The Smart Tracker predicted my PPR within days of when it actually came, based on my stream and country cohort. Watching my milestones against the medians from real cases kept me sane through the whole wait.",
+    image: "https://images.unsplash.com/photo-1500648767791-00dcc994a43e?q=80&w=200&auto=format&fit=crop",
+    name: "Carlos Mendoza",
+    role: "FSW-Outland — eCOPR in hand",
+  },
+  {
+    text: "Two consultants told me I didn't qualify. The free eligibility check caught that my part-time work hours actually counted toward CEC. Ran the CRS calculator, entered the pool, invited in the next draw.",
+    image: "https://images.unsplash.com/photo-1531123897727-8f129e1688ce?q=80&w=200&auto=format&fit=crop",
+    name: "Grace Adeyemi",
+    role: "CEC — ITA on first draw",
+  },
 ];
 
-const firstColumn = testimonials.slice(0, 2);
-const secondColumn = testimonials.slice(2, 4);
-const thirdColumn = testimonials.slice(4, 6);
+const firstColumn = testimonials.slice(0, 3);
+const secondColumn = testimonials.slice(3, 6);
+const thirdColumn = testimonials.slice(6, 9);
 
 export const Testimonials = () => {
   return (

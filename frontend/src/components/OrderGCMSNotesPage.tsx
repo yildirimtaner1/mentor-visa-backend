@@ -1,7 +1,7 @@
 import { useState, useEffect, type FC, type ChangeEvent } from 'react';
 import { useAuth, SignInButton } from '@clerk/clerk-react';
 import { SEO } from './common/SEO';
-import { createGCMSOrder, getGCMSOrders, uploadGCMSConsent, createCheckoutSession, setGCMSPersons, downloadGCMSConsentForm, type GCMSOrderData, type GCMSRelatedPerson } from '../services/api';
+import { createGCMSOrder, getGCMSOrders, uploadGCMSConsent, createCheckoutSession, setGCMSPersons, downloadGCMSConsentForm, updateGCMSOrder, type GCMSOrderData, type GCMSRelatedPerson } from '../services/api';
 import ReactGA from 'react-ga4';
 
 const PRICE = 19.90;
@@ -191,6 +191,12 @@ export const OrderGCMSNotesPage: FC = () => {
   const [docIds, setDocIds] = useState<(File | null)[]>([]);
   // Completed orders (received/filed/delivered) — shown as trackable history, never block a new order
   const [pastOrders, setPastOrders] = useState<GCMSOrder[]>([]);
+  // Editing a paid order's details from step 3 (allowed until documents are submitted)
+  const [editingOrder, setEditingOrder] = useState(false);
+  // Identity-verification requirement modal + upload attestations (IRCC rejects requests without them)
+  const [showIdModal, setShowIdModal] = useState(false);
+  const [consentChecks, setConsentChecks] = useState([false, false, false]);
+  const [idCheck, setIdCheck] = useState(false);
 
   const set = (k: keyof GCMSOrderData) => (e: ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
     const next = { ...form, [k]: e.target.value };
@@ -236,6 +242,16 @@ export const OrderGCMSNotesPage: FC = () => {
     try {
       const token = await getToken();
       if (!token) return;
+      if (editingOrder && order) {
+        // Correcting details on an already-paid order — save and return to the documents step.
+        const updated = await updateGCMSOrder(order.id, form, token);
+        setOrder(updated);
+        setEditingOrder(false);
+        setFormReady(false); // the pre-filled IMM 5744 must be regenerated with the corrected details
+        setStep(3);
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+        return;
+      }
       const created = await createGCMSOrder(form, token);
       setOrder(created);
       // A prepaid GCMS credit skips the payment step entirely (order arrives already paid).
@@ -298,6 +314,22 @@ export const OrderGCMSNotesPage: FC = () => {
     } finally { setBusy(false); }
   };
 
+  // Step 3 -> step 1 with the paid order's details prefilled for correction.
+  const startEditDetails = () => {
+    if (!order) return;
+    setForm({
+      family_name: order.family_name || '', given_name: order.given_name || '',
+      email: order.email, date_of_birth: order.date_of_birth,
+      country_of_residence: order.country_of_residence || '', uci: order.uci || '',
+      application_number: order.application_number || '', application_type: order.application_type || APPLICATION_TYPES[0],
+      notes_type: order.notes_type, extra_notes: order.extra_notes || '',
+    });
+    setEditingOrder(true);
+    setError('');
+    setStep(1);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
   // After completing an order, let the user immediately start another one.
   const startNewOrder = () => {
     if (order) setPastOrders(prev => [order, ...prev.filter(p => p.id !== order.id)]);
@@ -309,6 +341,9 @@ export const OrderGCMSNotesPage: FC = () => {
     setDocIds([]);
     setUploadedFile(null);
     setError('');
+    setEditingOrder(false);
+    setConsentChecks([false, false, false]);
+    setIdCheck(false);
     sessionStorage.removeItem('gcmsOrderForm');
     setStep(1);
     window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -340,6 +375,54 @@ export const OrderGCMSNotesPage: FC = () => {
         canonical="/order-gcms-notes"
         schema={FAQ_SCHEMA}
       />
+
+      {/* Identity Verification Requirement modal (Learn more) */}
+      {showIdModal && (
+        <div onClick={() => setShowIdModal(false)}
+          style={{ position: 'fixed', inset: 0, background: 'rgba(15,23,42,0.6)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '16px' }}>
+          <div onClick={e => e.stopPropagation()}
+            style={{ background: 'white', borderRadius: '16px', maxWidth: '560px', width: '100%', maxHeight: '85vh', overflowY: 'auto', padding: '26px 24px', position: 'relative' }}>
+            <button type="button" onClick={() => setShowIdModal(false)} aria-label="Close"
+              style={{ position: 'absolute', top: '12px', right: '14px', background: '#F1F5F9', border: 'none', borderRadius: '50%', width: '32px', height: '32px', cursor: 'pointer', fontSize: '1rem', fontWeight: 700, color: '#475569' }}>
+              ✕
+            </button>
+            <h3 style={{ fontSize: '1.15rem', fontWeight: 800, marginBottom: '10px', paddingRight: '30px' }}>🪪 Identity Verification Requirement</h3>
+            <p style={{ fontSize: '0.9rem', lineHeight: 1.65, marginBottom: '12px' }}>
+              You are required to submit identity documents to validate the identities and signatures of the
+              requester and everyone referenced in your GCMS/ATIP application.
+            </p>
+            <p style={{ fontSize: '0.9rem', lineHeight: 1.65, marginBottom: '6px' }}>
+              Please include a copy of a valid government-issued document (Canadian or foreign) showing:
+            </p>
+            <ul style={{ paddingLeft: '20px', fontSize: '0.9rem', lineHeight: 1.8, marginBottom: '14px' }}>
+              <li>Full name</li>
+              <li>Date of birth</li>
+              <li>Photograph</li>
+              <li>Signature (<strong>your signature MUST be clearly visible</strong>)</li>
+            </ul>
+            <img src="/sample-id-specimen.jpg" alt="Sample identity document — passport biodata page (specimen)"
+              onError={e => { (e.target as HTMLImageElement).style.display = 'none'; }}
+              style={{ width: '100%', borderRadius: '10px', border: '1px solid var(--border-color)', marginBottom: '6px' }} />
+            <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', textAlign: 'center', marginBottom: '14px' }}>
+              Sample identity document — passport biodata page (specimen)
+            </p>
+            <p style={{ fontSize: '0.9rem', lineHeight: 1.65, marginBottom: '6px' }}>
+              <strong>Examples:</strong> passport biodata page, driver's licence, health card, certificate of identity.
+              Documents must be provided for:
+            </p>
+            <ul style={{ paddingLeft: '20px', fontSize: '0.9rem', lineHeight: 1.8, marginBottom: '14px' }}>
+              <li>The requester</li>
+              <li>Each individual whose information is being requested</li>
+            </ul>
+            <p style={{ fontSize: '0.87rem', lineHeight: 1.6, background: '#FEF2F2', border: '1px solid #FECACA', borderRadius: '8px', padding: '10px 14px', color: '#991B1B', marginBottom: '16px' }}>
+              Failure to include the identity documents may result in your request being deemed incomplete and/or delayed.
+            </p>
+            <button className="btn btn-primary" style={{ width: '100%' }} onClick={() => setShowIdModal(false)}>
+              Got it
+            </button>
+          </div>
+        </div>
+      )}
 
       <section className="page-hero">
         <div className="page-hero-content">
@@ -408,9 +491,13 @@ export const OrderGCMSNotesPage: FC = () => {
             {/* ── STEP 1 — Information ── */}
             {step === 1 && (
               <div className="info-card" style={{ padding: '32px 28px' }}>
-                <h3 style={{ fontSize: '1.2rem', fontWeight: 700, marginBottom: '4px' }}>Step 1 — Tell us about your application</h3>
+                <h3 style={{ fontSize: '1.2rem', fontWeight: 700, marginBottom: '4px' }}>
+                  {editingOrder ? `Edit details — order #${order?.id}` : 'Step 1 — Tell us about your application'}
+                </h3>
                 <p style={{ fontSize: '0.9rem', color: 'var(--text-muted)', marginBottom: '22px' }}>
-                  We use this to prepare your ATIP request exactly as IRCC expects it. Details must match your application.
+                  {editingOrder
+                    ? 'Correct anything below — your payment is unaffected. We\'ll regenerate the consent form with the updated details.'
+                    : 'We use this to prepare your ATIP request exactly as IRCC expects it. Details must match your application.'}
                 </p>
 
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: '16px', marginBottom: '16px' }}>
@@ -479,9 +566,17 @@ export const OrderGCMSNotesPage: FC = () => {
                 </div>
 
                 {isSignedIn ? (
-                  <button className="btn btn-primary btn-lg" style={{ width: '100%' }} disabled={busy || !formValid} onClick={submitInfo}>
-                    {busy ? 'Saving…' : 'Continue to payment →'}
-                  </button>
+                  <>
+                    <button className="btn btn-primary btn-lg" style={{ width: '100%' }} disabled={busy || !formValid} onClick={submitInfo}>
+                      {busy ? 'Saving…' : editingOrder ? '💾 Save changes — back to documents →' : 'Continue to payment →'}
+                    </button>
+                    {editingOrder && (
+                      <button className="btn btn-outline" style={{ width: '100%', marginTop: '10px' }} disabled={busy}
+                        onClick={() => { setEditingOrder(false); setError(''); setStep(3); }}>
+                        Cancel — keep my original details
+                      </button>
+                    )}
+                  </>
                 ) : (
                   <SignInButton mode="modal" fallbackRedirectUrl="/order-gcms-notes">
                     <button className="btn btn-primary btn-lg" style={{ width: '100%' }}>
@@ -539,8 +634,20 @@ export const OrderGCMSNotesPage: FC = () => {
             {/* ── STEP 3 — Consent form: household -> pre-filled download -> sign -> upload ── */}
             {step === 3 && order && (
               <div className="info-card" style={{ padding: '32px 28px' }}>
-                <div style={{ padding: '12px 16px', background: '#ECFDF5', border: '1px solid #6EE7B7', borderRadius: '10px', marginBottom: '20px', fontSize: '0.9rem', color: '#065F46', fontWeight: 600 }}>
+                <div style={{ padding: '12px 16px', background: '#ECFDF5', border: '1px solid #6EE7B7', borderRadius: '10px', marginBottom: '14px', fontSize: '0.9rem', color: '#065F46', fontWeight: 600 }}>
                   ✅ Payment received — one last step and we can file your request.
+                </div>
+
+                {/* Applicant summary — catch wrong details BEFORE the form is signed */}
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '12px', flexWrap: 'wrap', padding: '10px 16px', background: '#F8FAFC', border: '1px solid var(--border-color)', borderRadius: '10px', marginBottom: '20px', fontSize: '0.85rem' }}>
+                  <span style={{ color: 'var(--text-muted)' }}>
+                    Applicant: <strong style={{ color: 'var(--text-main, #1e293b)' }}>{order.given_name} {(order.family_name || '').toUpperCase()}</strong>
+                    {' '}· {order.date_of_birth} · {order.email}
+                  </span>
+                  <button type="button" onClick={startEditDetails} disabled={busy}
+                    style={{ background: 'none', border: '1px solid var(--border-color)', borderRadius: '8px', padding: '5px 12px', cursor: 'pointer', fontSize: '0.8rem', fontWeight: 600, color: 'var(--primary-color)', flexShrink: 0 }}>
+                    ✏️ Edit details
+                  </button>
                 </div>
 
                 {!formReady ? (
@@ -630,20 +737,64 @@ export const OrderGCMSNotesPage: FC = () => {
                       <li><strong>Scan or photograph</strong> everything — colour, well-lit, 300dpi or a sharp phone photo</li>
                     </ol>
 
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginBottom: '16px' }}>
+                    {/* IRCC identity-document requirement */}
+                    <div style={{ background: '#FFFBEB', border: '1px solid #FDE68A', borderRadius: '10px', padding: '14px 16px', fontSize: '0.87rem', color: '#78350F', lineHeight: 1.65, marginBottom: '18px' }}>
+                      <strong>It is now mandatory to include identity documents</strong> — such as the biodata page
+                      of your passport — with your request to validate your identity and signature(s).{' '}
+                      <button type="button" onClick={() => setShowIdModal(true)}
+                        style={{ background: 'none', border: 'none', padding: 0, color: '#B45309', fontWeight: 700, cursor: 'pointer', textDecoration: 'underline', fontSize: 'inherit' }}>
+                        Learn more
+                      </button>
+                      <div style={{ marginTop: '8px' }}>Documents must be provided for:</div>
+                      <ul style={{ margin: '4px 0 0', paddingLeft: '20px' }}>
+                        <li>The requester</li>
+                        <li>Each individual whose information is being requested</li>
+                      </ul>
+                    </div>
+
+                    {/* Consent-form attestations — IRCC rejects forms that fail any of these */}
+                    <div style={{ fontSize: '0.8rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.4px', marginBottom: '8px' }}>1 · Signed consent form</div>
+                    <div style={{ background: '#F8FAFC', border: '1px solid var(--border-color)', borderRadius: '10px', padding: '12px 16px', marginBottom: '10px' }}>
+                      <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: '8px' }}>Please confirm before uploading:</div>
+                      {[
+                        'The document was printed and hand-signed. eSigns or images of signatures are not accepted.',
+                        'Each individual of the age 16 or over signed on the form.',
+                        "Applicant signatures are consistent with their signatures on their passports.",
+                      ].map((label, i) => (
+                        <label key={i} style={{ display: 'flex', gap: '10px', alignItems: 'flex-start', fontSize: '0.85rem', lineHeight: 1.5, padding: '5px 0', cursor: 'pointer' }}>
+                          <input type="checkbox" checked={consentChecks[i]} disabled={busy}
+                            onChange={e => setConsentChecks(prev => prev.map((c, j) => j === i ? e.target.checked : c))}
+                            style={{ marginTop: '3px', width: '16px', height: '16px', flexShrink: 0, accentColor: '#4f46e5' }} />
+                          <span>{label}</span>
+                        </label>
+                      ))}
+                    </div>
+                    <div style={{ marginBottom: '18px', opacity: consentChecks.every(Boolean) ? 1 : 0.55 }}>
                       <FileSlot
                         label="Signed IMM 5744 consent form"
-                        sub="The form you just printed and signed"
-                        file={docConsent} disabled={busy}
+                        sub={consentChecks.every(Boolean) ? 'The form you just printed and signed' : 'Confirm the three points above to enable upload'}
+                        file={docConsent} disabled={busy || !consentChecks.every(Boolean)}
                         onPick={f => setDocConsent(f)}
                       />
+                    </div>
+
+                    {/* Government ID attestations + slots */}
+                    <div style={{ fontSize: '0.8rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.4px', marginBottom: '8px' }}>2 · Government-issued ID — one per person</div>
+                    <div style={{ background: '#F8FAFC', border: '1px solid var(--border-color)', borderRadius: '10px', padding: '12px 16px', marginBottom: '10px' }}>
+                      <label style={{ display: 'flex', gap: '10px', alignItems: 'flex-start', fontSize: '0.85rem', lineHeight: 1.5, cursor: 'pointer' }}>
+                        <input type="checkbox" checked={idCheck} disabled={busy} onChange={e => setIdCheck(e.target.checked)}
+                          style={{ marginTop: '3px', width: '16px', height: '16px', flexShrink: 0, accentColor: '#4f46e5' }} />
+                        <span>Uploaded identity document(s) clearly shows the applicant's signature.</span>
+                      </label>
+                    </div>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginBottom: '16px', opacity: idCheck ? 1 : 0.55 }}>
                       {[`${order.given_name || ''} ${order.family_name || order.full_name}`.trim(),
                         ...(order.related_persons || []).map(p => `${p.given_name} ${p.family_name}`.trim())
                       ].map((name, i) => (
                         <FileSlot key={i}
                           label={`Government-issued ID — ${name}`}
-                          sub="Passport bio page or ID card showing their name and signature"
-                          file={docIds[i] ?? null} disabled={busy}
+                          sub={idCheck ? 'Passport bio page or ID card showing name, photo, and signature' : 'Confirm the point above to enable upload'}
+                          file={docIds[i] ?? null} disabled={busy || !idCheck}
                           onPick={f => setDocIds(prev => prev.map((x, j) => j === i ? f : x))}
                         />
                       ))}
@@ -658,7 +809,8 @@ export const OrderGCMSNotesPage: FC = () => {
                     </div>
 
                     <button className="btn btn-primary btn-lg" style={{ width: '100%' }}
-                      disabled={busy || !docConsent || docIds.some(f => !f)} onClick={submitDocuments}>
+                      disabled={busy || !docConsent || docIds.some(f => !f) || !consentChecks.every(Boolean) || !idCheck}
+                      onClick={submitDocuments}>
                       {busy ? 'Uploading…' : `Submit ${1 + docIds.length} document${docIds.length ? 's' : ''} — finish my order →`}
                     </button>
                     <p style={{ fontSize: '0.78rem', color: 'var(--text-muted)', textAlign: 'center', marginTop: '12px', marginBottom: 0 }}>

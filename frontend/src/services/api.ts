@@ -189,6 +189,19 @@ export async function createGCMSOrder(data: GCMSOrderData, token: string) {
   return response.json();
 }
 
+export async function updateGCMSOrder(orderId: number, data: GCMSOrderData, token: string) {
+  const response = await fetch(`${API_BASE_URL}/api/v1/gcms/orders/${orderId}`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+    body: JSON.stringify(data),
+  });
+  if (!response.ok) {
+    const err = await response.json().catch(() => ({}));
+    throw new Error(err.detail || 'Failed to update your details.');
+  }
+  return response.json();
+}
+
 export async function getGCMSOrders(token: string) {
   const response = await fetch(`${API_BASE_URL}/api/v1/gcms/orders`, {
     headers: { 'Authorization': `Bearer ${token}` },

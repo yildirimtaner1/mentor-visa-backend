@@ -2,7 +2,7 @@ import type { FC } from 'react';
 import { Navbar } from './common/Navbar';
 import { SEO } from './common/SEO';
 import { Testimonials } from './ui/testimonials-columns-1';
-import { CheckCircle2, Search, LineChart, FileText, DollarSign, ShieldCheck, ArrowRight, TrendingDown, Bot, FileCheck, CalendarClock, FolderCheck, BarChart3, Calculator } from 'lucide-react';
+import { CheckCircle2, Search, LineChart, FileText, DollarSign, ShieldCheck, ArrowRight, TrendingDown, Bot, FileCheck, CalendarClock, FolderCheck, BarChart3, Calculator, FolderSearch } from 'lucide-react';
 import { ALL_DRAWS } from '../data/drawResults';
 import './LandingPage.css';
 import './PricingPage.css';
@@ -218,7 +218,7 @@ export const LandingPage: FC<LandingPageProps> = ({ onNavigate }) => {
       {/* ═══════════════════════════════════════════ */}
       <section className="section" id="toolkit">
         <h2 className="section-title">One Platform, Every Step of Express Entry</h2>
-        <p className="section-subtitle">Eight purpose-built tools that take you from "Am I eligible?" all the way to eCoPR.</p>
+        <p className="section-subtitle">Nine purpose-built tools that take you from "Am I eligible?" all the way to eCoPR.</p>
 
         <div className="toolkit-grid">
           {[
@@ -229,6 +229,7 @@ export const LandingPage: FC<LandingPageProps> = ({ onNavigate }) => {
             { icon: <Bot size={22} />, name: 'AI Profile Assistant', desc: 'Personalized answers and a tailored action plan to raise your CRS.', tier: 'Optimize', page: 'ai-profile-assistant' },
             { icon: <CalendarClock size={22} />, name: 'Smart Application Tracker', desc: 'Track every post-ITA milestone and get timeline predictions from 2,000+ real cases.', tier: 'Optimize', page: 'track-my-application' },
             { icon: <FolderCheck size={22} />, name: 'Document Checklist & Expiry Tracker', desc: 'A personalized checklist with expiry alerts for you and your dependents.', tier: 'Optimize', page: 'documents' },
+            { icon: <FolderSearch size={22} />, name: 'GCMS Notes Order', desc: 'Application delayed or refused? We file your ATIP request and email your complete IRCC file — officer notes included.', tier: '$19.90', page: 'order-gcms-notes' },
             { icon: <BarChart3 size={22} />, name: 'Draws & Processing Times', desc: 'Every recent Express Entry draw plus real-world processing-time data.', tier: 'Free', page: 'draw-results' },
           ].map((t) => (
             <div key={t.name} className="tool-card" onClick={() => onNavigate(t.page)}>

@@ -1769,6 +1769,35 @@ def create_gcms_order(
     return _gcms_order_dict(order)
 
 
+@app.put("/api/v1/gcms/orders/{order_id}")
+def update_gcms_order(
+    order_id: int,
+    req: GCMSOrderRequest,
+    user_id: str = Depends(get_current_user),
+    db: Session = Depends(database.get_db),
+):
+    """Edit applicant details on an existing order — including after payment, as long as
+    the signed documents haven't been submitted yet (they embed the old details)."""
+    order = db.query(db_models.GCMSOrder).filter_by(id=order_id, user_id=user_id).first()
+    if not order:
+        raise HTTPException(status_code=404, detail="Order not found.")
+    if order.status not in ('awaiting_payment', 'awaiting_consent'):
+        raise HTTPException(status_code=409,
+                            detail="Documents were already submitted for this order. "
+                                   "Email info@mentorvisa.com and we'll correct the details before filing.")
+    if req.family_name.strip() or req.given_name.strip():
+        req.full_name = f"{req.given_name.strip()} {req.family_name.strip()}".strip()
+    if not req.full_name.strip() or not req.email.strip() or "@" not in req.email:
+        raise HTTPException(status_code=422, detail="Please provide your name and a valid email.")
+    if not req.date_of_birth.strip():
+        raise HTTPException(status_code=422, detail="Please provide your date of birth.")
+    for k, v in req.model_dump().items():
+        setattr(order, k, v.strip() if isinstance(v, str) else v)
+    db.commit()
+    db.refresh(order)
+    return _gcms_order_dict(order)
+
+
 @app.get("/api/v1/gcms/orders")
 def list_gcms_orders(
     user_id: str = Depends(get_current_user),
