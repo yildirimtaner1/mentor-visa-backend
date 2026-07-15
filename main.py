@@ -1805,6 +1805,8 @@ def create_gcms_order(
         raise HTTPException(status_code=422, detail="Please provide your name and a valid email.")
     if not req.date_of_birth.strip():
         raise HTTPException(status_code=422, detail="Please provide your date of birth.")
+    if not (req.application_number or "").strip():
+        raise HTTPException(status_code=422, detail="Please provide your application number.")
     if req.notes_type not in ("ircc", "cbsa"):
         raise HTTPException(status_code=422, detail="notes_type must be 'ircc' or 'cbsa'.")
 
@@ -1854,6 +1856,8 @@ def update_gcms_order(
         raise HTTPException(status_code=422, detail="Please provide your name and a valid email.")
     if not req.date_of_birth.strip():
         raise HTTPException(status_code=422, detail="Please provide your date of birth.")
+    if not (req.application_number or "").strip():
+        raise HTTPException(status_code=422, detail="Please provide your application number.")
     for k, v in req.model_dump().items():
         setattr(order, k, v.strip() if isinstance(v, str) else v)
     db.commit()
