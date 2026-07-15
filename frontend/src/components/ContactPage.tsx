@@ -30,14 +30,6 @@ const SCHEMA = JSON.stringify({
     name: 'Mentor Visa',
     url: 'https://mentorvisa.com',
     email: 'contact@mentorvisa.com',
-    address: {
-      '@type': 'PostalAddress',
-      streetAddress: '1112 Avenue Rd',
-      addressLocality: 'Toronto',
-      addressRegion: 'ON',
-      postalCode: 'M5N 2E3',
-      addressCountry: 'CA',
-    },
     contactPoint: { '@type': 'ContactPoint', email: 'contact@mentorvisa.com', contactType: 'customer support' },
   },
 });
@@ -163,11 +155,8 @@ export const ContactPage: FC = () => {
             <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
               <div className="info-card" style={{ padding: '24px 26px' }}>
                 <h3 style={{ fontSize: '1.05rem', fontWeight: 700, marginBottom: '14px' }}>Reach us directly</h3>
-                <p style={{ fontSize: '0.92rem', lineHeight: 1.7, margin: '0 0 10px' }}>
+                <p style={{ fontSize: '0.92rem', lineHeight: 1.7, margin: 0 }}>
                   📧 <a href="mailto:contact@mentorvisa.com" style={{ color: 'var(--primary-color)', fontWeight: 600 }}>contact@mentorvisa.com</a>
-                </p>
-                <p style={{ fontSize: '0.92rem', lineHeight: 1.7, margin: 0, color: 'var(--text-muted)' }}>
-                  📍 1112 Avenue Rd<br />Toronto, ON M5N 2E3<br />Canada
                 </p>
               </div>
               <div className="info-card" style={{ padding: '24px 26px' }}>

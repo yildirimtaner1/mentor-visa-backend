@@ -205,7 +205,8 @@ export const OrderGCMSNotesPage: FC = () => {
   };
 
   const formValid = form.family_name.trim().length > 0 && form.given_name.trim().length > 0
-    && /\S+@\S+\.\S+/.test(form.email) && !!form.date_of_birth;
+    && /\S+@\S+\.\S+/.test(form.email) && !!form.date_of_birth
+    && (form.application_number || '').trim().length > 0;
   const personsValid = persons.every(p => p.family_name.trim() && p.given_name.trim() && p.date_of_birth);
 
   // On sign-in / return from Stripe: resume the latest in-progress order at the right step.
@@ -237,7 +238,7 @@ export const OrderGCMSNotesPage: FC = () => {
   }, [isSignedIn, getToken]);
 
   const submitInfo = async () => {
-    if (!formValid) { setError('Please fill in your full name, a valid email, and your date of birth.'); return; }
+    if (!formValid) { setError('Please fill in your name, a valid email, date of birth, and application number.'); return; }
     setError(''); setBusy(true);
     try {
       const token = await getToken();
@@ -542,7 +543,7 @@ export const OrderGCMSNotesPage: FC = () => {
                     <input style={inputStyle} value={form.uci} onChange={set('uci')} placeholder="e.g. 11-2233-4455" />
                   </div>
                   <div>
-                    <label style={labelStyle}>Application number (if known)</label>
+                    <label style={labelStyle}>Application number *</label>
                     <input style={inputStyle} value={form.application_number} onChange={set('application_number')} placeholder="e.g. E001234567" />
                   </div>
                 </div>
@@ -621,7 +622,8 @@ export const OrderGCMSNotesPage: FC = () => {
                     ['Date of birth', order.date_of_birth],
                     ['Notes requested', order.notes_type === 'cbsa' ? 'CBSA (security screening & border records)' : 'IRCC — GCMS notes'],
                     ['Application type', order.application_type || '—'],
-                    ['UCI / Application #', [order.uci, order.application_number].filter(Boolean).join(' / ') || 'Not provided (that’s OK)'],
+                    ['Application number', order.application_number || '—'],
+                    ['UCI', order.uci || 'Not provided (that’s OK)'],
                   ].map(([k, v]) => (
                     <div key={k} style={{ display: 'flex', justifyContent: 'space-between', gap: '16px', padding: '6px 0', fontSize: '0.9rem', borderBottom: '1px dashed #E2E8F0' }}>
                       <span style={{ color: 'var(--text-muted)', flexShrink: 0 }}>{k}</span>
