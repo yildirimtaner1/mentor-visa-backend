@@ -70,6 +70,22 @@ def _populate_detected_noc_code(mapper, connection, target):
         target.detected_noc_code = code
 
 
+class ContactMessage(Base):
+    """A message sent through the /contact page. Public endpoint — no account required."""
+    __tablename__ = "contact_messages"
+
+    id = Column(Integer, primary_key=True, index=True)
+    first_name = Column(String, nullable=False)
+    last_name = Column(String, nullable=False)
+    email = Column(String, nullable=False)
+    subject = Column(String, nullable=False)
+    message = Column(String, nullable=False)
+    user_id = Column(String, nullable=True)  # set when the sender is signed in
+    status = Column(String, default="new", nullable=False)  # 'new' -> 'replied' / 'closed'
+    timestamp_utc = Column(DateTime, default=datetime.datetime.utcnow)
+    timestamp_toronto = Column(DateTime, default=get_toronto_now)
+
+
 class GCMSOrder(Base):
     """A GCMS/ATIP notes order: applicant info (step 1) -> Stripe payment (step 2)
     -> signed consent form upload (step 3). Fulfilled manually via an ATIP request."""
