@@ -113,6 +113,11 @@ const ROUTE_META = {
     description: 'Choose the plan that fits your PR journey. Free tools, Optimize bundle ($49), or Execute package ($99) with AI auditors. One-time payments, no subscription.',
     h1: 'Pricing',
   },
+  '/contact': {
+    title: 'Contact Us — Mentor Visa',
+    description: 'Questions about your Express Entry tools, a GCMS notes order, or billing? Send us a message — we reply within 1 business day. contact@mentorvisa.com',
+    h1: 'Contact Us',
+  },
 };
 
 const TEER_LABELS = {

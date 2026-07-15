@@ -424,6 +424,7 @@ export const LandingPage: FC<LandingPageProps> = ({ onNavigate }) => {
             <a href="/noc-codes">NOC Directory</a>
             <a href="/glossary">Glossary</a>
             <a href="/pricing">Pricing</a>
+            <a href="/contact">Contact Us</a>
           </div>
           <p className="landing-footer-disclaimer">
             © 2026 Mentor Visa Services. All rights reserved.<br />

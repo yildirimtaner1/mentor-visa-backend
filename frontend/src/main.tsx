@@ -14,10 +14,11 @@ if (!PUBLISHABLE_KEY) {
   throw new Error("Missing Publishable Key")
 }
 
-import ReactGA from "react-ga4";
+import { initAnalyticsIfConsented } from './components/common/CookieConsent';
 
+// GA only starts when the visitor accepted analytics cookies (CookieConsent banner).
 if (GA_MEASUREMENT_ID) {
-  ReactGA.initialize(GA_MEASUREMENT_ID);
+  initAnalyticsIfConsented();
 }
 
 // Prerendered pages (scripts/prerender.mjs) ship static head tags for crawlers.

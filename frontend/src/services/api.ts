@@ -153,6 +153,23 @@ export async function createCheckoutSession(passType: 'finder' | 'finder_1' | 'f
   return response.json();
 }
 
+// ── Contact form ──
+
+export async function sendContactMessage(data: {
+  first_name: string; last_name: string; email: string; subject: string; message: string; website?: string;
+}) {
+  const response = await fetch(`${API_BASE_URL}/api/v1/contact`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(data),
+  });
+  if (!response.ok) {
+    const err = await response.json().catch(() => ({}));
+    throw new Error(err.detail || 'Could not send your message. Please try again or email us directly.');
+  }
+  return response.json();
+}
+
 // ── GCMS Notes Orders ──
 
 export interface GCMSRelatedPerson {

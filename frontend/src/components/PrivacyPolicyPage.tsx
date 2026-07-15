@@ -29,7 +29,7 @@ export const PrivacyPolicyPage: FC = () => (
       <ul style={{ paddingLeft: '24px', marginBottom: '16px' }}>
         <li><strong>Usage Analytics:</strong> We use Vercel Web Analytics and Google Analytics 4 to collect anonymized usage data such as page views, session duration, and general geographic region.</li>
         <li><strong>Device Data:</strong> Browser type, operating system, and screen resolution for optimizing user experience.</li>
-        <li><strong>Cookies:</strong> Essential cookies for authentication session management. We do not use advertising or tracking cookies.</li>
+        <li><strong>Cookies:</strong> Essential cookies for authentication session management are always active. Google Analytics cookies are set only if you choose "Accept all" in our cookie banner — you can decline them ("Essential only") without losing any functionality. We do not use advertising cookies.</li>
       </ul>
 
       <h2 style={{ fontSize: '1.3rem', fontWeight: 700, margin: '32px 0 12px', color: 'var(--primary-dark)' }}>2. How We Use Your Information</h2>

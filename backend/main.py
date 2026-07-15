@@ -1575,6 +1575,69 @@ async def stripe_webhook(request: Request, db: Session = Depends(database.get_db
     return {"status": "success"}
 
 
+# ── Contact form ───────────────────────────────────────────────────────────────
+
+CONTACT_SUBJECTS = {
+    "Technical issue", "Billing & payments", "GCMS notes order", "Refund request",
+    "Feedback & suggestions", "Partnership / business", "Question about my results", "Other",
+}
+
+
+class ContactRequest(BaseModel):
+    first_name: str
+    last_name: str
+    email: str
+    subject: str
+    message: str
+    website: str = ""  # honeypot — real users never fill this hidden field
+
+
+@app.post("/api/v1/contact")
+@limiter.limit("5/hour")
+def send_contact_message(request: Request, req: ContactRequest, db: Session = Depends(database.get_db)):
+    """Public contact endpoint: store the message, notify the inbox when SMTP is configured."""
+    if req.website.strip():  # bot filled the honeypot — pretend success, store nothing
+        return {"status": "ok"}
+    if not req.first_name.strip() or not req.last_name.strip():
+        raise HTTPException(status_code=422, detail="Please provide your first and last name.")
+    if "@" not in req.email or "." not in req.email.split("@")[-1]:
+        raise HTTPException(status_code=422, detail="Please provide a valid email address.")
+    if len(req.message.strip()) < 10:
+        raise HTTPException(status_code=422, detail="Please write a few more details so we can help.")
+    subject = req.subject if req.subject in CONTACT_SUBJECTS else "Other"
+
+    msg = db_models.ContactMessage(
+        first_name=req.first_name.strip()[:100], last_name=req.last_name.strip()[:100],
+        email=req.email.strip()[:200], subject=subject, message=req.message.strip()[:5000],
+    )
+    db.add(msg)
+    db.commit()
+    db.refresh(msg)
+
+    # Notify the inbox — never let a mail failure break the submission (it's already stored).
+    host, smtp_user, smtp_pass = os.getenv("SMTP_HOST"), os.getenv("SMTP_USER"), os.getenv("SMTP_PASS")
+    if host and smtp_user and smtp_pass:
+        try:
+            import smtplib
+            from email.message import EmailMessage
+            m = EmailMessage()
+            m["Subject"] = f"[Mentor Visa contact] {subject} — {msg.first_name} {msg.last_name}"
+            m["From"] = smtp_user
+            m["To"] = os.getenv("CONTACT_NOTIFY_EMAIL", "contact@mentorvisa.com")
+            m["Reply-To"] = msg.email
+            m.set_content(f"From:    {msg.first_name} {msg.last_name} <{msg.email}>\n"
+                          f"Subject: {subject}\nMessage #{msg.id}\n\n{msg.message}")
+            with smtplib.SMTP(host, int(os.getenv("SMTP_PORT", "587")), timeout=20) as s:
+                s.starttls()
+                s.login(smtp_user, smtp_pass)
+                s.send_message(m)
+        except Exception as e:
+            print(f"[CONTACT] Email notify failed for message #{msg.id}: {e}")
+    else:
+        print(f"[CONTACT] New message #{msg.id} ({subject}) from {msg.email} — SMTP unset, stored only.")
+    return {"status": "ok", "id": msg.id}
+
+
 # ── GCMS Notes Orders ─────────────────────────────────────────────────────────
 # Flow: create order (step 1 info) -> Stripe payment (pass_type='gcms') -> signed
 # consent (IMM 5744) upload. Fulfilled manually via an ATIP request; a notification

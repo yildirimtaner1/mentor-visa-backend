@@ -30,11 +30,13 @@ const ApplicationTrackerPage = lazy(() => import('./components/ApplicationTracke
 const ProcessingTimesPage = lazy(() => import('./components/ProcessingTimesPage').then(m => ({ default: m.ProcessingTimesPage })));
 const OrderGCMSNotesPage = lazy(() => import('./components/OrderGCMSNotesPage').then(m => ({ default: m.OrderGCMSNotesPage })));
 const GCMSNotesGuidePage = lazy(() => import('./components/GCMSNotesGuidePage').then(m => ({ default: m.GCMSNotesGuidePage })));
+const ContactPage = lazy(() => import('./components/ContactPage').then(m => ({ default: m.ContactPage })));
 import { useAuth, UserButton } from '@clerk/clerk-react';
 import { saveEvaluation, cancelPaymentEvent } from './services/api';
 import { useJourneySync } from './hooks/useJourneySync';
 import { usePageTracking } from './hooks/usePageTracking';
 import { Navbar } from './components/common/Navbar';
+import { CookieConsent } from './components/common/CookieConsent';
 import { Routes, Route, useNavigate } from 'react-router-dom';
 import './components/LandingPage.css';
 import './components/Pages.css';
@@ -82,6 +84,7 @@ const SharedLayout = ({ children }: { children: React.ReactNode }) => {
               <a href="/how-to-read-gcms-notes" style={{ color: 'var(--text-muted)', textDecoration: 'none' }}>GCMS Notes Guide</a>
             </div>
             <div style={{ display: 'flex', gap: '16px', justifyContent: 'center', fontSize: '12px', flexWrap: 'wrap' }}>
+              <a href="/contact" style={{ color: 'var(--text-muted)', textDecoration: 'none' }}>Contact Us</a>
               <a href="/glossary" style={{ color: 'var(--text-muted)', textDecoration: 'none' }}>Immigration Glossary</a>
               <a href="/noc-codes" style={{ color: 'var(--text-muted)', textDecoration: 'none' }}>NOC Directory</a>
               <a href="/privacy-policy" style={{ color: 'var(--text-muted)', textDecoration: 'none' }}>Privacy Policy</a>
@@ -375,6 +378,8 @@ function App() {
   };
 
   return (
+    <>
+    <CookieConsent />
     <Suspense fallback={
       <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '60vh' }}>
         <div style={{ width: '36px', height: '36px', border: '4px solid #E5E7EB', borderTopColor: '#3B82F6', borderRadius: '50%', animation: 'spin 1s linear infinite' }} />
@@ -411,6 +416,7 @@ function App() {
       <Route path="/express-entry-processing-times" element={<SharedLayout><ProcessingTimesPage onNavigate={(p) => navigate(`/${p}`)} /></SharedLayout>} />
       <Route path="/order-gcms-notes" element={<SharedLayout><OrderGCMSNotesPage /></SharedLayout>} />
       <Route path="/how-to-read-gcms-notes" element={<SharedLayout><GCMSNotesGuidePage /></SharedLayout>} />
+      <Route path="/contact" element={<SharedLayout><ContactPage /></SharedLayout>} />
 
       {/* Legal Pages */}
       <Route path="/privacy-policy" element={<SharedLayout><PrivacyPolicyPage /></SharedLayout>} />
@@ -426,6 +432,7 @@ function App() {
       } />
     </Routes>
     </Suspense>
+    </>
   );
 }
 
