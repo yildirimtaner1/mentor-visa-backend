@@ -376,15 +376,62 @@ def delete_document(
 # Cohort-based estimates from community case data (immitracker_cases). For each milestone
 # transition we use the MOST SPECIFIC cohort that has enough samples, falling back to broader
 # cohorts so we always return a defensible estimate with its sample size.
+# Each prediction is measured from the milestone that immediately precedes it (a conditional
+# / interval model): early stages are anchored on AOR, the back half chains from the previous
+# real milestone. This tightens estimates and lets the tracker re-anchor on the user's own
+# actual dates as they log them. Note: Immitracker records P2 (inland portal 2) and PPR
+# (outland passport request) as ONE date, so decision_to_ppr and p1_to_p2 share that end date.
 _PROC_TRANSITIONS = [
-    ("aor_to_bil",      "AOR to Biometrics"),
-    ("aor_to_meds",     "AOR to Medical passed"),
-    ("aor_to_decision", "AOR to Final Decision"),
-    ("aor_to_p1",       "AOR to P1 (PR Portal)"),
-    ("aor_to_ppr",      "AOR to PPR / Portal 2"),
-    ("aor_to_ecopr",    "AOR to eCOPR"),
+    ("aor_to_bil",       "AOR to Biometrics"),
+    ("aor_to_meds",      "AOR to Medical passed"),
+    ("aor_to_decision",  "AOR to Final Decision"),
+    ("decision_to_p1",   "Final Decision to P1"),
+    ("decision_to_ppr",  "Final Decision to PPR"),
+    ("p1_to_p2",         "P1 to P2"),
+    ("p2_to_ecopr",      "P2 to eCOPR"),
 ]
 _PROC_MIN_N = 15
+
+
+def _proc_parse_dt(s):
+    if s in (None, "", "N/A"):
+        return None
+    s = " ".join(str(s).split())
+    for fmt in ("%b %d, %Y", "%B %d, %Y"):
+        try:
+            return datetime.datetime.strptime(s, fmt)
+        except ValueError:
+            pass
+    return None
+
+
+def _proc_interval(a, b, lo=-5, hi=800):
+    """b - a in days, kept only if within a sane range (drops typos/reversed dates)."""
+    if a and b:
+        n = (b - a).days
+        if lo < n < hi:
+            return n
+    return None
+
+
+def _case_transitions(c) -> dict:
+    """All prediction-interval values for one case. AOR-anchored stages use the stored
+    day-delta columns; the back-half intervals are computed on the fly from the raw source
+    dates (Decision / Portal 1 / Portal 2-PPR / eCoPR)."""
+    raw = c.raw or {}
+    dec = _proc_parse_dt(raw.get("Decision Made"))
+    p1 = _proc_parse_dt(raw.get("Portal 1 Email (Inland)"))
+    p2 = _proc_parse_dt(raw.get("Portal 2 Email / PPR Date"))  # inland P2 == outland PPR date
+    ec = _proc_parse_dt(raw.get("eCoPR Date (Inland Landing)"))
+    return {
+        "aor_to_bil": c.aor_to_bil,
+        "aor_to_meds": c.aor_to_meds,
+        "aor_to_decision": c.aor_to_decision,
+        "decision_to_p1": _proc_interval(dec, p1),
+        "decision_to_ppr": _proc_interval(dec, p2),
+        "p1_to_p2": _proc_interval(p1, p2),
+        "p2_to_ecopr": _proc_interval(p2, ec),
+    }
 
 
 def _percentile(xs: list, p: float):
@@ -399,11 +446,11 @@ def _cohort_stats(cases: list, stream, country, category, vo):
     """Processing-time percentiles for a user's milestone sequence.
 
     All transitions are computed from ONE shared cohort so the milestones stay mutually
-    consistent (e.g. P2 can never be predicted earlier than P1 just because it happened to
-    use a broader sample). We pick the MOST SPECIFIC cohort level at which every transition
-    relevant to this applicant clears _PROC_MIN_N, then clamp the resulting day-offsets to be
-    monotonically non-decreasing along the real milestone order (_PROC_TRANSITIONS is already
-    chronological: BIL -> MEP -> Decision -> P1 -> PPR/P2 -> eCOPR)."""
+    consistent. We pick the MOST SPECIFIC cohort level at which every transition relevant to
+    this applicant clears _PROC_MIN_N. Transitions are INTERVALS (each measured from its own
+    anchor milestone), so they are independent durations — no cross-transition monotonic
+    clamp; only the p25<=median<=p75<=p90 ordering within a transition is enforced."""
+    txv = {c: _case_transitions(c) for c in cases}  # precompute once per request
     levels = [
         ("stream + country + category + office",
          lambda c: c.stream == stream and c.country_of_residence == country and c.ee_draw_category == category and (vo is None or c.primary_vo == vo)),
@@ -422,7 +469,7 @@ def _cohort_stats(cases: list, stream, country, category, vo):
         levels = [lv for lv in levels if "office" not in lv[0]]
 
     def count_at(pred, key):
-        return sum(1 for c in cases if pred(c) and getattr(c, key) is not None)
+        return sum(1 for c in cases if pred(c) and txv[c][key] is not None)
 
     # Which transitions are relevant for this applicant? A transition is "relevant" only if the
     # applicant's own stream populates it enough to be meaningful — this also drops inland-only
@@ -444,28 +491,21 @@ def _cohort_stats(cases: list, stream, country, category, vo):
         if key not in relevant:
             out[key] = None
             continue
-        vals = [getattr(c, key) for c in cases if chosen_pred(c) and getattr(c, key) is not None]
+        vals = [txv[c][key] for c in cases if chosen_pred(c) and txv[c][key] is not None]
         out[key] = ({
             "label": label, "n": len(vals), "cohort": chosen_label,
             "p25": _percentile(vals, 25), "median": _percentile(vals, 50),
             "p75": _percentile(vals, 75), "p90": _percentile(vals, 90),
         } if vals else None)
 
-    # Monotonic clamp: a later milestone's day-offset can never precede an earlier one's, and
-    # within each transition keep p25 <= median <= p75 <= p90 intact after clamping.
-    prev = None
+    # Intervals are independent durations — only enforce p25 <= median <= p75 <= p90 within each.
     for key, _ in _PROC_TRANSITIONS:
         s = out.get(key)
         if not s:
             continue
-        if prev is not None:
-            for q in ("p25", "median", "p75", "p90"):
-                if s[q] is not None and prev[q] is not None and s[q] < prev[q]:
-                    s[q] = prev[q]
         for lo, hi in (("p25", "median"), ("median", "p75"), ("p75", "p90")):
             if s[lo] is not None and s[hi] is not None and s[hi] < s[lo]:
                 s[hi] = s[lo]
-        prev = s
     return out
 
 

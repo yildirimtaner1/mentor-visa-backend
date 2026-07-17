@@ -232,15 +232,32 @@ export const ApplicationTrackerPage: FC = () => {
   const cohortReady = !!(state.cohort.stream && state.cohort.country && state.cohort.category);
   // Inland if residing in Canada -> final stage is P1/P2; otherwise outland -> PPR.
   const inland = state.cohort.country.trim().toLowerCase() === 'canada';
-  const predictable: { milestone: MilestoneKey; transition: string }[] = [
-    { milestone: 'bil', transition: 'aor_to_bil' },
-    { milestone: 'mep', transition: 'aor_to_meds' },
-    { milestone: 'decision', transition: 'aor_to_decision' },
+  // Each prediction is anchored on the milestone immediately before it (interval model).
+  // Early stages anchor on AOR; the back half chains: Decision → P1 → P2 → eCOPR (inland),
+  // or Decision → PPR (outland). P2 and PPR share the same source date in the community data.
+  const predictable: { milestone: MilestoneKey; anchor: MilestoneKey; transition: string }[] = [
+    { milestone: 'bil', anchor: 'aor', transition: 'aor_to_bil' },
+    { milestone: 'mep', anchor: 'aor', transition: 'aor_to_meds' },
+    { milestone: 'decision', anchor: 'aor', transition: 'aor_to_decision' },
     ...(inland
-      ? [{ milestone: 'p1' as MilestoneKey, transition: 'aor_to_p1' }, { milestone: 'p2' as MilestoneKey, transition: 'aor_to_ppr' }]
-      : [{ milestone: 'ppr' as MilestoneKey, transition: 'aor_to_ppr' }]),
-    { milestone: 'ecopr', transition: 'aor_to_ecopr' },
+      ? [{ milestone: 'p1' as MilestoneKey, anchor: 'decision' as MilestoneKey, transition: 'decision_to_p1' },
+         { milestone: 'p2' as MilestoneKey, anchor: 'p1' as MilestoneKey, transition: 'p1_to_p2' }]
+      : [{ milestone: 'ppr' as MilestoneKey, anchor: 'decision' as MilestoneKey, transition: 'decision_to_ppr' }]),
+    { milestone: 'ecopr', anchor: (inland ? 'p2' : 'ppr') as MilestoneKey, transition: 'p2_to_ecopr' },
   ];
+
+  // Chain predicted dates: an actual logged anchor date wins; otherwise use the anchor's own
+  // prediction. Requires predictable to be in chronological order (it is).
+  const predForKey: Partial<Record<MilestoneKey, Date>> = {};
+  if (proc) {
+    for (const { milestone, anchor, transition } of predictable) {
+      const t = proc[transition];
+      if (!t) continue;
+      const base = parse(state.milestones[anchor]) || predForKey[anchor] || null;
+      if (!base) continue;
+      predForKey[milestone] = addDays(base, t.median);
+    }
+  }
 
   const streamOpts = options.streams.length ? options.streams : FALLBACK_STREAMS;
   const categoryOpts = options.categories.length ? options.categories : FALLBACK_CATEGORIES;
@@ -356,13 +373,18 @@ export const ApplicationTrackerPage: FC = () => {
                 <div style={{ fontSize: '0.8rem', color: MUTED }}>Loading predictions…</div>
               ) : (
                 <div>
-                  {predictable.map(({ milestone, transition }) => {
+                  {predictable.map(({ milestone, anchor, transition }) => {
                     const t = proc[transition];
-                    const aor = parse(state.milestones.aor);
                     const mdef = MILESTONES.find(m => m.key === milestone);
-                    if (!t || !aor) return null;
+                    if (!t) return null;
                     const lg = parse(state.milestones[milestone]);
-                    const actual = lg ? Math.round((lg.getTime() - aor.getTime()) / DAY) : null;
+                    const anchorActual = parse(state.milestones[anchor]);
+                    // "how you're tracking" needs the real interval — both this milestone and its anchor logged.
+                    const actual = (lg && anchorActual) ? Math.round((lg.getTime() - anchorActual.getTime()) / DAY) : null;
+                    // Predicted date anchors on the actual predecessor date when known, else the chained prediction.
+                    const base = anchorActual || predForKey[anchor] || null;
+                    if (!lg && !base) return null; // nothing to predict yet (predecessor unknown)
+                    const anchorLabel = MILESTONES.find(m => m.key === anchor)?.label.split(' (')[0].split(' —')[0] || 'previous step';
                     const vs = actual == null ? null
                       : actual <= t.p25 ? { txt: 'faster than most', c: GREEN }
                       : actual <= t.p75 ? { txt: 'on track', c: GREEN }
@@ -374,12 +396,15 @@ export const ApplicationTrackerPage: FC = () => {
                         {actual != null ? (
                           <div style={{ fontSize: '0.78rem' }}>
                             <span style={{ color: vs!.c, fontWeight: 700 }}>{vs!.txt}</span>
-                            <span style={{ color: MUTED }}> — yours {actual}d vs median {t.median}d</span>
+                            <span style={{ color: MUTED }}> — yours {actual}d vs median {t.median}d from {anchorLabel}</span>
                           </div>
+                        ) : lg ? (
+                          <div style={{ fontSize: '0.78rem', color: MUTED }}>Logged {fmt(lg)}</div>
                         ) : (
                           <div style={{ fontSize: '0.78rem', color: 'var(--text-main)' }}>
-                            Expected <strong>{fmt(addDays(aor, t.median))}</strong>
-                            <span style={{ color: MUTED }}> · most: {fmt(addDays(aor, t.p25))} – {fmt(addDays(aor, t.p75))}</span>
+                            Expected <strong>{fmt(addDays(base!, t.median))}</strong>
+                            <span style={{ color: MUTED }}> · most: {fmt(addDays(base!, t.p25))} – {fmt(addDays(base!, t.p75))}</span>
+                            <span style={{ color: MUTED }}> ({t.median}d from {anchorLabel})</span>
                           </div>
                         )}
                         <div style={{ fontSize: '0.66rem', color: MUTED }}>Based on {t.n} cases ({t.cohort})</div>
