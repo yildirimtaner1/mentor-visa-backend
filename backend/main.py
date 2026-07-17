@@ -410,8 +410,14 @@ def get_current_user(credentials: HTTPAuthorizationCredentials = Security(securi
         return user_id
     except HTTPException:
         raise
+    except jwt.ExpiredSignatureError:
+        # Short-lived Clerk token lapsed (e.g. a long GCMS upload). Never surface the raw
+        # "Signature has expired" — users mid-upload read it as their document's signature.
+        raise HTTPException(status_code=401,
+                            detail="Your session timed out. Please refresh the page and try again — your work is safe.")
     except Exception as e:
-        raise HTTPException(status_code=401, detail=f"Token verification failed: {str(e)}")
+        print(f"[AUTH] Token verification failed: {e}")  # keep the real reason in logs only
+        raise HTTPException(status_code=401, detail="Authentication failed. Please refresh the page and sign in again.")
 
 # --- DB Endpoints ---
 

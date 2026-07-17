@@ -301,17 +301,33 @@ export const OrderGCMSNotesPage: FC = () => {
   const submitDocuments = async () => {
     if (!order || !docConsent || docIds.some(f => !f)) return;
     setError(''); setBusy(true);
+    // The upload can be long (several ID photos on mobile) and outlast the short-lived
+    // auth token. On a session/timeout error, force a fresh token and retry once so the
+    // user never sees the confusing "session timed out" — their selected files are kept.
+    const attempt = async (forceFresh: boolean) => {
+      const token = await getToken(forceFresh ? { skipCache: true } : undefined);
+      if (!token) throw new Error('Please sign in again to upload your documents.');
+      return uploadGCMSConsent(order.id, docConsent, token, docIds as File[]);
+    };
+    const looksLikeAuth = (m: string) =>
+      /session timed out|sign in again|401|unauthor|Authentication failed/i.test(m || '');
     try {
-      const token = await getToken();
-      if (!token) return;
-      const updated = await uploadGCMSConsent(order.id, docConsent, token, docIds as File[]);
+      let updated;
+      try {
+        updated = await attempt(false);
+      } catch (e: any) {
+        if (!looksLikeAuth(e?.message)) throw e;
+        updated = await attempt(true); // fresh token, one retry
+      }
       setOrder(updated);
       setUploadedFile(docConsent);
       setStep(4);
       sessionStorage.removeItem('gcmsOrderForm');
       window.scrollTo({ top: 0, behavior: 'smooth' });
     } catch (e: any) {
-      setError(e.message || 'Upload failed. Please try again.');
+      setError(looksLikeAuth(e?.message)
+        ? 'Your session timed out. Please refresh the page and click submit again — your selected files are still here.'
+        : (e.message || 'Upload failed. Please try again.'));
     } finally { setBusy(false); }
   };
 
