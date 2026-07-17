@@ -1,5 +1,6 @@
-import { useState, useEffect, type FC } from 'react';
+import { useState, useEffect, useRef, type FC } from 'react';
 import { useAuth, SignInButton } from '@clerk/clerk-react';
+import ptData from '../data/processingTimes.json';
 import { getJourney, updateJourney, getTrackerOptions, getProcessingStats } from '../services/journeyApi';
 import { createCheckoutSession } from '../services/api';
 import { PaywallGate } from './common/PaywallGate';
@@ -37,10 +38,15 @@ interface Dependent { id: string; name: string; relationship: 'spouse' | 'child'
 interface Cohort { country: string; stream: string; category: string; vo: string; }
 interface ProcTransition { label: string; n: number; cohort: string; p25: number; median: number; p75: number; p90: number; }
 interface TrackerOptions { streams: string[]; countries: string[]; categories: string[]; visa_offices: string[]; }
+// Phase C extras: IRCC can issue multiple ADRs, but at most one PFL per application.
+interface ADREvent { id: string; received?: string; submitted?: string; }
+interface PFLEvent { received?: string; submitted?: string; }
+interface TrackerEvents { adrs: ADREvent[]; pfl?: PFLEvent | null; }
 interface TrackerState {
   milestones: Partial<Record<MilestoneKey, string>>;
   dependents: Dependent[];
   cohort: Cohort;
+  events: TrackerEvents;
 }
 
 // Static fallbacks (used only if the DB options haven't loaded yet)
@@ -92,6 +98,220 @@ const inputStyle: React.CSSProperties = { fontSize: '0.82rem', padding: '8px 10p
 const cardStyle: React.CSSProperties = { background: '#fff', border: '1px solid var(--border-color)', borderRadius: 14, padding: '20px 22px' };
 const headStyle: React.CSSProperties = { fontSize: '0.8rem', textTransform: 'uppercase', letterSpacing: '0.05em', color: MUTED, fontWeight: 700, marginBottom: 12 };
 
+// ─── "Your Estimated Timeline" horizontal visual ───────────────────────────────
+export interface TimelineItem {
+  key: string; label: string; final?: boolean;
+  actual: Date | null;        // logged by the user
+  pred: Date | null;          // chained prediction
+  p25: Date | null; p75: Date | null;
+  n: number;
+}
+
+const fmtShort = (d: Date | null) => d ? d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' }) : '—';
+
+const EstimatedTimeline: FC<{ items: TimelineItem[]; aor: Date }> = ({ items, aor }) => {
+  const cardRef = useRef<HTMLDivElement>(null);
+  const [sharing, setSharing] = useState(false);
+  if (!items.length) return null;
+
+  // Export the card as a PNG — native share sheet on mobile, download elsewhere.
+  const shareCard = async () => {
+    if (!cardRef.current || sharing) return;
+    setSharing(true);
+    try {
+      const html2canvas = (await import('html2canvas')).default;
+      const canvas = await html2canvas(cardRef.current, { backgroundColor: '#ffffff', scale: 2, logging: false });
+      const blob: Blob | null = await new Promise(res => canvas.toBlob(res, 'image/png'));
+      if (!blob) return;
+      const file = new File([blob], 'my-express-entry-timeline.png', { type: 'image/png' });
+      if (navigator.canShare?.({ files: [file] })) {
+        await navigator.share({ files: [file], title: 'My Express Entry timeline', text: 'My estimated Express Entry timeline — via mentorvisa.com' });
+      } else {
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url; a.download = 'my-express-entry-timeline.png';
+        document.body.appendChild(a); a.click(); a.remove();
+        URL.revokeObjectURL(url);
+      }
+    } catch { /* user cancelled the share sheet, or capture failed — no-op */ }
+    finally { setSharing(false); }
+  };
+
+  const finalItem = items[items.length - 1];
+  const journeyEnd = finalItem.actual || finalItem.pred;
+  const totalDays = journeyEnd ? Math.round((journeyEnd.getTime() - aor.getTime()) / DAY) : null;
+  const daysSince = Math.max(0, -daysFromToday(aor));
+  // "You're here": the first milestone that isn't logged and whose expected date is still ahead.
+  let hereIdx = items.findIndex(it => !it.actual && it.pred && daysFromToday(it.pred) >= 0);
+  if (hereIdx === -1) hereIdx = items.length - 1;
+
+  return (
+    <div ref={cardRef} className="tracker-card" style={{ ...cardStyle, marginBottom: 22 }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', marginBottom: 14 }}>
+        <h2 style={{ ...headStyle, marginBottom: 0 }}>Your Estimated Timeline</h2>
+        <span style={{ fontSize: '0.72rem', fontWeight: 700, padding: '3px 11px', borderRadius: 999, background: '#ede9fe', color: '#6d28d9' }}>
+          AOR: {fmt(aor)}
+        </span>
+        <button onClick={shareCard} disabled={sharing} data-html2canvas-ignore="true"
+          style={{ marginLeft: 'auto', fontSize: '0.72rem', fontWeight: 700, padding: '5px 13px', borderRadius: 999, border: `1px solid ${ACCENT}`, background: '#fff', color: ACCENT, cursor: 'pointer' }}>
+          {sharing ? 'Preparing…' : '📤 Share'}
+        </button>
+      </div>
+
+      {/* Summary strip */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', gap: 14, flexWrap: 'wrap', background: 'linear-gradient(135deg, #eef2ff, #f5f3ff)', border: '1px solid #e0e7ff', borderRadius: 12, padding: '14px 18px', marginBottom: 18 }}>
+        <div>
+          <div style={{ fontSize: '0.64rem', fontWeight: 800, letterSpacing: '0.8px', color: '#7c3aed', textTransform: 'uppercase', marginBottom: 3 }}>Estimated journey</div>
+          <div style={{ fontSize: 'clamp(1rem, 3.5vw, 1.3rem)', fontWeight: 800, color: 'var(--text-main, #1e293b)' }}>
+            {fmt(aor)} → {fmt(journeyEnd)}
+          </div>
+          {totalDays !== null && (
+            <div style={{ fontSize: '0.76rem', color: 'var(--text-muted)' }}>~{totalDays} days from AOR to {finalItem.label}</div>
+          )}
+        </div>
+        <div style={{ textAlign: 'right' }}>
+          <div style={{ fontSize: '0.64rem', fontWeight: 800, letterSpacing: '0.8px', color: '#7c3aed', textTransform: 'uppercase', marginBottom: 3 }}>Days since AOR</div>
+          <div style={{ fontSize: '1.5rem', fontWeight: 800, color: 'var(--text-main, #1e293b)', lineHeight: 1 }}>
+            {daysSince}<span style={{ fontSize: '0.78rem', fontWeight: 600, color: 'var(--text-muted)' }}> days</span>
+          </div>
+        </div>
+      </div>
+
+      {/* Node row — horizontally scrollable on small screens */}
+      <div style={{ overflowX: 'auto', WebkitOverflowScrolling: 'touch', paddingBottom: 4 }}>
+        <div style={{ position: 'relative', display: 'flex', minWidth: `${items.length * 138}px` }}>
+          {/* connecting line (sits at dot height: chip 22 + label ~20 + gap 8 + half-dot 7 = 57) */}
+          <div style={{ position: 'absolute', left: 60, right: 60, top: 57, height: 2, background: '#e2e8f0' }} />
+          {items.map((it, i) => {
+            const shown = it.actual || it.pred;
+            const done = !!it.actual;
+            const likelyDone = !done && !!it.pred && daysFromToday(it.pred) < 0;
+            const color = it.final ? AMBER : (done || likelyDone) ? ACCENT : '#a5b4fc';
+            return (
+              <div key={it.key} style={{ flex: '1 0 138px', textAlign: 'center', position: 'relative', padding: '0 6px' }}>
+                {/* You're-here chip row (fixed height keeps dots aligned) */}
+                <div style={{ height: 22 }}>
+                  {i === hereIdx && (
+                    <span style={{ fontSize: '0.64rem', fontWeight: 800, padding: '2px 10px', borderRadius: 999, border: `1.5px solid ${ACCENT}`, color: ACCENT, background: '#fff', whiteSpace: 'nowrap' }}>
+                      › You're here
+                    </span>
+                  )}
+                </div>
+                <div style={{ fontSize: '0.8rem', fontWeight: 800, color: it.final ? AMBER : done || likelyDone ? '#6d28d9' : 'var(--text-main, #1e293b)', height: 20 }}>
+                  {it.label}
+                </div>
+                <div style={{ height: 16, display: 'flex', alignItems: 'center', justifyContent: 'center', marginTop: 8 }}>
+                  <span style={{
+                    width: it.final ? 15 : 13, height: it.final ? 15 : 13, borderRadius: '50%', display: 'inline-block',
+                    background: done || likelyDone || it.final ? color : '#fff',
+                    border: `3px solid ${color}`, boxShadow: i === hereIdx ? `0 0 0 4px ${ACCENT}22` : undefined,
+                  }} />
+                </div>
+                <div style={{ fontSize: '0.86rem', fontWeight: 800, marginTop: 8, color: it.final ? AMBER : 'var(--text-main, #1e293b)' }}>
+                  {fmt(shown)}
+                </div>
+                {done ? (
+                  <div style={{ fontSize: '0.66rem', color: GREEN, fontWeight: 700, marginTop: 2 }}>logged ✓</div>
+                ) : likelyDone ? (
+                  <div style={{ fontSize: '0.66rem', color: '#7c3aed', fontWeight: 700, marginTop: 2 }}>likely done</div>
+                ) : (
+                  <div style={{ fontSize: '0.66rem', color: MUTED, marginTop: 2 }}>
+                    {fmtShort(it.p25)} · {fmtShort(it.pred)} · <strong style={{ color: it.final ? AMBER : '#6d28d9' }}>{fmtShort(it.p75)}</strong>
+                  </div>
+                )}
+                <div style={{ marginTop: 5 }}>
+                  <span style={{ fontSize: '0.62rem', fontWeight: 700, padding: '2px 8px', borderRadius: 999, background: '#ecfdf5', color: '#047857' }}>n={it.n}</span>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+      <p style={{ fontSize: '0.66rem', color: MUTED, marginTop: 10, marginBottom: 0, display: 'flex', justifyContent: 'space-between', gap: 10, flexWrap: 'wrap' }}>
+        <span>Dates chain from your own logged milestones where available (small dates: 25th · median · 75th percentile). Estimates from similar recent cases — guidance, not a guarantee.</span>
+        <span style={{ fontWeight: 700, color: ACCENT, whiteSpace: 'nowrap' }}>mentorvisa.com/track-my-application</span>
+      </p>
+    </div>
+  );
+};
+
+// Community-data insight shown when the user logs an ADR (refreshed with each monthly scrape).
+const ADR_IMPACT = (ptData as any).adr_impact as
+  { with_median: number; without_median: number; delta: number; n_with: number; n_without: number } | undefined;
+
+// ─── Phase C events: ADRs (repeatable) + PFL (single) ──────────────────────────
+const PhaseCEvents: FC<{
+  events: TrackerEvents;
+  onChange: (ev: TrackerEvents) => void;
+}> = ({ events, onChange }) => {
+  const dateIn = (value: string | undefined, set: (v: string) => void, label: string) => (
+    <label style={{ display: 'flex', flexDirection: 'column', gap: 3, fontSize: '0.66rem', fontWeight: 700, color: MUTED, flex: 1, minWidth: 128 }}>
+      {label}
+      <input type="date" value={value || ''} onChange={e => set(e.target.value)} style={{ ...inputStyle, fontSize: '0.8rem' }} />
+    </label>
+  );
+  return (
+    <div style={{ background: '#fffbeb', border: '1px dashed #fcd34d', borderRadius: 12, padding: '14px 16px', margin: '10px 0 4px' }}>
+      <div style={{ fontSize: '0.74rem', fontWeight: 800, color: '#92400e', marginBottom: 2 }}>⚠️ Phase C events (optional)</div>
+      <div style={{ fontSize: '0.7rem', color: '#a16207', marginBottom: 10 }}>
+        Did IRCC ask for more? Track document requests (ADR) and procedural fairness letters (PFL). Multiple ADRs can happen; only one PFL.
+      </div>
+
+      {events.adrs.map((adr, i) => (
+        <div key={adr.id} style={{ background: '#fff', border: '1px solid var(--border-color)', borderRadius: 10, padding: '10px 12px', marginBottom: 8 }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+            <span style={{ fontSize: '0.74rem', fontWeight: 800 }}>📎 ADR {events.adrs.length > 1 ? `#${i + 1}` : ''} — Additional Document Request</span>
+            <button onClick={() => onChange({ ...events, adrs: events.adrs.filter(a => a.id !== adr.id) })}
+              aria-label="Remove ADR" style={{ background: 'none', border: 'none', cursor: 'pointer', color: MUTED, fontSize: '0.85rem' }}>✕</button>
+          </div>
+          <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+            {dateIn(adr.received, v => onChange({ ...events, adrs: events.adrs.map(a => a.id === adr.id ? { ...a, received: v || undefined } : a) }), 'ADR received')}
+            {dateIn(adr.submitted, v => onChange({ ...events, adrs: events.adrs.map(a => a.id === adr.id ? { ...a, submitted: v || undefined } : a) }), 'ADR submitted')}
+          </div>
+        </div>
+      ))}
+
+      {events.pfl && (
+        <div style={{ background: '#fff', border: '1px solid #fecaca', borderRadius: 10, padding: '10px 12px', marginBottom: 8 }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+            <span style={{ fontSize: '0.74rem', fontWeight: 800, color: '#b91c1c' }}>🚨 PFL — Procedural Fairness Letter</span>
+            <button onClick={() => onChange({ ...events, pfl: null })}
+              aria-label="Remove PFL" style={{ background: 'none', border: 'none', cursor: 'pointer', color: MUTED, fontSize: '0.85rem' }}>✕</button>
+          </div>
+          <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+            {dateIn(events.pfl.received, v => onChange({ ...events, pfl: { ...events.pfl, received: v || undefined } }), 'PFL received')}
+            {dateIn(events.pfl.submitted, v => onChange({ ...events, pfl: { ...events.pfl, submitted: v || undefined } }), 'PFL response submitted')}
+          </div>
+        </div>
+      )}
+
+      {events.adrs.length > 0 && ADR_IMPACT && (
+        <div style={{ fontSize: '0.7rem', color: '#78350f', background: '#fef3c7', borderRadius: 8, padding: '8px 12px', marginBottom: 8, lineHeight: 1.55 }}>
+          📊 In our community data, cases with an ADR reached PPR a median of <strong>{ADR_IMPACT.delta} days later</strong> ({ADR_IMPACT.with_median}d vs {ADR_IMPACT.without_median}d — {ADR_IMPACT.n_with} ADR cases vs {ADR_IMPACT.n_without} without; small sample, treat as indicative).
+        </div>
+      )}
+      {events.pfl && (
+        <div style={{ fontSize: '0.7rem', color: '#7f1d1d', background: '#fee2e2', borderRadius: 8, padding: '8px 12px', marginBottom: 8, lineHeight: 1.55 }}>
+          A PFL is serious — respond fully before the deadline. Reviews of PFL responses typically add meaningful processing time. Your{' '}
+          <a href="/order-gcms-notes" style={{ color: '#b91c1c', fontWeight: 700 }}>GCMS notes</a> show exactly what concern triggered it.
+        </div>
+      )}
+      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+        <button onClick={() => onChange({ ...events, adrs: [...events.adrs, { id: uid() }] })}
+          style={{ fontSize: '0.72rem', fontWeight: 700, padding: '6px 12px', borderRadius: 8, border: '1px solid #fcd34d', background: '#fff', color: '#92400e', cursor: 'pointer' }}>
+          + Add ADR
+        </button>
+        {!events.pfl && (
+          <button onClick={() => onChange({ ...events, pfl: {} })}
+            style={{ fontSize: '0.72rem', fontWeight: 700, padding: '6px 12px', borderRadius: 8, border: '1px solid #fecaca', background: '#fff', color: '#b91c1c', cursor: 'pointer' }}>
+            + Add PFL
+          </button>
+        )}
+      </div>
+    </div>
+  );
+};
+
 // ─── Timeline milestone card (modern, mobile-friendly, with "N days ago") ──────
 const MilestoneCard: FC<{ def: MilestoneDef; date?: string; isNext: boolean; onChange: (v: string) => void }> =
 ({ def, date, isNext, onChange }) => {
@@ -130,7 +350,7 @@ export const ApplicationTrackerPage: FC = () => {
   const { tier } = useJourneyStore();
   const isPaid = tier === 'starter' || tier === 'complete';
   const EMPTY_COHORT: Cohort = { country: '', stream: '', category: '', vo: '' };
-  const [state, setState] = useState<TrackerState>({ milestones: {}, dependents: [], cohort: EMPTY_COHORT });
+  const [state, setState] = useState<TrackerState>({ milestones: {}, dependents: [], cohort: EMPTY_COHORT, events: { adrs: [] } });
   const [options, setOptions] = useState<TrackerOptions>({ streams: [], countries: [], categories: [], visa_offices: [] });
   const [proc, setProc] = useState<Record<string, ProcTransition | null> | null>(null);
   const [spousePrefill, setSpousePrefill] = useState(false);
@@ -155,6 +375,7 @@ export const ApplicationTrackerPage: FC = () => {
           milestones: t.milestones ?? {},
           dependents: t.dependents ?? [],
           cohort: { ...EMPTY_COHORT, ...(t.cohort || {}) },
+          events: { adrs: t.events?.adrs ?? [], pfl: t.events?.pfl ?? null },
         });
         setSpousePrefill(Boolean((j as any)?.profile_data?.spouse_accompanying) && !(t.dependents?.length));
         if (opts) setOptions(opts as TrackerOptions);
@@ -192,7 +413,7 @@ export const ApplicationTrackerPage: FC = () => {
       try {
         const token = await getToken();
         if (!token) return;
-        await updateJourney(token, { tracker_data: { milestones: state.milestones, dependents: state.dependents, cohort: state.cohort } });
+        await updateJourney(token, { tracker_data: { milestones: state.milestones, dependents: state.dependents, cohort: state.cohort, events: state.events } });
       } catch (e) { console.error('[tracker] save failed', e); }
     }, 700);
     return () => clearTimeout(t);
@@ -259,6 +480,37 @@ export const ApplicationTrackerPage: FC = () => {
     }
   }
 
+  // Items for the "Your Estimated Timeline" visual (needs predictions + a logged AOR).
+  const aorDate = parse(state.milestones.aor);
+  const TL_LABELS: Record<string, string> = { bil: 'BIL', mep: 'Medical', decision: 'Final Decision', p1: 'P1', p2: 'P2', ppr: 'PPR', ecopr: 'eCOPR' };
+  const timelineItems: TimelineItem[] = (proc && aorDate)
+    ? predictable.flatMap(({ milestone, anchor, transition }) => {
+        const t = proc[transition];
+        if (!t) return [];
+        const actual = parse(state.milestones[milestone]);
+        const base = parse(state.milestones[anchor]) || predForKey[anchor] || null;
+        if (!actual && !base) return [];
+        return [{
+          key: milestone, label: TL_LABELS[milestone] || milestone, final: milestone === 'ecopr',
+          actual, pred: predForKey[milestone] || null,
+          p25: base ? addDays(base, t.p25) : null, p75: base ? addDays(base, t.p75) : null,
+          n: t.n,
+        }];
+      })
+    : [];
+
+  // Red flag for the GCMS upsell: an interval already slower than 90% of similar cases —
+  // either logged late, or its predicted p90 date has passed with no milestone logged.
+  const hasRedFlag = !!proc && predictable.some(({ milestone, anchor, transition }) => {
+    const t = proc[transition];
+    if (!t) return false;
+    const lg = parse(state.milestones[milestone]);
+    const anchorActual = parse(state.milestones[anchor]);
+    if (lg && anchorActual) return Math.round((lg.getTime() - anchorActual.getTime()) / DAY) > t.p90;
+    const base = anchorActual || predForKey[anchor] || null;
+    return !lg && !!base && daysFromToday(addDays(base, t.p90)) < 0;
+  });
+
   const streamOpts = options.streams.length ? options.streams : FALLBACK_STREAMS;
   const categoryOpts = options.categories.length ? options.categories : FALLBACK_CATEGORIES;
 
@@ -313,6 +565,11 @@ export const ApplicationTrackerPage: FC = () => {
         </div>
       )}
 
+      {/* Your Estimated Timeline — appears once predictions load and AOR is logged */}
+      {aorDate && timelineItems.length > 0 && (
+        <EstimatedTimeline items={timelineItems} aor={aorDate} />
+      )}
+
       <div className="tracker-grid">
         {/* LEFT — timeline (standalone milestone cards) */}
         <div>
@@ -323,6 +580,10 @@ export const ApplicationTrackerPage: FC = () => {
                 <div className="milestone-phase">{m.phase}</div>
               )}
               <MilestoneCard def={m} date={state.milestones[m.key]} isNext={i === nextIdx} onChange={(v) => setMilestone(m.key, v)} />
+              {/* Phase C extras (ADR / PFL) slot in right after the last Phase C milestone */}
+              {m.key === 'decision' && (
+                <PhaseCEvents events={state.events} onChange={(ev) => setState(s => ({ ...s, events: ev }))} />
+              )}
             </div>
           ))}
         </div>
@@ -411,6 +672,15 @@ export const ApplicationTrackerPage: FC = () => {
                       </div>
                     );
                   })}
+                  {hasRedFlag && (
+                    <a href="/order-gcms-notes" style={{ display: 'block', textDecoration: 'none', marginTop: 12, padding: '12px 14px', borderRadius: 10, background: '#fef2f2', border: '1px solid #fecaca' }}>
+                      <div style={{ fontSize: '0.78rem', fontWeight: 800, color: '#b91c1c', marginBottom: 3 }}>🚨 Slower than 90% of similar cases</div>
+                      <div style={{ fontSize: '0.74rem', color: '#7f1d1d', lineHeight: 1.5 }}>
+                        Your GCMS notes show exactly which step your file is stuck at — officer remarks included.
+                        We file the request for you. <strong>Order for $19.90 →</strong>
+                      </div>
+                    </a>
+                  )}
                   <div style={{ fontSize: '0.66rem', color: MUTED, marginTop: 8 }}>Estimates from recent community-reported timelines — guidance, not a guarantee.</div>
                 </div>
               )}

@@ -1,5 +1,5 @@
 {
-  "generated": "2026-07-12",
+  "generated": "2026-07-17",
   "total_cases": 718,
   "all": {
     "aor_to_bil": {
@@ -172,6 +172,37 @@
         "median": 45,
         "p75": 56
       }
+    }
+  },
+  "snapshot": {
+    "stages": {
+      "aor": 147,
+      "bil": 32,
+      "medical": 236,
+      "bg_check": 134,
+      "decision": 34,
+      "p1_ppr": 73,
+      "ecopr": 62
+    },
+    "inland_pct": 71
+  },
+  "adr_impact": {
+    "metric": "aor_to_ppr",
+    "with_median": 131,
+    "without_median": 121,
+    "delta": 10,
+    "n_with": 17,
+    "n_without": 87
+  },
+  "previous": {
+    "generated": "2026-07-05",
+    "medians": {
+      "aor_to_bil": 57,
+      "aor_to_meds": 58,
+      "aor_to_decision": 97,
+      "aor_to_p1": 103,
+      "aor_to_ppr": 110,
+      "aor_to_ecopr": 126
     }
   }
 }
