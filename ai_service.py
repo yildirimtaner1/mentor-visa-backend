@@ -693,11 +693,12 @@ Output your analysis strictly conforming to the requested JSON schema.
 """
 
 
-def ocr_from_page_images(page_images: list[tuple[bytes, str]], max_pages: int = 2) -> str:
+def ocr_from_page_images(page_images: list[tuple[bytes, str]], max_pages: int = 5) -> str:
     """Use GPT-4o-mini vision to OCR text from scanned PDF page images.
-    
-    This is a lightweight fallback for scanned PDFs where pdfminer returns no text.
-    We only OCR the first few pages to keep costs low — just enough for the RAG search.
+
+    This is a fallback for scanned PDFs where pdfminer returns no text. The cap matches
+    pdf_pages_to_images (5): a 3+ page scanned letter must not be silently truncated —
+    the audit would otherwise judge duties/signatures it never read.
     """
     if not openai_client or not page_images:
         return ""
@@ -753,8 +754,74 @@ def extract_document_content(doc_bytes: bytes, ext: str, is_image: bool) -> tupl
         user_content = f"=== EXTRACTED WORD TEXT ===\n{extract_text_from_docx(doc_bytes)}"
     else:
         user_content = f"=== EXTRACTED TEXT ===\n{doc_bytes.decode('utf-8', errors='replace')}"
-    
+
+    # French letters are valid IRCC documents, but the NOC index + embeddings are English:
+    # translate once here so every downstream consumer (Finder, Auditor, re-evals via the
+    # persisted text) works at full accuracy without ever re-paying for translation.
+    user_content = translate_to_english_if_french(user_content)
+
     return user_content, page_images
+
+
+def page_images_only(doc_bytes: bytes, ext: str, is_image: bool) -> list:
+    """Render page images WITHOUT any text extraction or OCR. Used by re-evaluations that
+    already have the persisted extracted text but still need the visual pages (letterhead /
+    signature checks)."""
+    if is_image:
+        return [(doc_bytes, IMAGE_MIME_TYPES.get(ext, 'image/jpeg'))]
+    if ext == '.pdf':
+        return pdf_pages_to_images(doc_bytes)
+    return []
+
+
+# ── French letter support ───────────────────────────────────────────────────────
+# IRCC accepts documents in both official languages; our NOC index and embeddings are
+# English-only, so French letters are translated once at extraction time.
+_FRENCH_MARKERS = (
+    " le ", " la ", " les ", " des ", " une ", " être ", " été ", " avec ", " pour ",
+    " dans ", " nous ", " vous ", " ainsi ", " tâches", " fonctions", " emploi ",
+    " travail ", " entreprise ", " monsieur ", " madame ", " attestation ", " poste ",
+    " responsabilités", " salaire ", " heures ", " semaine ", " depuis ", " chez ",
+)
+_ENGLISH_MARKERS = (
+    " the ", " and ", " with ", " for ", " duties ", " responsibilities ", " employment ",
+    " letter ", " company ", " salary ", " hours ", " week ", " since ", " position ",
+)
+
+
+def _looks_french(text: str) -> bool:
+    """Cheap heuristic so English letters never pay for a language-detection LLM call."""
+    t = f" {(text or '').lower()} "
+    fr = sum(t.count(m) for m in _FRENCH_MARKERS)
+    en = sum(t.count(m) for m in _ENGLISH_MARKERS)
+    return fr >= 5 and fr > en * 1.5
+
+
+def translate_to_english_if_french(text: str) -> str:
+    """Translate a French document to English (one gpt-4o-mini call), preserving structure.
+    Returns the text unchanged when it doesn't look French or translation is unavailable.
+    The translated text is marked so the auditor knows the original was French (valid for IRCC)."""
+    if not text or not openai_client or not _looks_french(text):
+        return text
+    try:
+        resp = openai_client.chat.completions.create(
+            model="gpt-4o-mini",
+            messages=[
+                {"role": "system", "content": (
+                    "Translate this French employment document to English. Preserve the structure, "
+                    "line breaks, names, dates, numbers and job titles exactly. Return ONLY the translation.")},
+                {"role": "user", "content": text},
+            ],
+            temperature=0.0,
+        )
+        translated = (resp.choices[0].message.content or "").strip()
+        if translated:
+            print(f"[French] Letter detected as French — translated to English ({len(translated)} chars)")
+            return ("=== TRANSLATED FROM FRENCH (original letter is in French — a valid IRCC language; "
+                    "any French page images correspond to this English translation) ===\n" + translated)
+    except Exception as e:
+        print(f"[French] Translation failed (continuing with original text): {e}")
+    return text
 
 
 def preprocess_duties_for_embedding(user_text: str) -> str:
@@ -1381,9 +1448,12 @@ def pop_finder_audit(file_id: str, code: str) -> dict | None:
     return _FINDER_AUDIT_CACHE.pop((file_id, str(code)), None)
 
 
-def audit_duty_coverage(letter_text: str, code: str) -> dict | None:
+def audit_duty_coverage(letter_text: str, code: str, page_images: list = None,
+                        model_tier: str = "standard") -> dict | None:
     """Run the FULL Employment Letter Auditor against a fixed NOC code and return its duty coverage +
     breakdown — the EXACT same computation/prompt the Auditor uses, so the Finder converges with it.
+    page_images: when provided (document uploads), the audit sees the pages too — making the result
+    byte-identical in kind to a direct /analyze audit, so it can be REUSED as the real audit.
     Returns {coverage, sub_title, duties_breakdown:[{noc_duty,letter_evidence,match}], key_gaps} or None
     (None when there is no model, the code is unknown, or the Auditor rejects the input as not a letter)."""
     if not openai_client or not letter_text or not code or code not in NOC_CODE_TO_ENTRY:
@@ -1395,7 +1465,8 @@ def audit_duty_coverage(letter_text: str, code: str) -> dict | None:
     top[code] = NOC_CODE_TO_ENTRY[code]                       # ensure the locked code is in the reference
     system = _build_prompt_text(json.dumps(top, ensure_ascii=False), code)
     try:
-        res = audit_document_with_openai(system, letter_text, None, auto_detected_noc=code)
+        res = audit_document_with_openai(system, letter_text, page_images, auto_detected_noc=code,
+                                         model_tier=model_tier)
     except Exception as e:
         print(f"[audit_duty_coverage] auditor failed: {e}")
         return None
@@ -1528,17 +1599,22 @@ def find_noc_with_openai(system_prompt: str, user_content: str, page_images: lis
     return result
 
 
-def auto_detect_noc(user_content: str, page_images: list[tuple[bytes, str]] = None) -> str | None:
+def auto_detect_noc(user_content: str, page_images: list[tuple[bytes, str]] = None,
+                    from_document: bool = False, model_tier: str = "standard") -> str | None:
     """Run the NOC Finder (v2) to auto-detect the best NOC code for a document.
 
     Returns the detected NOC code string, or None if detection fails.
-    Side effect: caches the full v2 confidence on `auto_detect_noc.last_confidence` so the Auditor
-    can display the SAME NOC-match confidence the Finder would, for free (no recomputation).
+    Side effects: caches the full v2 confidence on `auto_detect_noc.last_confidence` so the Auditor
+    can display the SAME NOC-match confidence the Finder would, for free; and stashes the complete
+    internal audit (when v2 ran one — document path) on `auto_detect_noc.last_audit` so /analyze can
+    REUSE it instead of paying for a second identical audit.
     """
     auto_detect_noc.last_confidence = None
+    auto_detect_noc.last_audit = None
     try:
         import noc_finder_v2
-        result = noc_finder_v2.run_noc_finder_v2(user_content, page_images)
+        result = noc_finder_v2.run_noc_finder_v2(user_content, page_images,
+                                                 from_document=from_document, model_tier=model_tier)
 
         rec = result.get("recommended_noc", {})
         detected_code = rec.get("code")
@@ -1548,6 +1624,10 @@ def auto_detect_noc(user_content: str, page_images: list[tuple[bytes, str]] = No
         if detected_code and detected_code != "00000":
             print(f"[Auto-Detect NOC] Detected: {detected_code} ({detected_title}) — {confidence}% confidence")
             auto_detect_noc.last_confidence = confidence
+            audit = result.get("_audit_full")
+            if isinstance(audit, dict):
+                import copy as _copy
+                auto_detect_noc.last_audit = _copy.deepcopy(audit)
             return detected_code
         else:
             print("[Auto-Detect NOC] Failed to detect NOC code from result")
@@ -1557,7 +1637,67 @@ def auto_detect_noc(user_content: str, page_images: list[tuple[bytes, str]] = No
         return None
 
 
-def audit_document_with_openai(system_prompt: str, user_content: str, page_images: list[tuple[bytes, str]] = None, auto_detected_noc: str = None, forced_noc: str = None) -> dict:
+def _call_claude_structured(system_prompt: str, user_content: str, page_images: list[tuple[bytes, str]],
+                            response_format, label: str = "AI",
+                            model: str = "claude-haiku-4-5-20251001") -> dict:
+    """Claude structured-output call mirroring _call_openai_structured: the schema is enforced by
+    forcing a single tool call whose input_schema is the Pydantic model's JSON schema. Raises on
+    any failure so callers can fall back to the OpenAI path."""
+    import noc_agents
+    client = noc_agents._get_anthropic_client()
+    if client is None:
+        raise ValueError("ANTHROPIC_API_KEY not configured")
+
+    content = []
+    if user_content:
+        content.append({"type": "text", "text": user_content})
+    for img_bytes, mime_type in (page_images or []):
+        content.append({
+            "type": "image",
+            "source": {"type": "base64", "media_type": mime_type,
+                       "data": base64.b64encode(img_bytes).decode("utf-8")},
+        })
+
+    print(f"Calling Claude {model} for {label}...")
+    resp = client.messages.create(
+        model=model,
+        max_tokens=8000,   # AnalysisResponse with a full duty-by-duty table is large
+        temperature=0.0,
+        system=system_prompt,
+        messages=[{"role": "user", "content": content}],
+        tools=[{
+            "name": "emit_analysis",
+            "description": ("Emit the complete analysis strictly conforming to the schema. "
+                            "Include EVERY field — use empty arrays/strings for fields with nothing to report."),
+            "input_schema": response_format.model_json_schema(),
+        }],
+        tool_choice={"type": "tool", "name": "emit_analysis"},
+    )
+    tool_input = next((b.input for b in resp.content if getattr(b, "type", "") == "tool_use"), None)
+    if tool_input is None:
+        raise ValueError("Claude returned no tool_use block")
+    _backfill_empty_fields(tool_input, response_format)
+    result = response_format.model_validate(tool_input).model_dump()
+    return _sanitize_noc_response(result)
+
+
+def _backfill_empty_fields(data: dict, response_format) -> None:
+    """Claude's tool-use omits required-but-empty container fields (e.g. refusal_reasons: []).
+    Backfill list/dict fields with empties so Pydantic validation passes; anything else still
+    missing fails validation and triggers the gpt-4o-mini fallback."""
+    from typing import get_origin
+    for name, field in response_format.model_fields.items():
+        if name in data:
+            continue
+        ann = field.annotation
+        origin = get_origin(ann) or ann
+        if origin is list:
+            data[name] = []
+        elif origin is dict:
+            data[name] = {}
+
+
+def audit_document_with_openai(system_prompt: str, user_content: str, page_images: list[tuple[bytes, str]] = None, auto_detected_noc: str = None, forced_noc: str = None, model_tier: str = "standard") -> dict:
     """Employment Auditor: returns AnalysisResponse.
 
     Args:
@@ -1569,6 +1709,9 @@ def audit_document_with_openai(system_prompt: str, user_content: str, page_image
             Like auto_detected_noc, employer NOC references are stripped and the result's
             detected_code is hard-locked to this code — but the NOC-match confidence is
             computed fresh (we did not run auto-detection, so there is no cached score).
+        model_tier: "premium" = the requesting user's audit will be unlocked (paid tier /
+            credit holder) — judged by Claude Haiku 4.5, a stronger model than the free
+            preliminary's gpt-4o-mini. Falls back to gpt-4o-mini on any Claude failure.
     """
     # The NOC the result must end up locked to (explicit user request wins over auto-detection).
     target_noc = forced_noc or auto_detected_noc
@@ -1581,7 +1724,16 @@ def audit_document_with_openai(system_prompt: str, user_content: str, page_image
         user_content = cleaned_content
 
     from models import AnalysisResponse
-    result = _call_openai_structured(system_prompt, user_content, page_images, AnalysisResponse, "Auditor")
+    result = None
+    if model_tier == "premium":
+        try:
+            result = _call_claude_structured(system_prompt, user_content, page_images, AnalysisResponse, "Auditor (premium)")
+            result["_audit_model"] = "claude-haiku-4-5"
+        except Exception as e:
+            print(f"[Auditor] Premium Claude call failed, falling back to gpt-4o-mini: {e}")
+            result = None
+    if result is None:
+        result = _call_openai_structured(system_prompt, user_content, page_images, AnalysisResponse, "Auditor")
 
     # Post-process: if a target NOC was determined (auto-detected OR explicitly requested) but the
     # model returned a different detected_code (e.g. the employer's NOC claim leaked via page images,

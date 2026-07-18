@@ -321,12 +321,15 @@ def _cache_key(text: str) -> str:
 
 
 # ── Pipeline ──────────────────────────────────────────────────────────────────
-def run_noc_finder_v2(user_content: str, page_images=None, target_noc: str = None, from_document: bool = False) -> dict:
+def run_noc_finder_v2(user_content: str, page_images=None, target_noc: str = None, from_document: bool = False,
+                      model_tier: str = "standard") -> dict:
     """Run the knowledge-first multi-model NOC Finder. Returns NOCFinderResponseSchema dict.
 
     target_noc: when set, lock the result to that NOC (re-evaluation / alternative / manual code) and
     skip proposing+adjudication — it is still scored honestly via semantic precision + duty-by-duty.
-    from_document: True when the input is an uploaded letter/document (drives input_reliability)."""
+    from_document: True when the input is an uploaded letter/document (drives input_reliability).
+    model_tier: forwarded to the internal Auditor run ("premium" = Claude Haiku for paid users),
+    so the reusable _audit_full matches what the paid audit path would have produced."""
     t_start = time.time()
     # Serve repeat calls on the same letter from cache (text-only) for Finder/Auditor consistency.
     # Never cache targeted evals — the cache key is the letter only, not the requested code.
@@ -357,7 +360,8 @@ def run_noc_finder_v2(user_content: str, page_images=None, target_noc: str = Non
     # deliberately re-checking it against a chosen code, so a borderline/non-deterministic extraction
     # rejection must not block the re-evaluation ("Could not validate input" bug).
     if target_noc and target_noc in ai_service.NOC_LOOKUP:
-        result = _build_v2_response(target_noc, None, extraction, [target_noc], from_document=from_document, letter_text=cleaned)
+        result = _build_v2_response(target_noc, None, extraction, [target_noc], from_document=from_document, letter_text=cleaned,
+                                    page_images=page_images, model_tier=model_tier)
         result = ai_service._sanitize_noc_response(result, recompute_confidence=False)
         rec = result.get("recommended_noc", {})
         print(f"[v2] TARGETED {target_noc}: {rec.get('confidence')}% coverage={result.get('duty_coverage')}% "
@@ -450,7 +454,8 @@ def run_noc_finder_v2(user_content: str, page_images=None, target_noc: str = Non
         print(f"[Stage 4] Adjudication failed ({e}) — using top grounded candidate {winning_code}")
 
     # ── Build response (frontend-compatible) ──────────────────────────────────
-    result = _build_v2_response(winning_code, auditor, extraction, codes, from_document=from_document, letter_text=cleaned)
+    result = _build_v2_response(winning_code, auditor, extraction, codes, from_document=from_document, letter_text=cleaned,
+                                page_images=page_images, model_tier=model_tier)
     # recompute_confidence=False: v2 already set a calibrated semantic-precision confidence;
     # the sanitizer's recall-style matched/total recompute would clobber it (and break 51114).
     result = ai_service._sanitize_noc_response(result, recompute_confidence=False)
@@ -475,7 +480,8 @@ def _semantic_confidence(applicant_duties: list, code: str):
 
 def _build_v2_response(winning_code: str, auditor: dict | None,
                        extraction: dict, candidate_codes: list, from_document: bool = False,
-                       letter_text: str = "") -> dict:
+                       letter_text: str = "", page_images: list = None,
+                       model_tier: str = "standard") -> dict:
     """Assemble a NOCFinderResponseSchema dict from the auditor's grounded decision."""
     auditor = auditor or {}
     noc_entry = ai_service.get_noc_entry(winning_code)
@@ -543,7 +549,11 @@ def _build_v2_response(winning_code: str, auditor: dict | None,
     full_audit_result = None  # the complete Auditor result, surfaced for the "Audit my letter" reuse cache
     # Document uploads run the FULL Auditor (exact convergence with the paid Auditor). Typed text uses
     # the gpt-4o grader below instead — the full Auditor rejects non-letters, and text is lower-signal.
-    audit_cov = ai_service.audit_duty_coverage(letter_text, winning_code) if (from_document and letter_text) else None
+    # Page images are passed through so the internal audit is the SAME computation a direct
+    # /analyze audit would run (letterhead/signature checks included) — making _audit_full reusable
+    # as the real audit, which is what eliminates the double-audit cost on /analyze.
+    audit_cov = ai_service.audit_duty_coverage(letter_text, winning_code, page_images=page_images,
+                                               model_tier=model_tier) if (from_document and letter_text) else None
     if audit_cov:
         duty_cov = audit_cov["coverage"]
         coverage_subtitle = audit_cov["sub_title"]

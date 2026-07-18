@@ -214,7 +214,8 @@ def dynamic_rate_limit_value(key: str) -> str:
 async def analyze_document_endpoint(
     request: Request,
     document: UploadFile = File(...),
-    target_noc: Optional[str] = Form(None)
+    target_noc: Optional[str] = Form(None),
+    user_id: str = Depends(get_current_user_optional)
 ):
     """
     Accepts a document (PDF, Word, or Image).
@@ -294,44 +295,69 @@ async def analyze_document_endpoint(
 
         # --- MIGRATION TO OPENAI RAG ---
         user_content, page_images = ai_service.extract_document_content(doc_bytes, ext, is_image)
-        
+
+        # Paid users' audits (their result will be unlocked) run on the premium model.
+        _tier_db = database.SessionLocal()
+        try:
+            model_tier = _audit_model_tier(user_id, _tier_db)
+        finally:
+            _tier_db.close()
+
         # Auto-detect NOC using the NOC Finder pipeline when no target is specified.
         # This guarantees the auditor uses the EXACT same NOC detection as the NOC Finder.
+        # from_document=True makes the Finder run the FULL auditor internally (with page images),
+        # and we REUSE that audit here instead of paying for a second identical call.
         auto_detected = None
+        result_json = None
         if not target_noc:
-            target_noc = ai_service.auto_detect_noc(user_content, page_images)
+            target_noc = ai_service.auto_detect_noc(user_content, page_images,
+                                                    from_document=True, model_tier=model_tier)
             auto_detected = target_noc  # Remember this was auto-detected, not user-specified
+            reused = getattr(ai_service.auto_detect_noc, "last_audit", None)
+            if (isinstance(reused, dict) and target_noc
+                    and (reused.get("noc_analysis") or {}).get("detected_code") == target_noc):
+                result_json = reused
+                # Keep the displayed NOC-match confidence identical to the Finder's number.
+                conf = getattr(ai_service.auto_detect_noc, "last_confidence", None)
+                if conf is not None and isinstance(result_json.get("noc_analysis"), dict):
+                    result_json["noc_analysis"]["noc_match_confidence"] = conf
+                print("[Analyze] Reused the Finder's internal audit — skipped the duplicate audit call")
 
-        top_nocs = ai_service.semantic_search_nocs(user_content)
+        if result_json is None:
+            top_nocs = ai_service.semantic_search_nocs(user_content)
 
-        # The Auditor evaluates against a determined NOC; if auto-detection failed, fall back to the
-        # top semantic candidate so we never run the prompt's from-scratch detection path.
-        if not target_noc and top_nocs:
-            target_noc = next(iter(top_nocs))
+            # The Auditor evaluates against a determined NOC; if auto-detection failed, fall back to the
+            # top semantic candidate so we never run the prompt's from-scratch detection path.
+            if not target_noc and top_nocs:
+                target_noc = next(iter(top_nocs))
 
-        # Auditor Fix: Always include the target_noc in the reference sheet so the AI can evaluate against it!
-        if target_noc:
-            target_data = ai_service.NOC_CODE_TO_ENTRY.get(target_noc)
-            if target_data:
-                top_nocs[target_noc] = target_data
-                
-        noc_reference = json.dumps(top_nocs, ensure_ascii=False)
-        system_prompt = ai_service._build_prompt_text(noc_reference, target_noc)
-        
-        try:
-            result_json = ai_service.audit_document_with_openai(
-                system_prompt=system_prompt,
-                user_content=user_content,
-                page_images=page_images,
-                auto_detected_noc=auto_detected
-            )
-        except Exception as e:
-            raise HTTPException(status_code=500, detail=f"OpenAI analysis failed: {str(e)}")
+            # Auditor Fix: Always include the target_noc in the reference sheet so the AI can evaluate against it!
+            if target_noc:
+                target_data = ai_service.NOC_CODE_TO_ENTRY.get(target_noc)
+                if target_data:
+                    top_nocs[target_noc] = target_data
+
+            noc_reference = json.dumps(top_nocs, ensure_ascii=False)
+            system_prompt = ai_service._build_prompt_text(noc_reference, target_noc)
+
+            try:
+                result_json = ai_service.audit_document_with_openai(
+                    system_prompt=system_prompt,
+                    user_content=user_content,
+                    page_images=page_images,
+                    auto_detected_noc=auto_detected,
+                    model_tier=model_tier
+                )
+            except Exception as e:
+                raise HTTPException(status_code=500, detail=f"OpenAI analysis failed: {str(e)}")
         
         # Inject file metadata into the response
         result_json["stored_file_id"] = file_id
         result_json["original_filename"] = filename
-        
+        # Persist the extracted text in the saved payload so re-evaluations reuse it instead of
+        # re-downloading + re-extracting (and re-paying vision OCR). Stripped from the API response.
+        result_json["_extracted_text"] = user_content
+
         # Save to dev cache for future re-use
         if DEV_CACHE_MODE:
             _save_cache("analyze", result_json)
@@ -356,7 +382,8 @@ async def analyze_document_endpoint(
             print(f"Warning: failed to auto-log evaluation: {log_err}")
         finally:
             db.close()
-        
+
+        result_json.pop("_extracted_text", None)
         return result_json
         
     except ValidationError as ve:
@@ -433,6 +460,17 @@ def get_current_user_optional(credentials: Optional[HTTPAuthorizationCredentials
 # to a teaser (code + confidence + summary) with the full breakdown behind Optimize.
 NEW_USER_FINDER_CREDITS = 2
 
+def _audit_model_tier(user_id: str, db: Session) -> str:
+    """'premium' when this user's audit will end up unlocked (paid tier or an audit credit) —
+    those audits run on the stronger Claude Haiku model; free preliminaries stay on gpt-4o-mini."""
+    if not user_id or user_id == "anonymous":
+        return "standard"
+    ua = db.query(db_models.UserAccount).filter_by(user_id=user_id).first()
+    if ua and (ua.subscription_tier in ("starter", "complete") or (ua.audit_letter_credits or 0) > 0):
+        return "premium"
+    return "standard"
+
+
 def ensure_user_exists(user_id: str, db: Session):
     """Create a UserAccount row if one doesn't exist yet (idempotent).
     Must be called before inserting any row with a FK to users.user_id.
@@ -477,7 +515,13 @@ def save_evaluation(
                 if existing.user_id != "anonymous" and existing.user_id != user_id:
                     return {"success": True, "id": existing.id}
                     
-                # Update payload to the latest state from frontend
+                # Update payload to the latest state from frontend, but preserve server-side
+                # artifacts the client never receives (they are stripped from API responses,
+                # so the incoming copy would silently destroy the reuse caches).
+                if isinstance(existing.payload, dict) and isinstance(payload, dict):
+                    for _k in ("_audit_full", "_extracted_text"):
+                        if _k in existing.payload and _k not in payload:
+                            payload[_k] = existing.payload[_k]
                 existing.payload = payload
                 
                 # Claim anonymous records for this user
@@ -540,9 +584,9 @@ def get_evaluations(
         payload = r.payload
         if not isinstance(payload, dict):
             return payload
-        # Never send the stored full Auditor result to the Finder client (it's reused server-side only).
-        if "_audit_full" in payload:
-            payload = {k: v for k, v in payload.items() if k != "_audit_full"}
+        # Never send server-side artifacts (stored full Auditor result, persisted extracted text).
+        if "_audit_full" in payload or "_extracted_text" in payload:
+            payload = {k: v for k, v in payload.items() if k not in ("_audit_full", "_extracted_text")}
         if r.evaluation_type != 'noc_finder' or is_paid or r.is_premium_unlocked:
             return payload
         gated = dict(payload)
@@ -707,7 +751,13 @@ def reevaluate_document(
                 user_content = f"Job Title: {original_title}\n\nDuties and Responsibilities:\n{original_duties}"
                 print(f"Re-evaluating text-only input: title='{original_title}', duties length={len(original_duties)}")
             else:
-                user_content, page_images = ai_service.extract_document_content(doc_bytes, ext, is_image)
+                _stored_text = (record.payload or {}).get("_extracted_text") if isinstance(record.payload, dict) else None
+                if _stored_text:
+                    user_content = _stored_text
+                    page_images = ai_service.page_images_only(doc_bytes, ext, is_image)
+                    print("[reevaluate] Reused persisted extracted text (skipped re-extraction/OCR)")
+                else:
+                    user_content, page_images = ai_service.extract_document_content(doc_bytes, ext, is_image)
             
             try:
                 import openai
@@ -733,6 +783,8 @@ def reevaluate_document(
             result_json["stored_file_id"] = reeval_file_id
             result_json["original_file_id"] = actual_file_id
             result_json["is_signed_in"] = 1  # NOC Finder uses is_signed_in, not is_premium_unlocked
+            if not is_text_only:
+                result_json["_extracted_text"] = user_content  # chained re-evals skip re-extraction too
             
             # Persist to DB so it shows in My Evaluations
             saved_role = result_json.get("role_name") or record.role_name or "Unknown Role"
@@ -751,17 +803,27 @@ def reevaluate_document(
             )
             db.add(new_record)
             db.commit()
-            
+
+            result_json.pop("_extracted_text", None)
             return result_json
         else:
             # Default: Auditor re-evaluation
-            user_content, page_images = ai_service.extract_document_content(doc_bytes, ext, is_image)
-            
+            _stored_text = (record.payload or {}).get("_extracted_text") if isinstance(record.payload, dict) else None
+            if _stored_text:
+                user_content = _stored_text
+                page_images = ai_service.page_images_only(doc_bytes, ext, is_image)
+                print("[reevaluate] Reused persisted extracted text (skipped re-extraction/OCR)")
+            else:
+                user_content, page_images = ai_service.extract_document_content(doc_bytes, ext, is_image)
+
+            model_tier = _audit_model_tier(user_id, db)
+
             # Auto-detect NOC using the NOC Finder pipeline when no target is specified.
             effective_target = req.target_noc if (req.target_noc and req.target_noc != 'auto') else None
             auto_detected = None
             if not effective_target:
-                effective_target = ai_service.auto_detect_noc(user_content, page_images)
+                effective_target = ai_service.auto_detect_noc(user_content, page_images,
+                                                              from_document=True, model_tier=model_tier)
                 auto_detected = effective_target
 
             top_nocs = ai_service.semantic_search_nocs(user_content)
@@ -788,7 +850,14 @@ def reevaluate_document(
                 return (isinstance(a, dict) and effective_target
                         and ((a.get("noc_analysis") or {}).get("detected_code") == effective_target))
 
-            result_json = ai_service.pop_finder_audit(req.file_id, effective_target) if effective_target else None
+            # Freshest source first: the audit the auto-detect v2 run just produced in THIS request.
+            result_json = getattr(ai_service.auto_detect_noc, "last_audit", None) if auto_detected else None
+            if not _audit_matches_target(result_json):
+                result_json = None
+            else:
+                print(f"[reevaluate] Reused the auto-detect run's internal audit for noc={effective_target}")
+            if result_json is None:
+                result_json = ai_service.pop_finder_audit(req.file_id, effective_target) if effective_target else None
             if not _audit_matches_target(result_json):
                 result_json = None
             if result_json is None and effective_target and isinstance(record.payload, dict):
@@ -807,6 +876,7 @@ def reevaluate_document(
                     page_images=page_images if page_images else None,
                     auto_detected_noc=auto_detected,
                     forced_noc=explicit_target,
+                    model_tier=model_tier,
                 )
             else:
                 print(f"[reevaluate] Reused NOC Finder's audit for file={req.file_id} noc={effective_target}")
@@ -827,7 +897,9 @@ def reevaluate_document(
             # Include target NOC in metadata for display in My Evaluations
             if req.target_noc and req.target_noc != 'auto':
                 result_json["reevaluated_against_noc"] = req.target_noc
-            
+
+            result_json["_extracted_text"] = user_content  # chained re-evals skip re-extraction too
+
             # Save as a brand new evaluation run
             new_record = db_models.Evaluation(
                 evaluation_type='audit',
@@ -844,7 +916,8 @@ def reevaluate_document(
             db.add(new_record)
             db.commit()
             db.refresh(new_record)
-            
+
+            result_json.pop("_extracted_text", None)
             return result_json
         
     except ValidationError as ve:
@@ -967,6 +1040,7 @@ async def noc_finder_endpoint(
             result = noc_finder_v2.run_noc_finder_v2(
                 user_content, page_images if page_images else None,
                 target_noc=_tgt, from_document=bool(document),
+                model_tier=_audit_model_tier(user_id, db),
             )
         except openai.RateLimitError as e:
             print(f"OpenAI RateLimitError details: {e.response.json() if hasattr(e, 'response') else str(e)}")
@@ -984,6 +1058,10 @@ async def noc_finder_endpoint(
         _audit_full = result.get("_audit_full")
         if _audit_full:
             ai_service.cache_finder_audit(evaluation_id, (result.get("recommended_noc") or {}).get("code"), _audit_full)
+        # Persist the extracted text (documents only) so later re-evaluations / "Audit my letter"
+        # skip re-download + re-extraction + OCR. Stripped from the API response below.
+        if document:
+            result["_extracted_text"] = user_content
         # NOC Finder is free for signed-in users
         is_signed_in = user_id and user_id != "anonymous"
         result["is_signed_in"] = 1 if is_signed_in else 0
@@ -1038,9 +1116,10 @@ async def noc_finder_endpoint(
         db.add(new_record)
         db.commit()
 
-        # Saved to the DB (payload retains _audit_full for reuse); strip it from the API response so the
-        # paid Auditor result is never sent to the Finder client.
+        # Saved to the DB (payload retains _audit_full + _extracted_text for reuse); strip them from
+        # the API response so internal artifacts are never sent to the Finder client.
         result.pop("_audit_full", None)
+        result.pop("_extracted_text", None)
 
         # Expose counts + balance so the teaser can say "see N gaps / M alternatives"
         result["gaps_count"] = len(result.get("key_gaps") or [])
@@ -1116,7 +1195,7 @@ def noc_finder_reveal(
     # _audit_full before sending.
     full = None
     if access == "full" and rec and isinstance(rec.payload, dict):
-        full = {k: v for k, v in rec.payload.items() if k != "_audit_full"}
+        full = {k: v for k, v in rec.payload.items() if k not in ("_audit_full", "_extracted_text")}
         full["gated"] = False
         full["gate_reason"] = None
         full["finder_credits_remaining"] = (None if is_paid else credits)
@@ -1335,6 +1414,7 @@ def get_user_credits(
         "ita_strategy_credits": user.ita_strategy_credits,
         "profile_builder_credits": user.profile_builder_credits,
         "gcms_credits": user.gcms_credits or 0,
+        "gcms_analyzer_credits": user.gcms_analyzer_credits or 0,
         "subscription_tier": user.subscription_tier or "free"
     }
 
@@ -1416,6 +1496,10 @@ def create_checkout_session(
         # 19.90 CAD — GCMS notes order (ATIP request filed on the applicant's behalf)
         amount = 1990
         name = "GCMS Notes Order — Full IRCC File Request"
+    elif req.pass_type == 'gcms_analyzer':
+        # 19.90 CAD — AI analysis of an already-obtained GCMS notes PDF (free with our orders)
+        amount = 1990
+        name = "GCMS Notes AI Analysis (1 Report)"
     elif req.pass_type == 'starter':
         # 49.00 CAD — Optimize tier
         amount = 4900
@@ -1548,6 +1632,9 @@ async def stripe_webhook(request: Request, db: Session = Depends(database.get_db
                     order = db.query(db_models.GCMSOrder).filter_by(stripe_session_id=session.id).first()
                 if order and order.status == 'awaiting_payment':
                     order.status = 'awaiting_consent'
+                    user.gcms_analyzer_credits += 1  # every paid order includes 1 free AI analysis
+            elif pass_type == 'gcms_analyzer':
+                user.gcms_analyzer_credits += 1
             elif pass_type == 'starter':
                 user.subscription_tier = 'starter'
                 # Starter (Optimize) tier includes some credits
@@ -1833,6 +1920,7 @@ def create_gcms_order(
     if user and (user.gcms_credits or 0) > 0:
         user.gcms_credits -= 1
         order.status = 'awaiting_consent'
+        user.gcms_analyzer_credits = (user.gcms_analyzer_credits or 0) + 1  # analysis included with every order
         print(f"[GCMS] Consumed 1 prepaid credit for {user_id} (order pre-paid; {user.gcms_credits} left)")
 
     db.commit()
@@ -1887,6 +1975,9 @@ def list_gcms_orders(
                 session = stripe.checkout.Session.retrieve(o.stripe_session_id)
                 if getattr(session, "payment_status", None) == 'paid':
                     o.status = 'awaiting_consent'
+                    ua_o = db.query(db_models.UserAccount).filter_by(user_id=o.user_id).first()
+                    if ua_o:
+                        ua_o.gcms_analyzer_credits = (ua_o.gcms_analyzer_credits or 0) + 1  # included analysis
                     changed = True
             except Exception as e:
                 print(f"[GCMS] Stripe verify failed for order #{o.id}: {e}")
@@ -2038,6 +2129,118 @@ def download_gcms_consent_form(
         media_type="application/pdf",
         headers={"Content-Disposition": f'attachment; filename="{form_code}_prefilled_order{order.id}.pdf"'},
     )
+
+
+# ── GCMS Notes AI Analyzer ─────────────────────────────────────────────────────
+# Pay-first: the analysis endpoint refuses to touch the PDF until the user holds a
+# gcms_analyzer_credit (granted by a $19.90 purchase, or included with every GCMS order).
+
+@app.get("/api/v1/gcms-analysis/status")
+def gcms_analysis_status(
+    user_id: str = Depends(get_current_user),
+    db: Session = Depends(database.get_db),
+):
+    """Credits + past analyses for the analyzer page. Also lazily verifies any initiated
+    analyzer checkout with Stripe (same pattern as GCMS orders — works without the webhook)."""
+    ensure_user_exists(user_id, db)
+    ua = db.query(db_models.UserAccount).filter_by(user_id=user_id).first()
+    pending = db.query(db_models.PaymentEvent).filter_by(
+        user_id=user_id, pass_type='gcms_analyzer', event_type='checkout_initiated').all()
+    for pe in pending:
+        try:
+            session = stripe.checkout.Session.retrieve(pe.stripe_session_id)
+            if getattr(session, "payment_status", None) == 'paid':
+                pe.event_type = 'checkout_success'
+                ua.gcms_analyzer_credits = (ua.gcms_analyzer_credits or 0) + 1
+                print(f"[GCMS-Analyzer] Lazily verified paid session for {user_id}")
+        except Exception as e:
+            print(f"[GCMS-Analyzer] Stripe verify failed: {e}")
+    db.commit()
+
+    analyses = (db.query(db_models.Evaluation)
+                .filter_by(user_id=user_id, evaluation_type='gcms_analysis')
+                .order_by(db_models.Evaluation.id.desc()).limit(20).all())
+    return {
+        "credits": (ua.gcms_analyzer_credits or 0) if ua else 0,
+        "analyses": [{
+            "stored_file_id": a.stored_file_id,
+            "original_filename": a.original_filename,
+            "created_at": a.timestamp_toronto.isoformat() if a.timestamp_toronto else None,
+            "result": {k: v for k, v in (a.payload or {}).items() if k != "_extracted_text"},
+        } for a in analyses],
+    }
+
+
+@app.post("/api/v1/gcms-analysis")
+@limiter.limit("10/hour")
+async def analyze_gcms_notes(
+    request: Request,
+    document: UploadFile = File(...),
+    user_id: str = Depends(get_current_user),
+    db: Session = Depends(database.get_db),
+):
+    """Analyze an uploaded GCMS/ATIP notes PDF. STRICTLY pay-first: no extraction or LLM work
+    happens without a credit. The credit is only consumed when the document is a valid notes
+    release (a wrong upload costs nothing — the user can retry)."""
+    ensure_user_exists(user_id, db)
+    ua = db.query(db_models.UserAccount).filter_by(user_id=user_id).first()
+    if not ua or (ua.gcms_analyzer_credits or 0) <= 0:
+        raise HTTPException(status_code=402, detail="This analysis requires a purchase. "
+                            "Buy an analysis report (or place a GCMS order — it includes one free).")
+
+    filename = document.filename or ""
+    ext = os.path.splitext(filename)[1].lower()
+    if ext != '.pdf':
+        raise HTTPException(status_code=400, detail="Please upload the PDF you received from IRCC/CBSA.")
+    doc_bytes = await document.read()
+    if len(doc_bytes) > 20 * 1024 * 1024:  # ATIP releases can be big — 20MB cap for this endpoint only
+        raise HTTPException(status_code=413, detail="File too large. Maximum size is 20MB.")
+
+    import gcms_analyzer
+    try:
+        report = gcms_analyzer.run_gcms_analysis(doc_bytes, ai_service.openai_client)
+    except ValueError as ve:
+        raise HTTPException(status_code=400, detail=str(ve))
+    except Exception as e:
+        print(f"[GCMS-Analyzer] Analysis failed for {user_id}: {e}")
+        raise HTTPException(status_code=500, detail="The analysis failed. Your credit was NOT used — please try again.")
+
+    if not report.get("document_valid", False):
+        # Wrong document — do not consume the credit, return the rejection so the user can retry.
+        return {**report, "credit_consumed": False, "credits_remaining": ua.gcms_analyzer_credits or 0}
+
+    ua.gcms_analyzer_credits -= 1
+
+    file_id = str(uuid.uuid4())
+    stored_filename = f"{file_id}.pdf"
+    try:
+        if supabase:
+            supabase.storage.from_("documents").upload(
+                path=stored_filename, file=doc_bytes, file_options={"content-type": "application/pdf"})
+        else:
+            with open(UPLOADS_DIR / stored_filename, "wb") as f:
+                f.write(doc_bytes)
+    except Exception as e:
+        print(f"[GCMS-Analyzer] File storage failed (analysis still returned): {e}")
+
+    report["stored_file_id"] = file_id
+    report["original_filename"] = filename
+    record = db_models.Evaluation(
+        evaluation_type='gcms_analysis',
+        user_id=user_id,
+        document_type="GCMS Notes Analysis",
+        role_name=None,
+        company_name=None,
+        original_filename=filename,
+        stored_file_id=file_id,
+        compliance_status="N/A",
+        is_premium_unlocked=1,
+        payload=report,
+    )
+    db.add(record)
+    db.commit()
+
+    return {**report, "credit_consumed": True, "credits_remaining": ua.gcms_analyzer_credits or 0}
 
 
 class UnlockRequest(BaseModel):
