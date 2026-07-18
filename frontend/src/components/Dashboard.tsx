@@ -449,7 +449,13 @@ export const Dashboard: FC<DashboardProps> = ({ data, onReset, onUpdate }) => {
             <h3 style={{ fontSize: '1.2rem', fontWeight: 700, marginBottom: '20px', color: 'var(--text-color)', borderBottom: '1px solid var(--border-color)', paddingBottom: '12px' }}>
               Employment Letter Audit Complete
             </h3>
-              
+
+            {(data as any).engine_tier === 'premium' && (
+              <div style={{ fontSize: '0.8rem', color: '#4338CA', background: '#EEF2FF', border: '1px solid #C7D2FE', borderRadius: '999px', padding: '5px 14px', fontWeight: 600, display: 'inline-block', marginBottom: '18px' }}>
+                ⚡ Premium AI engine — as a paying member, your audit ran on our most advanced, highest-accuracy model
+              </div>
+            )}
+
             {/* Decision Badge */}
             <div className="result-card-header" style={{ marginBottom: '24px' }}>
               <div className="result-card-icon" style={{ 

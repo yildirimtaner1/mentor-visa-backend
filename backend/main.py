@@ -416,6 +416,8 @@ async def analyze_document_endpoint(
         # Inject file metadata into the response
         result_json["stored_file_id"] = file_id
         result_json["original_filename"] = filename
+        # Paying users' audits run on the premium model — surface that so the UI can say so.
+        result_json["engine_tier"] = model_tier
         # Persist the extracted text in the saved payload so re-evaluations reuse it instead of
         # re-downloading + re-extracting (and re-paying vision OCR). Stripped from the API response.
         result_json["_extracted_text"] = user_content
@@ -891,16 +893,29 @@ def reevaluate_document(
             result_json["stored_file_id"] = reeval_file_id
             result_json["original_file_id"] = req.file_id  # Reference to original document
             result_json["original_filename"] = record.original_filename
-            # Inherit unlock status ONLY from audit source records.
-            # If the source is a NOC Finder record (always unlocked for signed-in users),
-            # the audit must NOT be auto-unlocked — audits require payment.
-            audit_unlocked = 1 if (record.evaluation_type == 'audit' and record.is_premium_unlocked) else 0
+            # Unlock inheritance:
+            # - Once THIS letter's audit was unlocked anywhere in its chain (original or any
+            #   re-eval), further re-evaluations against other NOC codes are free — the user
+            #   already paid for this letter.
+            # - Optimize/Execute include unlimited audits, so their re-evals unlock outright.
+            # - A NOC Finder source alone does NOT unlock (audits require payment).
+            chain_unlocked = db.query(db_models.Evaluation).filter(
+                db_models.Evaluation.evaluation_type == 'audit',
+                db_models.Evaluation.is_premium_unlocked == 1,
+                (db_models.Evaluation.stored_file_id == actual_file_id) |
+                (db_models.Evaluation.stored_file_id.startswith(f"{actual_file_id}_reeval_", autoescape=True)),
+            ).first() is not None
+            ua_re = db.query(db_models.UserAccount).filter_by(user_id=user_id).first() if user_id != "anonymous" else None
+            paid_tier = bool(ua_re and ua_re.subscription_tier in ("starter", "complete"))
+            audit_unlocked = 1 if (chain_unlocked or paid_tier
+                                   or (record.evaluation_type == 'audit' and record.is_premium_unlocked)) else 0
             result_json["is_premium_unlocked"] = audit_unlocked
             
             # Include target NOC in metadata for display in My Evaluations
             if req.target_noc and req.target_noc != 'auto':
                 result_json["reevaluated_against_noc"] = req.target_noc
 
+            result_json["engine_tier"] = model_tier
             result_json["_extracted_text"] = user_content  # chained re-evals skip re-extraction too
 
             # Save as a brand new evaluation run
@@ -1040,11 +1055,13 @@ async def noc_finder_endpoint(
             # coverage, not the old single-prompt path that self-reported 100/100.
             import noc_finder_v2
             _tgt = target_noc if (target_noc and target_noc != 'auto') else None
+            _model_tier = _audit_model_tier(user_id, db)
             result = noc_finder_v2.run_noc_finder_v2(
                 user_content, page_images if page_images else None,
                 target_noc=_tgt, from_document=bool(document),
-                model_tier=_audit_model_tier(user_id, db),
+                model_tier=_model_tier,
             )
+            result["engine_tier"] = _model_tier  # paid users' analyses run on the premium model
         except openai.RateLimitError as e:
             print(f"OpenAI RateLimitError details: {e.response.json() if hasattr(e, 'response') else str(e)}")
             raise HTTPException(status_code=429, detail=f"OpenAI Rate Limit Exceeded: {str(e)}")
@@ -1176,7 +1193,13 @@ def noc_finder_reveal(
     is_paid = tier in ("starter", "complete")
     credits = (ua.find_noc_credits if ua else 0) or 0
 
-    if is_paid:
+    rec = db.query(db_models.Evaluation).filter_by(
+        evaluation_type='noc_finder', stored_file_id=req.stored_file_id).first()
+    # IDEMPOTENT: the frontend may retry the reveal (token races right after sign-up) — a record
+    # this user already unlocked must never cost a second credit.
+    already_unlocked = bool(rec and rec.is_premium_unlocked and rec.user_id in (user_id, "anonymous"))
+
+    if is_paid or already_unlocked:
         access = "full"
     elif credits > 0:
         ua.find_noc_credits = credits - 1
@@ -1185,8 +1208,6 @@ def noc_finder_reveal(
     else:
         access = "gated"
 
-    rec = db.query(db_models.Evaluation).filter_by(
-        evaluation_type='noc_finder', stored_file_id=req.stored_file_id).first()
     if rec:
         if rec.user_id == "anonymous":
             rec.user_id = user_id          # claim the anon record for this user

@@ -52,6 +52,7 @@ interface NOCResult {
   coverage_subtitle?: string; // sub-occupation the coverage is scoped to (multi-title NOCs)
   duties_breakdown?: DutyMatch[];
   breakdown_count?: number;
+  engine_tier?: string; // 'premium' when the backend ran the paid-tier AI model
 }
 
 interface NOCFinderPageProps {
@@ -240,49 +241,57 @@ export const NOCFinderPage: FC<NOCFinderPageProps> = ({ onNavigate }) => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isSignedIn]);
 
-  // On sign-in after an anonymous search, decide entitlement on the SERVER (no AI re-run): a paid
-  // or credit-holding user reveals the full report (spending one credit); an existing user with no
-  // credits sees the upgrade teaser + payment CTAs. This closes the "log out → run anon → log back in
-  // to read it free" loophole.
-  const prevSignedIn = useRef(isSignedIn);
+  // Once signed in with a gated result on screen, decide entitlement on the SERVER (no AI re-run):
+  // paid/credit users reveal the full report (one credit); users with no credits get the upgrade
+  // teaser. Fires whenever a gated result meets a signed-in session — sign-in transition, page
+  // (re)mount after a Clerk redirect, everything — not just the in-place transition. Right after
+  // sign-UP Clerk's token can lag by a moment, so getToken is retried; the server reveal is
+  // idempotent (an already-unlocked record never costs a second credit), making retries safe.
+  const revealInFlight = useRef(false);
   useEffect(() => {
-    if (prevSignedIn.current || !isSignedIn) { prevSignedIn.current = isSignedIn; return; }
-    prevSignedIn.current = isSignedIn;
+    if (!isSignedIn || revealInFlight.current) return;
 
     let cur: NOCResult | null = result;
     if (!cur) {
       const saved = sessionStorage.getItem('nocFinderResult');
       if (saved) { try { cur = JSON.parse(saved); } catch { /* ignore */ } }
     }
-    if (!cur || !cur.gate_reason) return; // nothing gated to reveal
+    // Only 'signin'-gated results need a server decision; 'upgrade'-gated ones already had it.
+    if (!cur || !cur.gate_reason || cur.gate_reason === 'upgrade' || !cur.stored_file_id) return;
 
+    revealInFlight.current = true;
     (async () => {
-      const token = await getToken();
-      if (!token || !cur) return;
-      let access: 'full' | 'gated' = 'full';
-      let serverFull: any = null;
-      if (cur.stored_file_id) {
-        const r = await revealNocResult(token, cur.stored_file_id);
-        access = r.access; serverFull = r.result;
+      try {
+        let token: string | null = null;
+        for (let i = 0; i < 5 && !token; i++) {
+          token = await getToken().catch(() => null);
+          if (!token) await new Promise(r => setTimeout(r, 700));
+        }
+        if (!token || !cur) { revealInFlight.current = false; return; }
+
+        const r = await revealNocResult(token, cur.stored_file_id!);
         setUserTier(r.tier);
         setFinderCredits(r.finder_credits_remaining ?? 0);
+
+        if (r.access === 'full' && r.result) {
+          // The gated response had the NOC code stripped; use the server's full result to reveal it.
+          const full = { ...mapApiResponse(r.result), from_file: cur.from_file };
+          setResult(full);
+          sessionStorage.setItem('nocFinderResult', JSON.stringify(full));
+          setNoc({ code: full.noc_code, title: full.noc_title, teerCategory: full.teer_category, cecEligible: full.cec_eligible, confidence: full.confidence });
+        } else {
+          // Existing user with no credits → keep only the duty-coverage gauge visible; code stays hidden.
+          const gated: NOCResult = { ...cur, is_signed_in: true, gated: true, gate_reason: 'upgrade', finder_credits_remaining: 0 };
+          setResult(gated);
+          sessionStorage.setItem('nocFinderResult', JSON.stringify(gated));
+        }
+        setTimeout(() => document.getElementById('primary-match-section')?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 300);
+      } catch {
+        revealInFlight.current = false; // network hiccup — allow the next render to retry
       }
-      if (access === 'full' && serverFull) {
-        // The gated response had the NOC code stripped; use the server's full result to reveal it.
-        const full = { ...mapApiResponse(serverFull), from_file: cur.from_file };
-        setResult(full);
-        sessionStorage.setItem('nocFinderResult', JSON.stringify(full));
-        setNoc({ code: full.noc_code, title: full.noc_title, teerCategory: full.teer_category, cecEligible: full.cec_eligible, confidence: full.confidence });
-      } else {
-        // Existing user with no credits → keep only the duty-coverage gauge visible; code stays hidden.
-        const gated: NOCResult = { ...cur, is_signed_in: true, gated: true, gate_reason: 'upgrade', finder_credits_remaining: 0 };
-        setResult(gated);
-        sessionStorage.setItem('nocFinderResult', JSON.stringify(gated));
-      }
-      setTimeout(() => document.getElementById('primary-match-section')?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 300);
     })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isSignedIn]);
+  }, [isSignedIn, result]);
 
   /** Map raw backend v2 response to our local NOCResult interface */
   const mapApiResponse = (rawData: any): NOCResult => {
@@ -330,6 +339,7 @@ export const NOCFinderPage: FC<NOCFinderPageProps> = ({ onNavigate }) => {
         match: d.match || 'missing',
       })),
       breakdown_count: rawData.breakdown_count ?? (rawData.duties_breakdown || []).length,
+      engine_tier: rawData.engine_tier,
     };
   };
 
@@ -393,6 +403,11 @@ export const NOCFinderPage: FC<NOCFinderPageProps> = ({ onNavigate }) => {
         const mapped = mapApiResponse(rawData);
         mapped.from_file = !!inputFile; // remember whether this came from a real document
         setResult(mapped);
+        // Land the user on the NOC match itself, not wherever they happened to be on the page.
+        setTimeout(() => {
+          (document.getElementById('primary-match-section') || document.getElementById('noc-results-area'))
+            ?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }, 250);
         ReactGA.event("tool_engagement", { tool_name: "NOC Finder" });
         sessionStorage.setItem('nocFinderResult', JSON.stringify(mapped));
         // Remember the inputs so we can re-run (reveal full report) after a successful payment.
@@ -768,6 +783,11 @@ export const NOCFinderPage: FC<NOCFinderPageProps> = ({ onNavigate }) => {
                     {typeof result.finder_credits_remaining === 'number' && !result.gated && (
                       <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '4px', display: 'block' }}>
                         🎟️ {result.finder_credits_remaining} free full {result.finder_credits_remaining === 1 ? 'report' : 'reports'} left
+                      </span>
+                    )}
+                    {result.engine_tier === 'premium' && !result.gated && (
+                      <span style={{ fontSize: '0.75rem', color: '#4338CA', marginTop: '6px', display: 'inline-block', background: '#EEF2FF', border: '1px solid #C7D2FE', borderRadius: '999px', padding: '3px 10px', fontWeight: 600 }}>
+                        ⚡ Premium AI engine — as a paying member, your analysis ran on our most advanced, highest-accuracy model
                       </span>
                     )}
                   </div>
