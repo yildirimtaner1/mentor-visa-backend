@@ -337,6 +337,16 @@ MANDATORY ELEMENTS (populate `mandatory_requirements` booleans - set TRUE only i
 7. SALARY / COMPENSATION - Any format acceptable (hourly, weekly, monthly, annual)
 8. SIGNATORY - Name, title, and signature of supervisor OR HR officer (both valid)
 
+HOW TO JUDGE ELEMENTS 1, 3 AND 8 (letterhead / contact information / signatory):
+- Use BOTH the page images (when provided) and the extracted text. A header or footer block with
+  the company name, logo, address, phone, email or website IS official letterhead.
+- Word documents and plain-text extractions often reach you WITHOUT page images, and PDF text
+  extraction frequently loses header/footer formatting. Judge from textual cues (company block,
+  signature block with name and title). NEVER mark these elements false merely because no image
+  was provided or because formatting was lost in extraction.
+- Contact information counts wherever it appears: header, footer, signature block, or body.
+- Mark FALSE only when the element is affirmatively absent from BOTH the text and the images.
+
 For `compliance.score`: (count of true mandatory_requirements / 8) x 100
 For `compliance.missing_elements`: List mandatory elements completely absent.
 For `compliance.warnings`: List elements present but insufficient/ambiguous.
