@@ -2029,14 +2029,14 @@ def download_gcms_consent_form(
     if order.status == 'awaiting_payment':
         raise HTTPException(status_code=402, detail="Please complete payment first.")
     try:
-        pdf_bytes = gcms_form.fill_imm5744(order)
+        pdf_bytes, form_code = gcms_form.fill_consent_form(order)
     except Exception as e:
-        print(f"[GCMS] IMM 5744 generation failed for order #{order.id}: {e}")
+        print(f"[GCMS] Consent form generation failed for order #{order.id}: {e}")
         raise HTTPException(status_code=500, detail="Could not generate the consent form. Please try again.")
     return Response(
         content=pdf_bytes,
         media_type="application/pdf",
-        headers={"Content-Disposition": f'attachment; filename="IMM5744_prefilled_order{order.id}.pdf"'},
+        headers={"Content-Disposition": f'attachment; filename="{form_code}_prefilled_order{order.id}.pdf"'},
     )
 
 
