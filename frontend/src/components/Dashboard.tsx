@@ -96,7 +96,9 @@ export const Dashboard: FC<DashboardProps> = ({ data, onReset, onUpdate }) => {
     try {
         const tk = await getToken();
         if (!tk) return;
-        const result = await createCheckoutSession('auditor', tk, '/results');
+        // Return to the page this Dashboard is mounted on (/audit-employment-letter
+        // inline flow or /results history view) so the payment_success auto-unlock fires.
+        const result = await createCheckoutSession('auditor', tk, window.location.pathname);
         if (result?.session_url) window.location.href = result.session_url;
     } catch (e: any) {
         alert(friendlyError(e, 'Failed to initiate checkout. Please try again.'));
@@ -743,7 +745,7 @@ export const Dashboard: FC<DashboardProps> = ({ data, onReset, onUpdate }) => {
                         <div className="pricing-card-header">
                           <div style={{ fontSize: '2.5rem', marginBottom: '0.75rem' }}>✨</div>
                           <h3>Unlock Full Audit</h3>
-                          <p className="pricing-desc">Unlimited audits are included in your <strong>{userTier.charAt(0).toUpperCase() + userTier.slice(1)}</strong> plan.</p>
+                          <p className="pricing-desc">Unlimited audits are included in your <strong>{userTier === 'starter' ? 'Optimize' : 'Execute'}</strong> plan.</p>
                         </div>
                         <div className="pricing-card-footer">
                           <button className="pricing-btn primary" onClick={handleUnlock} disabled={isUnlocking} style={{ width: '100%' }}>
@@ -833,7 +835,7 @@ export const Dashboard: FC<DashboardProps> = ({ data, onReset, onUpdate }) => {
                                 try {
                                   const tk = await getToken();
                                   if (!tk) return;
-                                  const result = await createCheckoutSession(userTier === 'starter' ? 'complete' : 'starter', tk, '/results');
+                                  const result = await createCheckoutSession(userTier === 'starter' ? 'complete' : 'starter', tk, window.location.pathname);
                                   if (result?.session_url) window.location.href = result.session_url;
                                 } catch (e: any) {
                                   alert(friendlyError(e, 'Failed to start checkout. Please try again.'));
