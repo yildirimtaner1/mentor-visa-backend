@@ -19,6 +19,7 @@ CARDS = {
     "track-my-application": ("Smart Application Tracker", "Timeline predictions from 700+ real PR cases"),
     "order-gcms-notes": ("Order Your GCMS Notes", "Your complete IRCC file — $19.90, filed for you"),
     "how-to-read-gcms-notes": ("GCMS Notes Guide", "Decode every stage, code and red flag in your file"),
+    "gcms-notes-analyzer": ("GCMS Notes AI Analyzer", "Your IRCC file, explained in plain English"),
     "draw-results": ("Express Entry Draw Results", "Every CRS cut-off and ITA count, updated live"),
     "express-entry-processing-times": ("Processing Times 2026", "AOR to eCOPR medians from real recent cases"),
     "noc-codes": ("NOC 2021 Directory", "All 516 occupation codes with duties & eligibility"),

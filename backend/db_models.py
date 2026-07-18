@@ -18,6 +18,7 @@ class UserAccount(Base):
     ita_strategy_credits = Column(Integer, default=0, nullable=False)
     profile_builder_credits = Column(Integer, default=0, nullable=False)
     gcms_credits = Column(Integer, default=0, nullable=False)  # prepaid GCMS notes orders (skip payment step)
+    gcms_analyzer_credits = Column(Integer, default=0, nullable=False)  # GCMS Notes AI Analysis reports (1 free per order)
     subscription_tier = Column(String, default="free", nullable=False)  # "free", "starter", "complete"
 
 
