@@ -1,7 +1,7 @@
 import { type FC, type ReactNode, useState, useRef, useEffect } from 'react';
 import { useUser, SignInButton, useAuth } from '@clerk/clerk-react';
 import { useLocation } from 'react-router-dom';
-import { findNOCCode, reevaluateDocument, createCheckoutSession, fetchUserCredits, revealNocResult } from '../services/api';
+import { findNOCCode, reevaluateDocument, createCheckoutSession, fetchUserCredits, revealNocResult, friendlyError } from '../services/api';
 import { SEO } from './common/SEO';
 import { DynamicLoader } from './common/DynamicLoader';
 import { useJourneyStore } from '../stores/journeyStore';
@@ -430,7 +430,7 @@ export const NOCFinderPage: FC<NOCFinderPageProps> = ({ onNavigate }) => {
         });
       }
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Something went wrong. Please try again.');
+      setError(friendlyError(e, 'Something went wrong. Please try again.'));
     } finally {
       setLoading(false);
     }
@@ -466,7 +466,7 @@ export const NOCFinderPage: FC<NOCFinderPageProps> = ({ onNavigate }) => {
         setError('Re-evaluation returned no NOC analysis. Please try again.');
       }
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Re-evaluation failed. Please try again.');
+      setError(friendlyError(e, 'Re-evaluation failed. Please try again.'));
     } finally {
       setLoading(false);
     }

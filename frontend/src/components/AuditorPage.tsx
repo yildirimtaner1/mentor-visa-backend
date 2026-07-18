@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect } from 'react';
 import type { DragEvent, ChangeEvent, FC } from 'react';
 import type { AnalysisResponse } from '../types';
-import { uploadDocument, reevaluateDocument, saveEvaluation } from '../services/api';
+import { uploadDocument, reevaluateDocument, saveEvaluation, friendlyError } from '../services/api';
 import { SEO } from './common/SEO';
 import { DynamicLoader } from './common/DynamicLoader';
 import { Dashboard } from './Dashboard';
@@ -92,8 +92,7 @@ export const AuditorPage: FC = () => {
           }, 300);
           // Backend reevaluate endpoint already saves the record — no need to double-save
         } catch (err) {
-          const message = err instanceof Error ? err.message : 'An error occurred during auto-analysis.';
-          setError(message);
+          setError(friendlyError(err, 'An error occurred during auto-analysis.'));
         } finally {
           setLoading(false);
           // Clear history state to prevent looping on page refresh
@@ -179,8 +178,7 @@ export const AuditorPage: FC = () => {
         }
       }
     } catch (err) {
-      const message = err instanceof Error ? err.message : 'An error occurred during analysis. Please try again.';
-      setError(message);
+      setError(friendlyError(err, 'An error occurred during analysis. Please try again.'));
     } finally {
       setLoading(false);
     }

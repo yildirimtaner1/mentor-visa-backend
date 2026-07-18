@@ -2,7 +2,7 @@ import { type FC, useEffect, useState, useRef } from 'react';
 import { useUser, SignInButton, SignUpButton, useAuth } from '@clerk/clerk-react';
 import { usePDF } from 'react-to-pdf';
 import type { AnalysisResponse, KeyRisk } from '../types';
-import { reevaluateDocument, fetchUserCredits, createCheckoutSession, consumeCreditToUnlock, saveEvaluation } from '../services/api';
+import { reevaluateDocument, fetchUserCredits, createCheckoutSession, consumeCreditToUnlock, saveEvaluation, friendlyError } from '../services/api';
 import { DynamicLoader } from './common/DynamicLoader';
 import { CheckCircle2, X } from 'lucide-react';
 import '../components/common/PaywallGate.css';
@@ -96,10 +96,10 @@ export const Dashboard: FC<DashboardProps> = ({ data, onReset, onUpdate }) => {
     try {
         const tk = await getToken();
         if (!tk) return;
-        const result = await createCheckoutSession('auditor', tk, '/audit-employment-letter');
+        const result = await createCheckoutSession('auditor', tk, '/results');
         if (result?.session_url) window.location.href = result.session_url;
     } catch (e: any) {
-        alert("Failed to initiate checkout: " + (e.message || "Unknown error"));
+        alert(friendlyError(e, 'Failed to initiate checkout. Please try again.'));
         setIsBuying(false);
     }
   };
@@ -119,7 +119,7 @@ export const Dashboard: FC<DashboardProps> = ({ data, onReset, onUpdate }) => {
         url.searchParams.delete('payment_success');
         window.history.replaceState({}, '', url.toString());
     } catch (e: any) {
-        alert(e.message || "Failed to unlock document");
+        alert(friendlyError(e, 'Failed to unlock document.'));
     } finally {
         setIsUnlocking(false);
     }
@@ -185,7 +185,7 @@ export const Dashboard: FC<DashboardProps> = ({ data, onReset, onUpdate }) => {
         onUpdate(newResult);
         window.scrollTo({ top: 0, behavior: 'smooth' });
     } catch (e: any) {
-        alert(e.message || "Failed to re-evaluate document.");
+        alert(friendlyError(e, 'Failed to re-evaluate document.'));
     } finally {
         setIsReevaluating(null);
     }
@@ -833,10 +833,10 @@ export const Dashboard: FC<DashboardProps> = ({ data, onReset, onUpdate }) => {
                                 try {
                                   const tk = await getToken();
                                   if (!tk) return;
-                                  const result = await createCheckoutSession(userTier === 'starter' ? 'complete' : 'starter', tk, '/audit-employment-letter');
+                                  const result = await createCheckoutSession(userTier === 'starter' ? 'complete' : 'starter', tk, '/results');
                                   if (result?.session_url) window.location.href = result.session_url;
                                 } catch (e: any) {
-                                  alert('Failed to start checkout: ' + (e.message || 'Unknown error'));
+                                  alert(friendlyError(e, 'Failed to start checkout. Please try again.'));
                                   setIsBuying(false);
                                 }
                               }}

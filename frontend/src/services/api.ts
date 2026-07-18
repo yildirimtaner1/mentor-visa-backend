@@ -2,6 +2,22 @@ import type { AnalysisResponse } from '../types';
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
 
+// Browser network failures surface as terse TypeErrors ("Failed to fetch",
+// "NetworkError when attempting to fetch resource.", "Load failed") that mean
+// nothing to users. Translate those; pass real backend messages through.
+export function friendlyError(e: unknown, fallback: string): string {
+  const msg = e instanceof Error ? e.message : '';
+  const isNetworkError =
+    (e instanceof TypeError && /fetch|network|load failed/i.test(msg)) ||
+    /^(failed to fetch|networkerror|load failed|network request failed)/i.test(msg);
+  if (isNetworkError) {
+    return "We couldn't reach our servers — this is usually a brief connection hiccup. " +
+      'Please check your internet connection and try again in a few seconds. ' +
+      'If it keeps happening, refresh the page and retry.';
+  }
+  return msg || fallback;
+}
+
 export async function uploadDocument(file: File, targetNoc?: string, token?: string): Promise<AnalysisResponse> {
   const formData = new FormData();
   formData.append('document', file);
