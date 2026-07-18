@@ -1610,7 +1610,8 @@ def find_noc_with_openai(system_prompt: str, user_content: str, page_images: lis
 
 
 def auto_detect_noc(user_content: str, page_images: list[tuple[bytes, str]] = None,
-                    from_document: bool = False, model_tier: str = "standard") -> str | None:
+                    from_document: bool = False, model_tier: str = "standard",
+                    content_key: str = None) -> str | None:
     """Run the NOC Finder (v2) to auto-detect the best NOC code for a document.
 
     Returns the detected NOC code string, or None if detection fails.
@@ -1618,13 +1619,16 @@ def auto_detect_noc(user_content: str, page_images: list[tuple[bytes, str]] = No
     can display the SAME NOC-match confidence the Finder would, for free; and stashes the complete
     internal audit (when v2 ran one — document path) on `auto_detect_noc.last_audit` so /analyze can
     REUSE it instead of paying for a second identical audit.
+    content_key: stable source hash so the Auditor and the NOC Finder share one cached v2 result for
+    the same letter (identical NOC/coverage/alternatives/flags across both tools).
     """
     auto_detect_noc.last_confidence = None
     auto_detect_noc.last_audit = None
     try:
         import noc_finder_v2
         result = noc_finder_v2.run_noc_finder_v2(user_content, page_images,
-                                                 from_document=from_document, model_tier=model_tier)
+                                                 from_document=from_document, model_tier=model_tier,
+                                                 content_key=content_key)
 
         rec = result.get("recommended_noc", {})
         detected_code = rec.get("code")
@@ -1707,6 +1711,63 @@ def _backfill_empty_fields(data: dict, response_format) -> None:
             data[name] = {}
 
 
+# Objective contact-coordinate patterns. A hit is unambiguous evidence, so it can only ADD a present
+# element, never remove one.
+_EMAIL_RE = re.compile(r"[A-Za-z0-9._%+\-]+@[A-Za-z0-9.\-]+\.[A-Za-z]{2,}")
+_PHONE_RE = re.compile(r"(?:\+?\d[\d\s().\-]{7,}\d)")
+_URL_RE = re.compile(r"(?:https?://|www\.)[A-Za-z0-9.\-]+\.[A-Za-z]{2,}", re.I)
+
+
+def _apply_contact_backstop(result: dict, text: str) -> None:
+    """False->True only, using objective evidence, for the presence elements the model misjudges.
+
+    - contact_information: an email OR a phone number OR a website is, by definition, contact info.
+    - company_letterhead: a reference letter that embeds the employer's own email / phone / website
+      is in practice printed on letterhead (that header block IS the letterhead). We treat the same
+      objective coordinates as letterhead evidence — this only ever corrects a false negative on a
+      real company header, and reference letters that are genuinely letterhead-less almost never carry
+      an embedded employer email/phone.
+    Keeps compliance.missing_element lists honest by dropping anything we just flipped to present.
+    """
+    mr = result.get("mandatory_requirements")
+    if not isinstance(mr, dict) or not text:
+        return
+    has_email = bool(_EMAIL_RE.search(text))
+    has_phone = bool(_PHONE_RE.search(text))
+    has_url = bool(_URL_RE.search(text))
+    has_contact_coord = has_email or has_phone or has_url
+
+    flipped = []
+    if has_contact_coord and mr.get("contact_information") is not True:
+        mr["contact_information"] = True
+        flipped.append(("contact_information", "contact"))
+    if has_contact_coord and mr.get("company_letterhead") is not True:
+        mr["company_letterhead"] = True
+        flipped.append(("company_letterhead", "letterhead"))
+
+    if flipped:
+        kinds = "+".join(k for _, k in flipped)
+        print(f"[Auditor] Contact backstop: found email={has_email} phone={has_phone} url={has_url} "
+              f"-> forced {kinds} = True")
+        # Scrub the flipped elements from any 'missing' list so the narrative doesn't contradict the flags.
+        comp = result.get("compliance")
+        if isinstance(comp, dict):
+            for key in ("missing_elements", "missing"):
+                lst = comp.get(key)
+                if isinstance(lst, list):
+                    comp[key] = [m for m in lst if not _mentions_flipped(m, flipped)]
+
+
+def _mentions_flipped(text: str, flipped) -> bool:
+    low = (text or "").lower()
+    for _, kind in flipped:
+        if kind == "contact" and ("contact" in low or "email" in low or "phone" in low or "telephone" in low):
+            return True
+        if kind == "letterhead" and "letterhead" in low:
+            return True
+    return False
+
+
 def audit_document_with_openai(system_prompt: str, user_content: str, page_images: list[tuple[bytes, str]] = None, auto_detected_noc: str = None, forced_noc: str = None, model_tier: str = "standard") -> dict:
     """Employment Auditor: returns AnalysisResponse.
 
@@ -1779,10 +1840,17 @@ def audit_document_with_openai(system_prompt: str, user_content: str, page_image
         
         result["noc_analysis"] = noc_analysis
     
+    # Deterministic backstop for the three "presence" mandatory elements the model judges least
+    # reliably (letterhead / contact info / signatory). OCR and PDF extraction routinely drop or
+    # reorder header blocks, so gpt-4o-mini sometimes marks an obvious letterhead absent. Objective
+    # textual evidence (a real email, phone, or website) can only turn these False->True — never the
+    # reverse — so it removes false negatives without risking false positives.
+    _apply_contact_backstop(result, user_content)
+
     # Post-process: Fix math errors from the LLM
     # LLMs are notoriously bad at math (e.g., outputting 8 instead of 100 for 8/8 requirements).
     # We recalculate these percentages natively to ensure 100% accuracy.
-    
+
     # 1. Compliance Score (out of 8 mandatory requirements)
     if "mandatory_requirements" in result and "compliance" in result:
         mand_reqs = result.get("mandatory_requirements", {})

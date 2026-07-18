@@ -1,5 +1,12 @@
 import os
 import uuid
+import hashlib
+
+
+def _content_key(doc_bytes: bytes) -> str:
+    """Stable hash of a document's raw bytes — the same uploaded file always yields the same key,
+    so the NOC Finder and the Employment Letter Auditor share one cached v2 result for one letter."""
+    return hashlib.sha1(doc_bytes).hexdigest()
 import json
 from pathlib import Path
 from fastapi import FastAPI, UploadFile, File, HTTPException, Depends, Security, Form
@@ -371,9 +378,11 @@ async def analyze_document_endpoint(
         # and we REUSE that audit here instead of paying for a second identical call.
         auto_detected = None
         result_json = None
+        ckey = _content_key(doc_bytes)
         if not target_noc:
             target_noc = ai_service.auto_detect_noc(user_content, page_images,
-                                                    from_document=True, model_tier=model_tier)
+                                                    from_document=True, model_tier=model_tier,
+                                                    content_key=ckey)
             auto_detected = target_noc  # Remember this was auto-detected, not user-specified
             reused = getattr(ai_service.auto_detect_noc, "last_audit", None)
             if (isinstance(reused, dict) and target_noc
@@ -826,9 +835,11 @@ def reevaluate_document(
             # Auto-detect NOC using the NOC Finder pipeline when no target is specified.
             effective_target = req.target_noc if (req.target_noc and req.target_noc != 'auto') else None
             auto_detected = None
+            _reeval_ckey = _content_key(doc_bytes) if doc_bytes else None
             if not effective_target:
                 effective_target = ai_service.auto_detect_noc(user_content, page_images,
-                                                              from_document=True, model_tier=model_tier)
+                                                              from_document=True, model_tier=model_tier,
+                                                              content_key=_reeval_ckey)
                 auto_detected = effective_target
 
             top_nocs = ai_service.semantic_search_nocs(user_content)
@@ -1060,6 +1071,7 @@ async def noc_finder_endpoint(
                 user_content, page_images if page_images else None,
                 target_noc=_tgt, from_document=bool(document),
                 model_tier=_model_tier,
+                content_key=_content_key(doc_bytes) if document else None,
             )
             result["engine_tier"] = _model_tier  # paid users' analyses run on the premium model
         except openai.RateLimitError as e:
