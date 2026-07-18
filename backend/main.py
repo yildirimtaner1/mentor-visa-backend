@@ -209,6 +209,68 @@ def dynamic_rate_limit_value(key: str) -> str:
             return "15/hour"
     return "5/hour"
 
+# --- Auth Dependency ---
+# Defined BEFORE the first endpoint that uses it in a Depends() — decorators resolve
+# these names at import time, so ordering matters (a late definition breaks startup).
+security = HTTPBearer()
+
+# Cache the JWKS client globally to avoid re-creating on every request
+_jwks_client = None
+def _get_jwks_client():
+    global _jwks_client
+    if _jwks_client is None and CLERK_ISSUER_URL:
+        jwks_url = f"{CLERK_ISSUER_URL}/.well-known/jwks.json"
+        _jwks_client = PyJWKClient(jwks_url)
+    return _jwks_client
+
+def get_current_user(credentials: HTTPAuthorizationCredentials = Security(security)):
+    token = credentials.credentials
+
+    try:
+        if not CLERK_ISSUER_URL:
+            # Dev fallback: decode without signature verification
+            claims = jwt.decode(token, options={"verify_signature": False})
+            user_id = claims.get("sub")
+            if not user_id:
+                raise HTTPException(status_code=401, detail="No user ID in token")
+            return user_id
+
+        jwks_client = _get_jwks_client()
+        if not jwks_client:
+            raise HTTPException(status_code=500, detail="JWKS client not configured")
+
+        signing_key = jwks_client.get_signing_key_from_jwt(token)
+        data = jwt.decode(
+            token,
+            signing_key.key,
+            algorithms=["RS256"],
+            issuer=CLERK_ISSUER_URL,
+            options={"verify_signature": True}
+        )
+        user_id = data.get("sub")
+        if not user_id:
+            raise HTTPException(status_code=401, detail="No user ID in token")
+        return user_id
+    except HTTPException:
+        raise
+    except jwt.ExpiredSignatureError:
+        # Short-lived Clerk token lapsed (e.g. a long GCMS upload). Never surface the raw
+        # "Signature has expired" — users mid-upload read it as their document's signature.
+        raise HTTPException(status_code=401,
+                            detail="Your session timed out. Please refresh the page and try again — your work is safe.")
+    except Exception as e:
+        print(f"[AUTH] Token verification failed: {e}")  # keep the real reason in logs only
+        raise HTTPException(status_code=401, detail="Authentication failed. Please refresh the page and sign in again.")
+
+def get_current_user_optional(credentials: Optional[HTTPAuthorizationCredentials] = Depends(HTTPBearer(auto_error=False))):
+    if not credentials:
+        return "anonymous"
+    try:
+        return get_current_user(credentials)
+    except Exception:
+        return "anonymous"
+
+
 @app.post("/api/v1/analyze")
 @limiter.limit(dynamic_rate_limit_value, key_func=dynamic_rate_limit_key)
 async def analyze_document_endpoint(
@@ -395,66 +457,7 @@ async def analyze_document_endpoint(
 def health_check():
     return {"status": "ok", "message": "Mentor Visa API is running"}
 
-# --- Auth Dependency ---
-security = HTTPBearer()
-
-# Cache the JWKS client globally to avoid re-creating on every request
-_jwks_client = None
-def _get_jwks_client():
-    global _jwks_client
-    if _jwks_client is None and CLERK_ISSUER_URL:
-        jwks_url = f"{CLERK_ISSUER_URL}/.well-known/jwks.json"
-        _jwks_client = PyJWKClient(jwks_url)
-    return _jwks_client
-
-def get_current_user(credentials: HTTPAuthorizationCredentials = Security(security)):
-    token = credentials.credentials
-    
-    try:
-        if not CLERK_ISSUER_URL:
-            # Dev fallback: decode without signature verification
-            claims = jwt.decode(token, options={"verify_signature": False})
-            user_id = claims.get("sub")
-            if not user_id:
-                raise HTTPException(status_code=401, detail="No user ID in token")
-            return user_id
-
-        jwks_client = _get_jwks_client()
-        if not jwks_client:
-            raise HTTPException(status_code=500, detail="JWKS client not configured")
-        
-        signing_key = jwks_client.get_signing_key_from_jwt(token)
-        data = jwt.decode(
-            token,
-            signing_key.key,
-            algorithms=["RS256"],
-            issuer=CLERK_ISSUER_URL,
-            options={"verify_signature": True}
-        )
-        user_id = data.get("sub")
-        if not user_id:
-            raise HTTPException(status_code=401, detail="No user ID in token")
-        return user_id
-    except HTTPException:
-        raise
-    except jwt.ExpiredSignatureError:
-        # Short-lived Clerk token lapsed (e.g. a long GCMS upload). Never surface the raw
-        # "Signature has expired" — users mid-upload read it as their document's signature.
-        raise HTTPException(status_code=401,
-                            detail="Your session timed out. Please refresh the page and try again — your work is safe.")
-    except Exception as e:
-        print(f"[AUTH] Token verification failed: {e}")  # keep the real reason in logs only
-        raise HTTPException(status_code=401, detail="Authentication failed. Please refresh the page and sign in again.")
-
 # --- DB Endpoints ---
-
-def get_current_user_optional(credentials: Optional[HTTPAuthorizationCredentials] = Depends(HTTPBearer(auto_error=False))):
-    if not credentials:
-        return "anonymous"
-    try:
-        return get_current_user(credentials)
-    except Exception:
-        return "anonymous"
 
 # New signed-in users get this many free FULL NOC Finder reports before the result is gated
 # to a teaser (code + confidence + summary) with the full breakdown behind Optimize.
