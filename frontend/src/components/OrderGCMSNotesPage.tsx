@@ -1,7 +1,7 @@
 import { useState, useEffect, type FC, type ChangeEvent } from 'react';
 import { useAuth, SignInButton } from '@clerk/clerk-react';
 import { SEO } from './common/SEO';
-import { createGCMSOrder, getGCMSOrders, uploadGCMSConsent, createCheckoutSession, setGCMSPersons, downloadGCMSConsentForm, updateGCMSOrder, type GCMSOrderData, type GCMSRelatedPerson } from '../services/api';
+import { createGCMSOrder, getGCMSOrders, uploadGCMSConsent, createCheckoutSession, setGCMSPersons, downloadGCMSConsentForm, updateGCMSOrder, friendlyError, type GCMSOrderData, type GCMSRelatedPerson } from '../services/api';
 import ReactGA from 'react-ga4';
 
 const PRICE = 19.90;
@@ -118,14 +118,15 @@ const STATUS_LABELS: Record<GCMSOrder['status'], string> = {
   delivered: 'Notes emailed ✓',
 };
 
-// Age check for the IMM 5744 signing rules (under-16s are listed but don't sign).
-function isUnder16(dob: string): boolean {
+// Age checks for signing rules: IMM 5744 (IRCC) uses 16+, BSF745 (CBSA) uses 18+.
+function isUnderAge(dob: string, age: number): boolean {
   if (!dob) return false;
   const d = new Date(dob + 'T00:00:00');
   const cutoff = new Date();
-  cutoff.setFullYear(cutoff.getFullYear() - 16);
+  cutoff.setFullYear(cutoff.getFullYear() - age);
   return d > cutoff;
 }
+const isUnder16 = (dob: string) => isUnderAge(dob, 16);
 
 // FAQ — rendered on-page and injected as FAQPage JSON-LD for SEO.
 const FAQ: { q: string; a: string }[] = [
@@ -143,7 +144,7 @@ const FAQ: { q: string; a: string }[] = [
   },
   {
     q: 'Why do I need to sign a consent form?',
-    a: "ATIP requests can only be filed from inside Canada. The signed consent form (IRCC form IMM 5744) authorizes us to request your file on your behalf — it's the standard, IRCC-approved way for applicants outside Canada to get their notes.",
+    a: "ATIP requests can only be filed from inside Canada. The signed consent form (IMM 5744 for IRCC notes, BSF745 for CBSA notes — we pre-fill the right one for you) authorizes us to request your file on your behalf. It's the standard, government-approved way for applicants outside Canada to get their notes.",
   },
   {
     q: 'What is the difference between IRCC and CBSA notes?',
@@ -208,6 +209,11 @@ export const OrderGCMSNotesPage: FC = () => {
     && /\S+@\S+\.\S+/.test(form.email) && !!form.date_of_birth
     && (form.application_number || '').trim().length > 0;
   const personsValid = persons.every(p => p.family_name.trim() && p.given_name.trim() && p.date_of_birth);
+  // CBSA orders use a different consent form (BSF745, signing age 18+) than IRCC (IMM 5744, 16+).
+  const isCbsa = order?.notes_type === 'cbsa';
+  const formCode = isCbsa ? 'BSF745' : 'IMM 5744';
+  const signAge = isCbsa ? 18 : 16;
+  const agency = isCbsa ? 'CBSA' : 'IRCC';
 
   // On sign-in / return from Stripe: resume the latest in-progress order at the right step.
   useEffect(() => {
@@ -260,7 +266,7 @@ export const OrderGCMSNotesPage: FC = () => {
       ReactGA.event('tool_engagement', { tool_name: 'GCMS Order' });
       window.scrollTo({ top: 0, behavior: 'smooth' });
     } catch (e: any) {
-      setError(e.message || 'Something went wrong. Please try again.');
+      setError(friendlyError(e, 'Something went wrong. Please try again.'));
     } finally { setBusy(false); }
   };
 
@@ -275,7 +281,7 @@ export const OrderGCMSNotesPage: FC = () => {
       if (res?.session_url) window.location.href = res.session_url;
       else setError('Could not start checkout. Please try again.');
     } catch (e: any) {
-      setError(e.message || 'Could not start checkout. Please try again.');
+      setError(friendlyError(e, 'Could not start checkout. Please try again.'));
       setBusy(false);
     }
   };
@@ -294,7 +300,7 @@ export const OrderGCMSNotesPage: FC = () => {
       setDocIds(new Array(1 + withAge.length).fill(null)); // one ID slot per person
       setFormReady(true);
     } catch (e: any) {
-      setError(e.message || 'Could not generate the form. Please try again.');
+      setError(friendlyError(e, 'Could not generate the form. Please try again.'));
     } finally { setBusy(false); }
   };
 
@@ -327,7 +333,7 @@ export const OrderGCMSNotesPage: FC = () => {
     } catch (e: any) {
       setError(looksLikeAuth(e?.message)
         ? 'Your session timed out. Please refresh the page and click submit again — your selected files are still here.'
-        : (e.message || 'Upload failed. Please try again.'));
+        : friendlyError(e, 'Upload failed. Please try again.'));
     } finally { setBusy(false); }
   };
 
@@ -688,7 +694,7 @@ export const OrderGCMSNotesPage: FC = () => {
                   <>
                     <h3 style={{ fontSize: '1.2rem', fontWeight: 700, marginBottom: '4px' }}>Step 3 — We prepare your consent form</h3>
                     <p style={{ fontSize: '0.9rem', color: 'var(--text-muted)', marginBottom: '20px', lineHeight: 1.6 }}>
-                      IRCC requires a signed consent form (IMM 5744) before we can request your file.
+                      {agency} requires a signed consent form ({formCode}) before we can request your file.
                       Tell us who's on the application and <strong>we'll fill the entire form for you</strong> — you just print, sign, and upload.
                     </p>
 
@@ -711,13 +717,13 @@ export const OrderGCMSNotesPage: FC = () => {
                       ))}
                     </div>
                     <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '-8px', marginBottom: '16px' }}>
-                      One IMM 5744 fits up to 4 people. More than 4? Mention it in an email — we'll prepare a second form at no charge.
+                      One {formCode} fits up to 4 people. More than 4? Mention it in an email — we'll prepare a second form at no charge.
                     </p>
 
                     {persons.map((p, i) => (
                       <div key={i} style={{ background: '#F8FAFC', border: '1px solid var(--border-color)', borderRadius: '12px', padding: '16px', marginBottom: '12px' }}>
                         <div style={{ fontSize: '0.8rem', fontWeight: 700, marginBottom: '10px', color: 'var(--primary-color)' }}>
-                          Person {i + 2} {isUnder16(p.date_of_birth) && <span style={{ color: '#B45309' }}>· under 16 — listed on the form, parents sign for them</span>}
+                          Person {i + 2} {isUnderAge(p.date_of_birth, signAge) && <span style={{ color: '#B45309' }}>· under {signAge} — {isCbsa ? 'covered by your consent, no signature needed' : 'listed on the form, parents sign for them'}</span>}
                         </div>
                         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '10px' }}>
                           <div>
@@ -747,26 +753,28 @@ export const OrderGCMSNotesPage: FC = () => {
                     ))}
 
                     <button className="btn btn-primary btn-lg" style={{ width: '100%', marginTop: '8px' }} disabled={busy || !personsValid} onClick={generateForm}>
-                      {busy ? 'Preparing your form…' : '📄 Generate my pre-filled IMM 5744 →'}
+                      {busy ? 'Preparing your form…' : `📄 Generate my pre-filled ${formCode} →`}
                     </button>
                     <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', textAlign: 'center', marginTop: '10px', marginBottom: 0 }}>
-                      🔒 These details go only onto IRCC's consent form (IMM 5744) — nothing is shared beyond IRCC.
+                      🔒 These details go only onto {agency}'s consent form ({formCode}) — nothing is shared beyond {agency}.
                     </p>
                   </>
                 ) : (
                   <>
                     <h3 style={{ fontSize: '1.2rem', fontWeight: 700, marginBottom: '4px' }}>Almost done — sign &amp; upload your documents</h3>
                     <p style={{ fontSize: '0.9rem', color: 'var(--text-muted)', marginBottom: '16px', lineHeight: 1.6 }}>
-                      Your pre-filled IMM 5744 just downloaded
+                      Your pre-filled {formCode} just downloaded
                       (<button type="button" onClick={generateForm} disabled={busy} style={{ background: 'none', border: 'none', padding: 0, color: 'var(--primary-color)', fontWeight: 600, cursor: 'pointer', fontSize: 'inherit' }}>download again</button>).
                       IRCC is strict about signatures, so follow these exactly:
                     </p>
                     <ol style={{ paddingLeft: '20px', fontSize: '0.92rem', lineHeight: 1.9, marginBottom: '20px' }}>
                       <li><strong>Print</strong> the form (page 1 is enough)</li>
-                      <li>Everyone <strong>16 or older</strong> signs in their box — <strong style={{ color: '#1D4ED8' }}>handwritten, in BLUE ink</strong> (IRCC rejects electronic signatures)</li>
+                      <li>Everyone <strong>{signAge} or older</strong> signs in their box — <strong style={{ color: '#1D4ED8' }}>handwritten, in BLUE ink</strong> (IRCC rejects electronic signatures)</li>
                       <li>The <strong>date is already filled in</strong> next to each signature — please sign today so they match</li>
-                      {(order.related_persons || []).some(p => p.under_16) && (
-                        <li>For children under 16: they don't sign — <strong>both parents</strong> sign the form instead</li>
+                      {(order.related_persons || []).some(p => p.date_of_birth && isUnderAge(p.date_of_birth, signAge)) && (
+                        <li>For children under {signAge}: they don't sign — {isCbsa
+                          ? <>your own signed consent <strong>covers them</strong></>
+                          : <><strong>both parents</strong> sign the form instead</>}</li>
                       )}
                       <li><strong>Scan or photograph</strong> everything — colour, well-lit, 300dpi or a sharp phone photo</li>
                     </ol>
@@ -792,7 +800,7 @@ export const OrderGCMSNotesPage: FC = () => {
                       <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: '8px' }}>Please confirm before uploading:</div>
                       {[
                         'The document was printed and hand-signed. eSigns or images of signatures are not accepted.',
-                        'Each individual of the age 16 or over signed on the form.',
+                        `Each individual of the age ${signAge} or over signed on the form.`,
                         "Applicant signatures are consistent with their signatures on their passports.",
                       ].map((label, i) => (
                         <label key={i} style={{ display: 'flex', gap: '10px', alignItems: 'flex-start', fontSize: '0.85rem', lineHeight: 1.5, padding: '5px 0', cursor: 'pointer' }}>
@@ -805,7 +813,7 @@ export const OrderGCMSNotesPage: FC = () => {
                     </div>
                     <div style={{ marginBottom: '18px', opacity: consentChecks.every(Boolean) ? 1 : 0.55 }}>
                       <FileSlot
-                        label="Signed IMM 5744 consent form"
+                        label={`Signed ${formCode} consent form`}
                         sub={consentChecks.every(Boolean) ? 'The form you just printed and signed' : 'Confirm the three points above to enable upload'}
                         file={docConsent} disabled={busy || !consentChecks.every(Boolean)}
                         onPick={f => setDocConsent(f)}

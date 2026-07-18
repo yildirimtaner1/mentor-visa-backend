@@ -102,8 +102,8 @@ const headStyle: React.CSSProperties = { fontSize: '0.8rem', textTransform: 'upp
 export interface TimelineItem {
   key: string; label: string; final?: boolean;
   actual: Date | null;        // logged by the user
-  pred: Date | null;          // chained prediction
-  p25: Date | null; p75: Date | null;
+  pred: Date | null;          // chained prediction (75th percentile — conservative)
+  p25: Date | null; med: Date | null; p75: Date | null;
   n: number;
 }
 
@@ -216,7 +216,7 @@ const EstimatedTimeline: FC<{ items: TimelineItem[]; aor: Date }> = ({ items, ao
                   <div style={{ fontSize: '0.66rem', color: '#7c3aed', fontWeight: 700, marginTop: 2 }}>likely done</div>
                 ) : (
                   <div style={{ fontSize: '0.66rem', color: MUTED, marginTop: 2 }}>
-                    {fmtShort(it.p25)} · {fmtShort(it.pred)} · <strong style={{ color: it.final ? AMBER : '#6d28d9' }}>{fmtShort(it.p75)}</strong>
+                    {fmtShort(it.p25)} · {fmtShort(it.med)} · <strong style={{ color: it.final ? AMBER : '#6d28d9' }}>{fmtShort(it.p75)}</strong>
                   </div>
                 )}
                 <div style={{ marginTop: 5 }}>
@@ -228,7 +228,7 @@ const EstimatedTimeline: FC<{ items: TimelineItem[]; aor: Date }> = ({ items, ao
         </div>
       </div>
       <p style={{ fontSize: '0.66rem', color: MUTED, marginTop: 10, marginBottom: 0, display: 'flex', justifyContent: 'space-between', gap: 10, flexWrap: 'wrap' }}>
-        <span>Dates chain from your own logged milestones where available (small dates: 25th · median · 75th percentile). Estimates from similar recent cases — guidance, not a guarantee.</span>
+        <span>Bold dates are 75th-percentile (conservative) estimates — recent timelines are trending longer. Small dates: 25th · median · 75th percentile, chained from your own logged milestones where available. Guidance, not a guarantee.</span>
         <span style={{ fontWeight: 700, color: ACCENT, whiteSpace: 'nowrap' }}>mentorvisa.com/track-my-application</span>
       </p>
     </div>
@@ -476,7 +476,7 @@ export const ApplicationTrackerPage: FC = () => {
       if (!t) continue;
       const base = parse(state.milestones[anchor]) || predForKey[anchor] || null;
       if (!base) continue;
-      predForKey[milestone] = addDays(base, t.median);
+      predForKey[milestone] = addDays(base, t.p75); // conservative: recent timelines trend longer
     }
   }
 
@@ -493,7 +493,7 @@ export const ApplicationTrackerPage: FC = () => {
         return [{
           key: milestone, label: TL_LABELS[milestone] || milestone, final: milestone === 'ecopr',
           actual, pred: predForKey[milestone] || null,
-          p25: base ? addDays(base, t.p25) : null, p75: base ? addDays(base, t.p75) : null,
+          p25: base ? addDays(base, t.p25) : null, med: base ? addDays(base, t.median) : null, p75: base ? addDays(base, t.p75) : null,
           n: t.n,
         }];
       })
@@ -663,9 +663,9 @@ export const ApplicationTrackerPage: FC = () => {
                           <div style={{ fontSize: '0.78rem', color: MUTED }}>Logged {fmt(lg)}</div>
                         ) : (
                           <div style={{ fontSize: '0.78rem', color: 'var(--text-main)' }}>
-                            Expected <strong>{fmt(addDays(base!, t.median))}</strong>
-                            <span style={{ color: MUTED }}> · most: {fmt(addDays(base!, t.p25))} – {fmt(addDays(base!, t.p75))}</span>
-                            <span style={{ color: MUTED }}> ({t.median}d from {anchorLabel})</span>
+                            Expected by <strong>{fmt(addDays(base!, t.p75))}</strong>
+                            <span style={{ color: MUTED }}> · median {fmt(addDays(base!, t.median))}</span>
+                            <span style={{ color: MUTED }}> ({t.p75}d from {anchorLabel})</span>
                           </div>
                         )}
                         <div style={{ fontSize: '0.66rem', color: MUTED }}>Based on {t.n} cases ({t.cohort})</div>
