@@ -322,18 +322,26 @@ def _cache_key(text: str) -> str:
 
 # ── Pipeline ──────────────────────────────────────────────────────────────────
 def run_noc_finder_v2(user_content: str, page_images=None, target_noc: str = None, from_document: bool = False,
-                      model_tier: str = "standard") -> dict:
+                      model_tier: str = "standard", content_key: str = None) -> dict:
     """Run the knowledge-first multi-model NOC Finder. Returns NOCFinderResponseSchema dict.
 
     target_noc: when set, lock the result to that NOC (re-evaluation / alternative / manual code) and
     skip proposing+adjudication — it is still scored honestly via semantic precision + duty-by-duty.
     from_document: True when the input is an uploaded letter/document (drives input_reliability).
     model_tier: forwarded to the internal Auditor run ("premium" = Claude Haiku for paid users),
-    so the reusable _audit_full matches what the paid audit path would have produced."""
+    so the reusable _audit_full matches what the paid audit path would have produced.
+    content_key: a stable hash of the SOURCE (file bytes for uploads, text for typed input). When the
+    NOC Finder and the Employment Letter Auditor process the SAME letter, they pass the same key, so
+    the second tool serves the first's EXACT result from cache — guaranteeing they never show different
+    NOC codes, coverage, alternatives, or letterhead/contact judgments for one letter (and saving a
+    full pipeline run). The internal audit is non-deterministic per-run, so the cache is what makes the
+    two tools consistent — not just a cost optimization."""
     t_start = time.time()
-    # Serve repeat calls on the same letter from cache (text-only) for Finder/Auditor consistency.
-    # Never cache targeted evals — the cache key is the letter only, not the requested code.
-    cache_key = _cache_key(user_content) if (not page_images and not target_noc) else None
+    # Cache key: the caller-supplied content hash (works for image/PDF uploads too), else the text
+    # hash for typed input. Never cache targeted evals — those lock to a requested code, not the letter.
+    cache_key = None
+    if not target_noc:
+        cache_key = content_key or (_cache_key(user_content) if not page_images else None)
     if cache_key and cache_key in _RESULT_CACHE:
         import copy
         print("[v2] cache hit — returning identical result (Finder/Auditor consistency)")
@@ -600,6 +608,18 @@ def _build_v2_response(winning_code: str, auditor: dict | None,
         f"{disp_matched} of {disp_total} of this NOC's official main duties ({duty_cov}% coverage)."
         if disp_total else f"Evaluated against NOC {winning_code} — {official_title}."
     )
+
+    # Consistency: the Employment Letter Auditor reuses full_audit_result, so make its alternative_nocs
+    # match the Finder's ranked alternatives (the Auditor's own single-call suggestions were unreliable
+    # and often empty — a user must never see the Finder suggest NOC X while the Auditor suggests none).
+    if full_audit_result and isinstance(full_audit_result.get("noc_analysis"), dict) and alternatives:
+        full_audit_result["noc_analysis"]["alternative_nocs"] = [
+            {"noc_code": a["code"], "noc_title": a.get("title", ""),
+             "fit_assessment": ("strong" if a.get("confidence", 0) >= 75
+                                else "moderate" if a.get("confidence", 0) >= 50 else "weak"),
+             "reason": f"Ranked by the NOC Finder as a {a.get('confidence', 0)}% alternative match to your duties."}
+            for a in alternatives
+        ]
 
     return {
         "document_valid": True,
