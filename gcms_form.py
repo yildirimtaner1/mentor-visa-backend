@@ -25,6 +25,7 @@ def _today_toronto() -> str:
         return datetime.date.today().isoformat()
 
 TEMPLATE_PATH = os.path.join(os.path.dirname(__file__), "templates", "imm5744e.pdf")
+BSF745_PATH = os.path.join(os.path.dirname(__file__), "templates", "bsf745e.pdf")
 
 # ── Section 1: Designated Representative (who files the ATIP request) ──────────
 # Configure via env on Render; defaults make missing config obvious on the PDF.
@@ -108,20 +109,87 @@ def fill_imm5744(order) -> bytes:
         values[f_rel] = rel
         values[f_sigdate] = _today_toronto()  # date next to each signature = generation date
 
-    doc = fitz.open(TEMPLATE_PATH)
+    return _fill_and_bake(TEMPLATE_PATH, values, order, "IMM 5744", len(related))
+
+
+def _fill_and_bake(template_path: str, values: dict, order, label: str, n_related: int,
+                   checkboxes: dict | None = None) -> bytes:
+    """Fill AcroForm widgets (text + checkboxes) and flatten to plain page content."""
+    doc = fitz.open(template_path)
     filled = 0
     for page in doc:
         for w in page.widgets() or []:
-            if w.field_name in values and values[w.field_name]:
-                w.field_value = values[w.field_name]
+            name = w.field_name
+            if checkboxes and name in checkboxes:
+                w.field_value = True  # PyMuPDF resolves the widget's own on-state
                 w.update()
                 filled += 1
-
-    # Flatten: bake widget appearances into page content (also neutralizes the XFA layer).
+            elif name in values and values[name]:
+                w.field_value = values[name]
+                w.update()
+                filled += 1
     doc.bake(annots=True, widgets=True)
     buf = io.BytesIO()
     doc.save(buf, garbage=3, deflate=True)
     doc.close()
-    print(f"[GCMS] IMM 5744 generated for order #{order.id}: {filled} fields filled, "
-          f"{len(related)} related person(s), DR configured={dr_configured()}")
+    print(f"[GCMS] {label} generated for order #{order.id}: {filled} fields filled, "
+          f"{n_related} related person(s), DR configured={dr_configured()}")
     return buf.getvalue()
+
+
+# ── BSF745 (CBSA — Authority to Release Personal Information) ──────────────────
+# Sec 2 = designated individual (us), Sec 3 = requester, Sec 4-6 = other individuals.
+# Signing age on this form is 18+ (dependent children under 18 are covered by the
+# requester's consent). "Consent1" checkboxes pick the consent scope: '/1' = release to
+# the designated individual only (privacy-conservative default), '/2' = to their firm.
+_B1 = "topmostSubform[0].Page1[0]."
+_B2 = "topmostSubform[0].Page2[0]."
+_BSF_OTHER_BLOCKS = [  # (prefix, has-relationship) for sections 4, 5, 6
+    _B1 + "Four_", _B2 + "Five_", _B2 + "Six_",
+]
+BSF_MAX_RELATED = len(_BSF_OTHER_BLOCKS)
+
+
+def fill_bsf745(order) -> bytes:
+    """Filled + flattened BSF745 for a CBSA-notes order. Signature cells stay blank."""
+    dr = _dr_info()
+    values = {
+        # Section 2 — designated individual (and firm, informational)
+        _B1 + "Two_NomdeFamille[0]": dr["family_name"],
+        _B1 + "Two_Prenom[0]": dr["given_name"],
+        _B1 + "Two_Adresse[0]": dr["address"],
+        _B1 + "Two_Ville[0]": dr["city"],
+        _B1 + "Two_Province[0]": dr["province"],
+        _B1 + "Two_Pays[0]": dr["country"],
+        _B1 + "Two_CodePostal[0]": dr["postal_code"],
+        _B1 + "Two_Entreprise[0]": dr["firm"],
+        _B1 + "Two_AddCourriel[0]": dr["email"],
+        _B1 + "Two_Telephone[0]": dr["phone"],
+        _B1 + "Two_AutreTelephone[0]": dr["other_phone"],
+        # Section 3 — requester (signature blank; date pre-filled like IMM 5744)
+        _B1 + "Three_NomdeFamille[0]": (order.family_name or order.full_name or "").strip(),
+        _B1 + "Three_Prenom[0]": (order.given_name or "").strip(),
+        _B1 + "Three_DateNaissance[0]": order.date_of_birth or "",
+        _B1 + "Three_NumeroClient[0]": (order.uci or "").strip(),
+        _B1 + "Three_SigDate[0]": _today_toronto(),
+    }
+    checkboxes = {_B1 + "Three_Consent1[0]": "/1"}  # release to designated individual only
+
+    related = (order.related_persons or [])[:BSF_MAX_RELATED]
+    for person, prefix in zip(related, _BSF_OTHER_BLOCKS):
+        values[prefix + "NomdeFamille[0]"] = (person.get("family_name") or "").strip()
+        values[prefix + "Prenom[0]"] = (person.get("given_name") or "").strip()
+        values[prefix + "DateNaissance[0]"] = (person.get("date_of_birth") or "").strip()
+        values[prefix + "Lien[0]"] = (person.get("relationship") or "").strip()
+        values[prefix + "SigDate[0]"] = _today_toronto()
+        checkboxes[prefix + "Consent1[0]"] = "/1"
+
+    return _fill_and_bake(BSF745_PATH, values, order, "BSF745", len(related), checkboxes)
+
+
+def fill_consent_form(order):
+    """Dispatch by notes type: CBSA orders get BSF745, IRCC orders get IMM 5744.
+    Returns (pdf_bytes, form_code)."""
+    if (order.notes_type or "ircc") == "cbsa":
+        return fill_bsf745(order), "BSF745"
+    return fill_imm5744(order), "IMM5744"
