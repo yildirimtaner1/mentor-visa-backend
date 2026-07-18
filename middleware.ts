@@ -16,7 +16,7 @@ const SITE_NAME = 'Mentor Visa';
 // Routes with a dedicated OG card (public/og/<route>.png, from backend/gen_og_images.py).
 const OG_ROUTES = new Set([
   '/crs-calculator', '/find-my-noc', '/audit-employment-letter', '/track-my-application',
-  '/order-gcms-notes', '/how-to-read-gcms-notes', '/draw-results', '/express-entry-processing-times',
+  '/order-gcms-notes', '/how-to-read-gcms-notes', '/gcms-notes-analyzer', '/draw-results', '/express-entry-processing-times',
   '/noc-codes', '/get-started', '/pricing',
 ]);
 
@@ -104,6 +104,10 @@ const PAGE_META: Record<string, { title: string; description: string }> = {
   '/how-to-read-gcms-notes': {
     title: 'How to Read Your GCMS Notes: Codes, Stages & Red Flags Explained | Mentor Visa',
     description: 'A plain-English guide to interpreting GCMS notes: the AOR-to-PPR pipeline, what R10, A11.2, RFV, ADR and PFL mean, and the red flags that predict delays or refusals.',
+  },
+  '/gcms-notes-analyzer': {
+    title: 'GCMS Notes AI Analyzer — Your IRCC File Explained in Plain English | Mentor Visa',
+    description: 'Upload your GCMS or CBSA notes PDF and get a plain-English report: stage-by-stage status, officer remarks explained, red flags, and likely next steps. $19.90 CAD.',
   },
 };
 

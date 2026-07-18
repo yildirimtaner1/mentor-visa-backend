@@ -68,6 +68,11 @@ const ROUTE_META = {
     description: 'A plain-English guide to interpreting GCMS notes: the AOR-to-PPR pipeline, what R10, A11.2, RFV, ADR and PFL mean, and the red flags that predict delays or refusals.',
     h1: 'How to Read Your GCMS Notes',
   },
+  '/gcms-notes-analyzer': {
+    title: 'GCMS Notes AI Analyzer — Your IRCC File Explained in Plain English | Mentor Visa',
+    description: 'Upload your GCMS or CBSA notes PDF and get a plain-English report: stage-by-stage status, officer remarks explained, red flags, and likely next steps. $19.90 CAD.',
+    h1: 'GCMS Notes AI Analyzer',
+  },
   '/express-entry-cec-guide': {
     title: 'Express Entry Canadian Experience Class (CEC) Document Checklist & Guide',
     description: 'Learn exactly what documents IRCC requires for the Canadian Experience Class (CEC) Express Entry program. Avoid application rejection with our official guidelines.',
@@ -131,7 +136,7 @@ const template = readFileSync(join(DIST, 'index.html'), 'utf-8');
 // Routes with a dedicated OG card (public/og/<route>.png, from backend/gen_og_images.py).
 const OG_ROUTES = new Set([
   '/crs-calculator', '/find-my-noc', '/audit-employment-letter', '/track-my-application',
-  '/order-gcms-notes', '/how-to-read-gcms-notes', '/draw-results', '/express-entry-processing-times',
+  '/order-gcms-notes', '/how-to-read-gcms-notes', '/gcms-notes-analyzer', '/draw-results', '/express-entry-processing-times',
   '/noc-codes', '/get-started', '/pricing',
 ]);
 function ogFor(path) {

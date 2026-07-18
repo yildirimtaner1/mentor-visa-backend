@@ -129,6 +129,7 @@ export const Navbar: FC = () => {
               { path: '/audit-employment-letter', label: 'Audit Employment Letter', subtext: 'Verify IRCC compliance', icon: <CheckSquare size={16} /> },
               { path: '/track-my-application', label: 'Smart Application Tracker', subtext: 'Track milestones and dates, receive smart predictions', icon: <CalendarClock size={16} /> },
               { path: '/order-gcms-notes', label: 'Order GCMS Notes', subtext: 'Your complete IRCC file — see what the officer sees', icon: <FolderSearch size={16} /> },
+              { path: '/gcms-notes-analyzer', label: 'GCMS Notes AI Analyzer', subtext: 'Your notes, explained in plain English', icon: <FolderSearch size={16} /> },
               { path: '/documents', label: '12 Mistakes Checklist', subtext: 'Error prevention guide', icon: <FileText size={16} /> },
             ]}
           />
@@ -216,6 +217,7 @@ export const Navbar: FC = () => {
           <button className="mobile-menu-link" onClick={() => { navigate('/audit-employment-letter'); setMobileMenuOpen(false); }}>📄 Audit Employment Letter</button>
           <button className="mobile-menu-link" onClick={() => { navigate('/track-my-application'); setMobileMenuOpen(false); }}>📅 Smart Application Tracker</button>
           <button className="mobile-menu-link" onClick={() => { navigate('/order-gcms-notes'); setMobileMenuOpen(false); }}>📂 Order GCMS Notes</button>
+          <button className="mobile-menu-link" onClick={() => { navigate('/gcms-notes-analyzer'); setMobileMenuOpen(false); }}>🔍 GCMS Notes AI Analyzer</button>
           <button className="mobile-menu-link" onClick={() => { navigate('/documents'); setMobileMenuOpen(false); }}>⚠️ 12 Mistakes Checklist</button>
 
           <div style={{ borderTop: '1px solid var(--border-color)', fontSize: '0.7rem', textTransform: 'uppercase', letterSpacing: '1px', color: 'var(--text-muted)', fontWeight: 700, padding: '12px 8px 8px', marginTop: '8px' }}>Learn</div>

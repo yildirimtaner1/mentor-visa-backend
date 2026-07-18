@@ -154,9 +154,14 @@ export const GCMSNotesGuidePage: FC = () => {
             Your GCMS notes are 40-100 pages of bureaucratic shorthand — but hidden inside is exactly where your file
             sits, what the officer thinks, and whether trouble is coming. This guide decodes every stage, code, and status.
           </p>
-          <Link to="/order-gcms-notes" className="btn btn-primary btn-lg" style={{ textDecoration: 'none', display: 'inline-block' }}>
-            Don't have your notes yet? Order them — $19.90 →
-          </Link>
+          <div style={{ display: 'flex', gap: '12px', justifyContent: 'center', flexWrap: 'wrap' }}>
+            <Link to="/order-gcms-notes" className="btn btn-primary btn-lg" style={{ textDecoration: 'none', display: 'inline-block' }}>
+              Don't have your notes yet? Order them — $19.90 →
+            </Link>
+            <Link to="/gcms-notes-analyzer" className="btn btn-lg" style={{ background: 'white', color: '#1E3A8A', fontWeight: 700, textDecoration: 'none', display: 'inline-block' }}>
+              Have them already? Let AI decode them →
+            </Link>
+          </div>
         </div>
       </section>
 
@@ -316,11 +321,16 @@ export const GCMSNotesGuidePage: FC = () => {
               We file your ATIP request within one business day and email you the complete file the day IRCC releases it.
               One flat fee, no subscriptions.
             </p>
-            <Link to="/order-gcms-notes" className="btn btn-lg" style={{ background: 'white', color: '#1E3A8A', fontWeight: 700, textDecoration: 'none', display: 'inline-block' }}>
-              Order my GCMS notes — $19.90 CAD →
-            </Link>
+            <div style={{ display: 'flex', gap: '12px', justifyContent: 'center', flexWrap: 'wrap' }}>
+              <Link to="/order-gcms-notes" className="btn btn-lg" style={{ background: 'white', color: '#1E3A8A', fontWeight: 700, textDecoration: 'none', display: 'inline-block' }}>
+                Order my GCMS notes — $19.90 CAD →
+              </Link>
+              <Link to="/gcms-notes-analyzer" className="btn btn-lg" style={{ background: 'transparent', border: '2px solid rgba(255,255,255,0.6)', color: 'white', fontWeight: 700, textDecoration: 'none', display: 'inline-block' }}>
+                Already have notes? AI analysis — $19.90 →
+              </Link>
+            </div>
             <p style={{ fontSize: '0.75rem', opacity: 0.6, marginTop: '14px', marginBottom: 0 }}>
-              Filed within 1 business day · IRCC responds in ~30-40 days · 3-day money-back guarantee
+              Filed within 1 business day · IRCC responds in ~30-40 days · Free AI analysis with every order
             </p>
           </div>
         </section>

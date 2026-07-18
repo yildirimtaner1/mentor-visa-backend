@@ -892,6 +892,11 @@ export const OrderGCMSNotesPage: FC = () => {
                   🔒 Your signed form and ID are stored encrypted, used only to file this request with IRCC,
                   and never shared with anyone else. Questions? info@mentorvisa.com
                 </p>
+                <div style={{ background: '#EFF6FF', border: '1px solid #BFDBFE', borderRadius: '10px', padding: '14px 18px', maxWidth: '520px', margin: '0 auto 20px', fontSize: '0.9rem', color: '#1E3A8A' }}>
+                  🎁 <strong>Your order includes a free AI analysis.</strong> When your notes arrive, upload the PDF to the{' '}
+                  <a href="/gcms-notes-analyzer" style={{ color: '#1D4ED8', fontWeight: 700 }}>GCMS Notes AI Analyzer</a>{' '}
+                  for a plain-English report — stages, officer remarks, flags, and next steps.
+                </div>
                 <div style={{ display: 'flex', gap: '12px', justifyContent: 'center', flexWrap: 'wrap' }}>
                   <a href="/track-my-application" className="btn btn-primary" style={{ textDecoration: 'none' }}>📅 Track my application meanwhile</a>
                   <a href="/audit-employment-letter" className="btn btn-outline" style={{ textDecoration: 'none' }}>📄 Audit my employment letter</a>

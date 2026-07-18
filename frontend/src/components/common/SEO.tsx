@@ -14,7 +14,7 @@ interface SEOProps {
 // backend/gen_og_images.py — keep in sync when adding tools.
 const OG_ROUTES = new Set([
   '/crs-calculator', '/find-my-noc', '/audit-employment-letter', '/track-my-application',
-  '/order-gcms-notes', '/how-to-read-gcms-notes', '/draw-results', '/express-entry-processing-times',
+  '/order-gcms-notes', '/how-to-read-gcms-notes', '/gcms-notes-analyzer', '/draw-results', '/express-entry-processing-times',
   '/noc-codes', '/get-started', '/pricing',
 ]);
 

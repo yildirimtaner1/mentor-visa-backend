@@ -152,7 +152,7 @@ export async function revealNocResult(token: string, storedFileId: string): Prom
   return response.json();
 }
 
-export async function createCheckoutSession(passType: 'finder' | 'finder_1' | 'finder_3' | 'finder_5' | 'auditor' | 'letter_builder' | 'ita_strategy' | 'war_room' | 'gcms' | 'starter' | 'complete', token: string, returnPath: string = '/dashboard', orderId?: number) {
+export async function createCheckoutSession(passType: 'finder' | 'finder_1' | 'finder_3' | 'finder_5' | 'auditor' | 'letter_builder' | 'ita_strategy' | 'war_room' | 'gcms' | 'gcms_analyzer' | 'starter' | 'complete', token: string, returnPath: string = '/dashboard', orderId?: number) {
   const returnUrl = window.location.origin + returnPath;
   const response = await fetch(`${API_BASE_URL}/api/v1/create-checkout-session`, {
     method: 'POST',
@@ -287,6 +287,33 @@ export async function uploadGCMSConsent(orderId: number, file: File, token: stri
   if (!response.ok) {
     const err = await response.json().catch(() => ({}));
     throw new Error(err.detail || 'Failed to upload the consent form.');
+  }
+  return response.json();
+}
+
+// ── GCMS Notes AI Analyzer ─────────────────────────────────────────────────────
+export async function getGCMSAnalysisStatus(token: string) {
+  const response = await fetch(`${API_BASE_URL}/api/v1/gcms-analysis/status`, {
+    headers: { 'Authorization': `Bearer ${token}` },
+  });
+  if (!response.ok) {
+    const err = await response.json().catch(() => ({}));
+    throw new Error(err.detail || 'Could not load your analyzer status.');
+  }
+  return response.json();
+}
+
+export async function analyzeGCMSNotes(file: File, token: string) {
+  const formData = new FormData();
+  formData.append('document', file);
+  const response = await fetch(`${API_BASE_URL}/api/v1/gcms-analysis`, {
+    method: 'POST',
+    headers: { 'Authorization': `Bearer ${token}` },
+    body: formData,
+  });
+  if (!response.ok) {
+    const err = await response.json().catch(() => ({}));
+    throw new Error(err.detail || 'The analysis failed. Please try again.');
   }
   return response.json();
 }

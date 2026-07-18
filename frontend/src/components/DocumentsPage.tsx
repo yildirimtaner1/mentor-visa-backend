@@ -261,7 +261,7 @@ export function DocumentsPage() {
                         <Feature included>Unlimited CRS Point Simulator (What-If Scenarios)</Feature>
                         <Feature included>Personalized Document Checklist</Feature>
                         <Feature included>Document Expiry Tracking</Feature>
-                        <Feature included>1 Free GCMS Notes Order ($19.90 value)</Feature>
+                        <Feature included>1 Free GCMS Notes Order + AI Analysis ($39.80 value)</Feature>
                       </ul>
                       <div className="pricing-card-footer">
                         <button className="pricing-btn primary" style={{ width: '100%' }} onClick={async () => {

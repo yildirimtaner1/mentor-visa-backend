@@ -30,6 +30,7 @@ const ApplicationTrackerPage = lazy(() => import('./components/ApplicationTracke
 const ProcessingTimesPage = lazy(() => import('./components/ProcessingTimesPage').then(m => ({ default: m.ProcessingTimesPage })));
 const OrderGCMSNotesPage = lazy(() => import('./components/OrderGCMSNotesPage').then(m => ({ default: m.OrderGCMSNotesPage })));
 const GCMSNotesGuidePage = lazy(() => import('./components/GCMSNotesGuidePage').then(m => ({ default: m.GCMSNotesGuidePage })));
+const GCMSAnalyzerPage = lazy(() => import('./components/GCMSAnalyzerPage').then(m => ({ default: m.GCMSAnalyzerPage })));
 const ContactPage = lazy(() => import('./components/ContactPage').then(m => ({ default: m.ContactPage })));
 import { useAuth, UserButton } from '@clerk/clerk-react';
 import { saveEvaluation, cancelPaymentEvent } from './services/api';
@@ -416,6 +417,7 @@ function App() {
       <Route path="/express-entry-processing-times" element={<SharedLayout><ProcessingTimesPage onNavigate={(p) => navigate(`/${p}`)} /></SharedLayout>} />
       <Route path="/order-gcms-notes" element={<SharedLayout><OrderGCMSNotesPage /></SharedLayout>} />
       <Route path="/how-to-read-gcms-notes" element={<SharedLayout><GCMSNotesGuidePage /></SharedLayout>} />
+      <Route path="/gcms-notes-analyzer" element={<SharedLayout><GCMSAnalyzerPage /></SharedLayout>} />
       <Route path="/contact" element={<SharedLayout><ContactPage /></SharedLayout>} />
 
       {/* Legal Pages */}

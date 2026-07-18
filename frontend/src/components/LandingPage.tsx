@@ -229,7 +229,8 @@ export const LandingPage: FC<LandingPageProps> = ({ onNavigate }) => {
             { icon: <Bot size={22} />, name: 'AI Profile Assistant', desc: 'Personalized answers and a tailored action plan to raise your CRS.', tier: 'Optimize', page: 'ai-profile-assistant' },
             { icon: <CalendarClock size={22} />, name: 'Smart Application Tracker', desc: 'Track every post-ITA milestone and get timeline predictions from 2,000+ real cases.', tier: 'Optimize', page: 'track-my-application' },
             { icon: <FolderCheck size={22} />, name: 'Document Checklist & Expiry Tracker', desc: 'A personalized checklist with expiry alerts for you and your dependents.', tier: 'Optimize', page: 'documents' },
-            { icon: <FolderSearch size={22} />, name: 'GCMS Notes Order', desc: 'Application delayed or refused? We file your ATIP request and email your complete IRCC file — officer notes included.', tier: '$19.90', page: 'order-gcms-notes' },
+            { icon: <FolderSearch size={22} />, name: 'GCMS Notes Order', desc: 'Application delayed or refused? We file your ATIP request and email your complete IRCC file — officer notes included. Free AI analysis with every order.', tier: '$19.90', page: 'order-gcms-notes' },
+            { icon: <FolderSearch size={22} />, name: 'GCMS Notes AI Analyzer', desc: 'Already have your notes? Upload the PDF and get a plain-English report: stage-by-stage status, officer remarks explained, flags and next steps.', tier: '$19.90', page: 'gcms-notes-analyzer' },
             { icon: <BarChart3 size={22} />, name: 'Draws & Processing Times', desc: 'Every recent Express Entry draw plus real-world processing-time data.', tier: 'Free', page: 'draw-results' },
           ].map((t) => (
             <div key={t.name} className="tool-card" onClick={() => onNavigate(t.page)}>
@@ -330,7 +331,7 @@ export const LandingPage: FC<LandingPageProps> = ({ onNavigate }) => {
               <li className="pricing-feature highlight"><CheckCircle2 size={16} className="feature-check" /><span>20 Question Credits - Express Entry AI Assistant</span></li>
               <li className="pricing-feature highlight"><CheckCircle2 size={16} className="feature-check" /><span>Personalized Document Checklist</span></li>
               <li className="pricing-feature highlight"><CheckCircle2 size={16} className="feature-check" /><span>Document Expiry Tracker</span></li>
-              <li className="pricing-feature highlight"><CheckCircle2 size={16} className="feature-check" /><span>1 Free GCMS Notes Order ($19.90 value)</span></li>
+              <li className="pricing-feature highlight"><CheckCircle2 size={16} className="feature-check" /><span>1 Free GCMS Notes Order + AI Analysis ($39.80 value)</span></li>
             </ul>
             <div className="pricing-card-footer">
               <button className="pricing-btn primary" onClick={() => onNavigate('pricing')}>Get Optimize — $49</button>
@@ -418,6 +419,7 @@ export const LandingPage: FC<LandingPageProps> = ({ onNavigate }) => {
             <a href="/audit-employment-letter">Letter Auditor</a>
             <a href="/track-my-application">Application Tracker</a>
             <a href="/order-gcms-notes">Order GCMS Notes</a>
+            <a href="/gcms-notes-analyzer">GCMS Notes AI Analyzer</a>
             <a href="/how-to-read-gcms-notes">GCMS Notes Guide</a>
             <a href="/draw-results">Draw Results</a>
             <a href="/express-entry-processing-times">Processing Times</a>
