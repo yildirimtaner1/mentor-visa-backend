@@ -41,8 +41,11 @@ V2_MODELS = {
     "extractor":      "gpt-4o-mini",                # cheap, reliable structured parse
     "claude_proposer": "claude-haiku-4-5-20251001",  # diverse proposer A (Anthropic)
     "gpt_proposer":    "gpt-4o-mini",                # diverse proposer B (OpenAI)
-    "auditor":        "claude-sonnet-4-6",          # primary decision (Anthropic)
-    "cross_check":    "gpt-4o",                      # 2nd opinion on HARD cases only (OpenAI)
+    "auditor":        "claude-sonnet-4-6",          # primary decision (Anthropic). NOTE: Sonnet 5
+                                                    # was trialed and REVERTED — it regressed the
+                                                    # salesperson-vs-supervisor case, is non-deterministic
+                                                    # (rejects temperature), and emits thinking blocks.
+    "cross_check":    "gemini-2.5-pro",             # 2nd opinion on HARD cases only (Google — strong + different lab)
     "tiebreak":       "claude-sonnet-4-6",           # resolves auditor vs cross-check disagreement
 }
 
@@ -249,6 +252,8 @@ def _call_auditor(model: str, extraction: dict, codes: list, extra_note: str = "
     prompt = _build_auditor_prompt()
     if model.startswith("claude"):
         return noc_agents._call_claude_agent("auditor", prompt, msg, AuditorResponse, model_override=model)
+    if model.startswith("gemini"):
+        return noc_agents._call_gemini_agent("auditor", prompt, msg, AuditorResponse, model_override=model)
     return noc_agents._call_openai_agent("auditor", prompt, msg, AuditorResponse, model_override=model)
 
 
