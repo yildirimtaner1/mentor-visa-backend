@@ -41,16 +41,10 @@ V2_MODELS = {
     "extractor":      "gpt-4o-mini",                # cheap, reliable structured parse
     "claude_proposer": "claude-haiku-4-5-20251001",  # diverse proposer A (Anthropic)
     "gpt_proposer":    "gpt-4o-mini",                # diverse proposer B (OpenAI)
-    "auditor":        "claude-sonnet-4-6",          # primary decision (Anthropic). NOTE: Sonnet 5
-                                                    # was trialed and REVERTED — it regressed the
-                                                    # salesperson-vs-supervisor case, is non-deterministic
-                                                    # (rejects temperature), and emits thinking blocks.
-    "cross_check":    "gemini-2.5-pro",             # 2nd opinion on HARD cases only (Google — strong + different lab)
+    "auditor":        "claude-sonnet-4-6",          # primary decision (Anthropic)
+    "cross_check":    "gpt-4o",                      # 2nd opinion on HARD cases only (OpenAI)
     "tiebreak":       "claude-sonnet-4-6",           # resolves auditor vs cross-check disagreement
 }
-
-# Minimum confidence for a runner-up NOC to be worth showing. Below this, an "alternative" is noise.
-ALT_MIN_CONFIDENCE = 50
 
 # How many embedding-retrieval candidates to union in as a recall safety-net.
 # These are OPTIONS for the auditor, never a constraint on the choice.
@@ -255,8 +249,6 @@ def _call_auditor(model: str, extraction: dict, codes: list, extra_note: str = "
     prompt = _build_auditor_prompt()
     if model.startswith("claude"):
         return noc_agents._call_claude_agent("auditor", prompt, msg, AuditorResponse, model_override=model)
-    if model.startswith("gemini"):
-        return noc_agents._call_gemini_agent("auditor", prompt, msg, AuditorResponse, model_override=model)
     return noc_agents._call_openai_agent("auditor", prompt, msg, AuditorResponse, model_override=model)
 
 
@@ -329,27 +321,16 @@ def _cache_key(text: str) -> str:
 
 
 # ── Pipeline ──────────────────────────────────────────────────────────────────
-def run_noc_finder_v2(user_content: str, page_images=None, target_noc: str = None, from_document: bool = False,
-                      model_tier: str = "standard", content_key: str = None) -> dict:
+def run_noc_finder_v2(user_content: str, page_images=None, target_noc: str = None, from_document: bool = False) -> dict:
     """Run the knowledge-first multi-model NOC Finder. Returns NOCFinderResponseSchema dict.
 
     target_noc: when set, lock the result to that NOC (re-evaluation / alternative / manual code) and
     skip proposing+adjudication — it is still scored honestly via semantic precision + duty-by-duty.
-    from_document: True when the input is an uploaded letter/document (drives input_reliability).
-    model_tier: forwarded to the internal Auditor run ("premium" = Claude Haiku for paid users),
-    so the reusable _audit_full matches what the paid audit path would have produced.
-    content_key: a stable hash of the SOURCE (file bytes for uploads, text for typed input). When the
-    NOC Finder and the Employment Letter Auditor process the SAME letter, they pass the same key, so
-    the second tool serves the first's EXACT result from cache — guaranteeing they never show different
-    NOC codes, coverage, alternatives, or letterhead/contact judgments for one letter (and saving a
-    full pipeline run). The internal audit is non-deterministic per-run, so the cache is what makes the
-    two tools consistent — not just a cost optimization."""
+    from_document: True when the input is an uploaded letter/document (drives input_reliability)."""
     t_start = time.time()
-    # Cache key: the caller-supplied content hash (works for image/PDF uploads too), else the text
-    # hash for typed input. Never cache targeted evals — those lock to a requested code, not the letter.
-    cache_key = None
-    if not target_noc:
-        cache_key = content_key or (_cache_key(user_content) if not page_images else None)
+    # Serve repeat calls on the same letter from cache (text-only) for Finder/Auditor consistency.
+    # Never cache targeted evals — the cache key is the letter only, not the requested code.
+    cache_key = _cache_key(user_content) if (not page_images and not target_noc) else None
     if cache_key and cache_key in _RESULT_CACHE:
         import copy
         print("[v2] cache hit — returning identical result (Finder/Auditor consistency)")
@@ -376,8 +357,7 @@ def run_noc_finder_v2(user_content: str, page_images=None, target_noc: str = Non
     # deliberately re-checking it against a chosen code, so a borderline/non-deterministic extraction
     # rejection must not block the re-evaluation ("Could not validate input" bug).
     if target_noc and target_noc in ai_service.NOC_LOOKUP:
-        result = _build_v2_response(target_noc, None, extraction, [target_noc], from_document=from_document, letter_text=cleaned,
-                                    page_images=page_images, model_tier=model_tier)
+        result = _build_v2_response(target_noc, None, extraction, [target_noc], from_document=from_document, letter_text=cleaned)
         result = ai_service._sanitize_noc_response(result, recompute_confidence=False)
         rec = result.get("recommended_noc", {})
         print(f"[v2] TARGETED {target_noc}: {rec.get('confidence')}% coverage={result.get('duty_coverage')}% "
@@ -470,8 +450,7 @@ def run_noc_finder_v2(user_content: str, page_images=None, target_noc: str = Non
         print(f"[Stage 4] Adjudication failed ({e}) — using top grounded candidate {winning_code}")
 
     # ── Build response (frontend-compatible) ──────────────────────────────────
-    result = _build_v2_response(winning_code, auditor, extraction, codes, from_document=from_document, letter_text=cleaned,
-                                page_images=page_images, model_tier=model_tier)
+    result = _build_v2_response(winning_code, auditor, extraction, codes, from_document=from_document, letter_text=cleaned)
     # recompute_confidence=False: v2 already set a calibrated semantic-precision confidence;
     # the sanitizer's recall-style matched/total recompute would clobber it (and break 51114).
     result = ai_service._sanitize_noc_response(result, recompute_confidence=False)
@@ -496,8 +475,7 @@ def _semantic_confidence(applicant_duties: list, code: str):
 
 def _build_v2_response(winning_code: str, auditor: dict | None,
                        extraction: dict, candidate_codes: list, from_document: bool = False,
-                       letter_text: str = "", page_images: list = None,
-                       model_tier: str = "standard") -> dict:
+                       letter_text: str = "") -> dict:
     """Assemble a NOCFinderResponseSchema dict from the auditor's grounded decision."""
     auditor = auditor or {}
     noc_entry = ai_service.get_noc_entry(winning_code)
@@ -542,14 +520,11 @@ def _build_v2_response(winning_code: str, auditor: dict | None,
         alt_code = next((c for c in candidate_codes if c != winning_code), "")
     if alt_code and alt_code in ai_service.NOC_LOOKUP:
         alt_conf = min(noc_agents._alt_confidence(extraction, alt_code, {}), max(confidence - 1, 0))
-        # Only surface a genuinely plausible alternative. Weak/irrelevant suggestions (e.g. NOC 14101
-        # Receptionists shown for an interpreter) are more misleading than helpful, so we drop them.
-        if alt_conf >= ALT_MIN_CONFIDENCE:
-            alternatives.append({
-                "code": alt_code,
-                "title": ai_service.NOC_LOOKUP.get(alt_code, ""),
-                "confidence": alt_conf,
-            })
+        alternatives.append({
+            "code": alt_code,
+            "title": ai_service.NOC_LOOKUP.get(alt_code, ""),
+            "confidence": alt_conf,
+        })
 
     if confidence >= 70:
         result_type, level = "STRONG_MATCH", "high"
@@ -568,11 +543,7 @@ def _build_v2_response(winning_code: str, auditor: dict | None,
     full_audit_result = None  # the complete Auditor result, surfaced for the "Audit my letter" reuse cache
     # Document uploads run the FULL Auditor (exact convergence with the paid Auditor). Typed text uses
     # the gpt-4o grader below instead — the full Auditor rejects non-letters, and text is lower-signal.
-    # Page images are passed through so the internal audit is the SAME computation a direct
-    # /analyze audit would run (letterhead/signature checks included) — making _audit_full reusable
-    # as the real audit, which is what eliminates the double-audit cost on /analyze.
-    audit_cov = ai_service.audit_duty_coverage(letter_text, winning_code, page_images=page_images,
-                                               model_tier=model_tier) if (from_document and letter_text) else None
+    audit_cov = ai_service.audit_duty_coverage(letter_text, winning_code) if (from_document and letter_text) else None
     if audit_cov:
         duty_cov = audit_cov["coverage"]
         coverage_subtitle = audit_cov["sub_title"]
@@ -592,7 +563,7 @@ def _build_v2_response(winning_code: str, auditor: dict | None,
             graded = ai_service.grade_scoped_duties_llm(letter_text or "; ".join(applicant_duties), set_duties)
             if graded and set_duties and len(graded) == len(set_duties):
                 covered = sum(1 for g in graded if g["match"] in ("strong", "partial"))
-                duty_cov = ai_service.coverage_pct([(g["noc_duty"], g["match"]) for g in graded])
+                duty_cov = int(round(100 * covered / len(set_duties)))
                 breakdown = graded
                 scoped_gaps = [g["noc_duty"] for g in graded if g["match"] in ("weak", "missing")]
                 disp_matched, disp_total = covered, len(set_duties)
@@ -619,18 +590,6 @@ def _build_v2_response(winning_code: str, auditor: dict | None,
         f"{disp_matched} of {disp_total} of this NOC's official main duties ({duty_cov}% coverage)."
         if disp_total else f"Evaluated against NOC {winning_code} — {official_title}."
     )
-
-    # Consistency: the Employment Letter Auditor reuses full_audit_result, so its alternative_nocs must
-    # match the Finder's ranked alternatives (the Auditor's own single-call suggestions were unreliable
-    # — e.g. it once offered Receptionists for an interpreter). ALWAYS overwrite (even with an empty
-    # list) so the auditor never shows a weak alternative the Finder already filtered out.
-    if full_audit_result and isinstance(full_audit_result.get("noc_analysis"), dict):
-        full_audit_result["noc_analysis"]["alternative_nocs"] = [
-            {"noc_code": a["code"], "noc_title": a.get("title", ""),
-             "fit_assessment": "moderate",  # strength intentionally NOT surfaced to the user
-             "reason": "A possible secondary match for your duties — worth double-checking."}
-            for a in alternatives
-        ]
 
     return {
         "document_valid": True,

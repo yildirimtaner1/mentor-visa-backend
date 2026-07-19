@@ -1,12 +1,6 @@
 import os
 import uuid
-import hashlib
 
-
-def _content_key(doc_bytes: bytes) -> str:
-    """Stable hash of a document's raw bytes — the same uploaded file always yields the same key,
-    so the NOC Finder and the Employment Letter Auditor share one cached v2 result for one letter."""
-    return hashlib.sha1(doc_bytes).hexdigest()
 import json
 from pathlib import Path
 from fastapi import FastAPI, UploadFile, File, HTTPException, Depends, Security, Form
@@ -364,69 +358,43 @@ async def analyze_document_endpoint(
 
         # --- MIGRATION TO OPENAI RAG ---
         user_content, page_images = ai_service.extract_document_content(doc_bytes, ext, is_image)
-
-        # Paid users' audits (their result will be unlocked) run on the premium model.
-        _tier_db = database.SessionLocal()
-        try:
-            model_tier = _audit_model_tier(user_id, _tier_db)
-        finally:
-            _tier_db.close()
-
+        
         # Auto-detect NOC using the NOC Finder pipeline when no target is specified.
         # This guarantees the auditor uses the EXACT same NOC detection as the NOC Finder.
-        # from_document=True makes the Finder run the FULL auditor internally (with page images),
-        # and we REUSE that audit here instead of paying for a second identical call.
         auto_detected = None
-        result_json = None
-        ckey = _content_key(doc_bytes)
         if not target_noc:
-            target_noc = ai_service.auto_detect_noc(user_content, page_images,
-                                                    from_document=True, model_tier=model_tier,
-                                                    content_key=ckey)
+            target_noc = ai_service.auto_detect_noc(user_content, page_images)
             auto_detected = target_noc  # Remember this was auto-detected, not user-specified
-            reused = getattr(ai_service.auto_detect_noc, "last_audit", None)
-            if (isinstance(reused, dict) and target_noc
-                    and (reused.get("noc_analysis") or {}).get("detected_code") == target_noc):
-                result_json = reused
-                # Keep the displayed NOC-match confidence identical to the Finder's number.
-                conf = getattr(ai_service.auto_detect_noc, "last_confidence", None)
-                if conf is not None and isinstance(result_json.get("noc_analysis"), dict):
-                    result_json["noc_analysis"]["noc_match_confidence"] = conf
-                print("[Analyze] Reused the Finder's internal audit — skipped the duplicate audit call")
 
-        if result_json is None:
-            top_nocs = ai_service.semantic_search_nocs(user_content)
+        top_nocs = ai_service.semantic_search_nocs(user_content)
 
-            # The Auditor evaluates against a determined NOC; if auto-detection failed, fall back to the
-            # top semantic candidate so we never run the prompt's from-scratch detection path.
-            if not target_noc and top_nocs:
-                target_noc = next(iter(top_nocs))
+        # The Auditor evaluates against a determined NOC; if auto-detection failed, fall back to the
+        # top semantic candidate so we never run the prompt's from-scratch detection path.
+        if not target_noc and top_nocs:
+            target_noc = next(iter(top_nocs))
 
-            # Auditor Fix: Always include the target_noc in the reference sheet so the AI can evaluate against it!
-            if target_noc:
-                target_data = ai_service.NOC_CODE_TO_ENTRY.get(target_noc)
-                if target_data:
-                    top_nocs[target_noc] = target_data
-
-            noc_reference = json.dumps(top_nocs, ensure_ascii=False)
-            system_prompt = ai_service._build_prompt_text(noc_reference, target_noc)
-
-            try:
-                result_json = ai_service.audit_document_with_openai(
-                    system_prompt=system_prompt,
-                    user_content=user_content,
-                    page_images=page_images,
-                    auto_detected_noc=auto_detected,
-                    model_tier=model_tier
-                )
-            except Exception as e:
-                raise HTTPException(status_code=500, detail=f"OpenAI analysis failed: {str(e)}")
+        # Auditor Fix: Always include the target_noc in the reference sheet so the AI can evaluate against it!
+        if target_noc:
+            target_data = ai_service.NOC_CODE_TO_ENTRY.get(target_noc)
+            if target_data:
+                top_nocs[target_noc] = target_data
+                
+        noc_reference = json.dumps(top_nocs, ensure_ascii=False)
+        system_prompt = ai_service._build_prompt_text(noc_reference, target_noc)
+        
+        try:
+            result_json = ai_service.audit_document_with_openai(
+                system_prompt=system_prompt,
+                user_content=user_content,
+                page_images=page_images,
+                auto_detected_noc=auto_detected
+            )
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=f"OpenAI analysis failed: {str(e)}")
         
         # Inject file metadata into the response
         result_json["stored_file_id"] = file_id
         result_json["original_filename"] = filename
-        # Paying users' audits run on the premium model — surface that so the UI can say so.
-        result_json["engine_tier"] = model_tier
         # Persist the extracted text in the saved payload so re-evaluations reuse it instead of
         # re-downloading + re-extracting (and re-paying vision OCR). Stripped from the API response.
         result_json["_extracted_text"] = user_content
@@ -473,16 +441,6 @@ def health_check():
 # New signed-in users get this many free FULL NOC Finder reports before the result is gated
 # to a teaser (code + confidence + summary) with the full breakdown behind Optimize.
 NEW_USER_FINDER_CREDITS = 2
-
-def _audit_model_tier(user_id: str, db: Session) -> str:
-    """'premium' when this user's audit will end up unlocked (paid tier or an audit credit) —
-    those audits run on the stronger Claude Haiku model; free preliminaries stay on gpt-4o-mini."""
-    if not user_id or user_id == "anonymous":
-        return "standard"
-    ua = db.query(db_models.UserAccount).filter_by(user_id=user_id).first()
-    if ua and (ua.subscription_tier in ("starter", "complete") or (ua.audit_letter_credits or 0) > 0):
-        return "premium"
-    return "standard"
 
 
 def ensure_user_exists(user_id: str, db: Session):
@@ -769,13 +727,7 @@ def reevaluate_document(
                 user_content = f"Job Title: {original_title}\n\nDuties and Responsibilities:\n{original_duties}"
                 print(f"Re-evaluating text-only input: title='{original_title}', duties length={len(original_duties)}")
             else:
-                _stored_text = (record.payload or {}).get("_extracted_text") if isinstance(record.payload, dict) else None
-                if _stored_text:
-                    user_content = _stored_text
-                    page_images = ai_service.page_images_only(doc_bytes, ext, is_image)
-                    print("[reevaluate] Reused persisted extracted text (skipped re-extraction/OCR)")
-                else:
-                    user_content, page_images = ai_service.extract_document_content(doc_bytes, ext, is_image)
+                user_content, page_images = ai_service.extract_document_content(doc_bytes, ext, is_image)
             
             try:
                 import openai
@@ -826,24 +778,13 @@ def reevaluate_document(
             return result_json
         else:
             # Default: Auditor re-evaluation
-            _stored_text = (record.payload or {}).get("_extracted_text") if isinstance(record.payload, dict) else None
-            if _stored_text:
-                user_content = _stored_text
-                page_images = ai_service.page_images_only(doc_bytes, ext, is_image)
-                print("[reevaluate] Reused persisted extracted text (skipped re-extraction/OCR)")
-            else:
-                user_content, page_images = ai_service.extract_document_content(doc_bytes, ext, is_image)
-
-            model_tier = _audit_model_tier(user_id, db)
+            user_content, page_images = ai_service.extract_document_content(doc_bytes, ext, is_image)
 
             # Auto-detect NOC using the NOC Finder pipeline when no target is specified.
             effective_target = req.target_noc if (req.target_noc and req.target_noc != 'auto') else None
             auto_detected = None
-            _reeval_ckey = _content_key(doc_bytes) if doc_bytes else None
             if not effective_target:
-                effective_target = ai_service.auto_detect_noc(user_content, page_images,
-                                                              from_document=True, model_tier=model_tier,
-                                                              content_key=_reeval_ckey)
+                effective_target = ai_service.auto_detect_noc(user_content, page_images)
                 auto_detected = effective_target
 
             top_nocs = ai_service.semantic_search_nocs(user_content)
@@ -870,14 +811,7 @@ def reevaluate_document(
                 return (isinstance(a, dict) and effective_target
                         and ((a.get("noc_analysis") or {}).get("detected_code") == effective_target))
 
-            # Freshest source first: the audit the auto-detect v2 run just produced in THIS request.
-            result_json = getattr(ai_service.auto_detect_noc, "last_audit", None) if auto_detected else None
-            if not _audit_matches_target(result_json):
-                result_json = None
-            else:
-                print(f"[reevaluate] Reused the auto-detect run's internal audit for noc={effective_target}")
-            if result_json is None:
-                result_json = ai_service.pop_finder_audit(req.file_id, effective_target) if effective_target else None
+            result_json = ai_service.pop_finder_audit(req.file_id, effective_target) if effective_target else None
             if not _audit_matches_target(result_json):
                 result_json = None
             if result_json is None and effective_target and isinstance(record.payload, dict):
@@ -896,7 +830,6 @@ def reevaluate_document(
                     page_images=page_images if page_images else None,
                     auto_detected_noc=auto_detected,
                     forced_noc=explicit_target,
-                    model_tier=model_tier,
                 )
             else:
                 print(f"[reevaluate] Reused NOC Finder's audit for file={req.file_id} noc={effective_target}")
@@ -930,7 +863,6 @@ def reevaluate_document(
             if req.target_noc and req.target_noc != 'auto':
                 result_json["reevaluated_against_noc"] = req.target_noc
 
-            result_json["engine_tier"] = model_tier
             result_json["_extracted_text"] = user_content  # chained re-evals skip re-extraction too
 
             # Save as a brand new evaluation run
@@ -1070,14 +1002,10 @@ async def noc_finder_endpoint(
             # coverage, not the old single-prompt path that self-reported 100/100.
             import noc_finder_v2
             _tgt = target_noc if (target_noc and target_noc != 'auto') else None
-            _model_tier = _audit_model_tier(user_id, db)
             result = noc_finder_v2.run_noc_finder_v2(
                 user_content, page_images if page_images else None,
                 target_noc=_tgt, from_document=bool(document),
-                model_tier=_model_tier,
-                content_key=_content_key(doc_bytes) if document else None,
             )
-            result["engine_tier"] = _model_tier  # paid users' analyses run on the premium model
         except openai.RateLimitError as e:
             print(f"OpenAI RateLimitError details: {e.response.json() if hasattr(e, 'response') else str(e)}")
             raise HTTPException(status_code=429, detail=f"OpenAI Rate Limit Exceeded: {str(e)}")

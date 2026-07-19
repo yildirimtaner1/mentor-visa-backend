@@ -39,53 +39,6 @@ def _get_anthropic_client():
     return _anthropic_client
 
 
-# Newer Claude "5" reasoning models reject the `temperature` parameter ("deprecated for this model").
-# We learn which models those are at runtime and drop temperature for them, so callers can keep asking
-# for temperature=0 without every call site needing to know the model's quirks.
-_ANTHROPIC_NO_TEMPERATURE = set()
-
-def _anthropic_create(client, **kwargs):
-    """client.messages.create with automatic handling of models that deprecate `temperature`."""
-    model = kwargs.get("model", "")
-    if model in _ANTHROPIC_NO_TEMPERATURE:
-        kwargs.pop("temperature", None)
-    try:
-        return client.messages.create(**kwargs)
-    except Exception as e:
-        msg = str(e).lower()
-        if "temperature" in kwargs and "temperature" in msg and ("deprecat" in msg or "not support" in msg):
-            _ANTHROPIC_NO_TEMPERATURE.add(model)
-            kwargs.pop("temperature", None)
-            return client.messages.create(**kwargs)
-        raise
-
-
-def _call_gemini_agent(agent_name: str, system_prompt: str, user_message: str,
-                       response_format_class, model_override: str = None) -> dict:
-    """Call a Gemini agent with native structured output (response_schema). Returns parsed dict.
-    Used as the independent, different-lab cross-check in the NOC adjudication step."""
-    from google.genai import types
-    model = model_override or "gemini-2.5-pro"
-    if ai_service.gemini_client is None:
-        raise ValueError("Gemini client not initialized")
-    print(f"  [{agent_name}] Calling {model}...")
-    resp = ai_service.gemini_client.models.generate_content(
-        model=model,
-        contents=f"{system_prompt}\n\n{user_message}",
-        config=types.GenerateContentConfig(
-            response_mime_type="application/json",
-            response_schema=response_format_class,
-            temperature=0.0,
-        ),
-    )
-    data = json.loads(resp.text)
-    try:
-        return response_format_class.model_validate(data).model_dump()
-    except Exception as e:
-        print(f"  [{agent_name}] Schema validation warning: {e}")
-        return data
-
-
 # ── Model Configuration (fallback defaults; callers usually pass model_override) ──
 
 AGENT_MODELS = {
@@ -144,8 +97,7 @@ def _call_claude_agent(agent_name: str, system_prompt: str, user_message: str,
     )
 
     print(f"  [{agent_name}] Calling {model}...")
-    message = _anthropic_create(
-        client,
+    message = client.messages.create(
         model=model,
         max_tokens=2000,
         temperature=0.0,

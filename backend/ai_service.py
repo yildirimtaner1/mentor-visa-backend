@@ -27,72 +27,6 @@ gemini_client = genai.Client()
 _openai_api_key = os.getenv("OPENAI_API_KEY", "")
 openai_client = OpenAI(api_key=_openai_api_key) if _openai_api_key else None
 
-# The Employment Letter Auditor grades every letter on a strong, deterministic model. gpt-4o-mini was
-# retired from this path: it under-grades duty coverage and is non-deterministic (57%/57%/57%/71% on a
-# letter whose accurate coverage is 85%), which showed users different numbers on the Finder vs the
-# Auditor. Haiku 4.5 is accurate and stable (85%/85%); paid tiers escalate to Sonnet 4.6.
-AUDIT_STANDARD_MODEL = "claude-haiku-4-5-20251001"
-
-# Duty coverage: a strong OR partial match counts as a demonstrated duty (1), weak/missing count
-# for nothing. Coverage % = demonstrated / total ESSENTIAL official duties. Non-essential duties
-# (the ones the NOC lists as "May …" — occasional/optional) are excluded from the denominator so a
-# letter isn't penalised for not showing duties that aren't core to the occupation.
-def _is_essential_duty(duty_text: str) -> bool:
-    return not str(duty_text or "").strip().lower().startswith("may ")
-
-def _backfill_official_duties(result: dict, code: str) -> None:
-    """Guarantee the duty-by-duty table covers EVERY official main duty of the NOC. Any duty the model
-    omitted is graded semantically against the applicant's demonstrated evidence (so a genuinely-shown
-    duty the model forgot is still credited) and appended; if it can't be graded, it's added as
-    'missing' so the table is at least complete. Sub-occupation scoping happens later."""
-    na = result.get("noc_analysis")
-    if not isinstance(na, dict) or not code:
-        return
-    dm = na.get("duties_match") or []
-    ent = NOC_CODE_TO_ENTRY.get(code) or {}
-    official = [d for d in (ent.get("duties_flat") or ent.get("duties") or []) if d and d.strip()]
-    if not official:
-        return
-    present = {(m.get("noc_duty", "") or "").strip().lower() for m in dm}
-    missing = [d for d in official if d.strip().lower() not in present]
-    if not missing:
-        return
-    # Grade the omitted duties against what the letter already evidenced (the model's matched quotes).
-    profile = [(m.get("letter_evidence") or "").strip() for m in dm
-               if m.get("match_strength") in ("strong", "partial") and (m.get("letter_evidence") or "").strip()]
-    graded = {}
-    if profile and openai_client:
-        try:
-            rp = openai_client.embeddings.create(model="text-embedding-3-small", input=profile)
-            rd = openai_client.embeddings.create(model="text-embedding-3-small", input=missing)
-            P = np.array([x.embedding for x in rp.data], dtype=np.float32)
-            P /= (np.linalg.norm(P, axis=1, keepdims=True) + 1e-9)
-            D = np.array([x.embedding for x in rd.data], dtype=np.float32)
-            D /= (np.linalg.norm(D, axis=1, keepdims=True) + 1e-9)
-            sims = (D @ P.T).max(axis=1)
-            for d, s in zip(missing, sims):
-                graded[d] = "strong" if s >= STRONG_DUTY_SIM else ("partial" if s >= 0.30 else "missing")
-        except Exception as e:
-            print(f"[Auditor] duty backfill grading failed: {e}")
-    for d in missing:
-        dm.append({"noc_duty": d, "letter_evidence": "", "match_strength": graded.get(d, "missing")})
-    na["duties_match"] = dm
-    print(f"[Auditor] Backfilled {len(missing)} official dut(ies) the model omitted "
-          f"({sum(1 for d in missing if graded.get(d) in ('strong','partial'))} evidenced).")
-
-
-def coverage_pct(pairs) -> int:
-    """pairs = iterable of (duty_text, match_strength). Binary coverage over essential duties."""
-    pairs = list(pairs)
-    essential = [(d, s) for (d, s) in pairs if _is_essential_duty(d)]
-    if not essential:                      # every duty was "May …" — fall back to all of them
-        essential = pairs
-    total = len(essential)
-    if not total:
-        return 0
-    covered = sum(1 for (_d, s) in essential if str(s or "").lower() in ("strong", "partial"))
-    return int(round(100 * covered / total))
-
 # Load the NOC index once at startup
 _noc_index_path = os.path.join(os.path.dirname(__file__), "noc_index.json")
 with open(_noc_index_path, "r", encoding="utf-8") as f:
@@ -281,9 +215,7 @@ surface keywords or the job title (a frequent industry/product/setting word is n
 {multi_title_rule}
 """
 
-    return f"""You are an advanced AI system acting as a STRICT, SKEPTICAL, and FAIR Canadian Immigration Officer auditing employment letters for Express Entry (which includes the Canadian Experience Class, the Federal Skilled Worker Program, the Federal Skilled Trades Program, and Provincial Nominee streams).
-
-SCOPE — READ CAREFULLY: Your ONLY job is to assess whether THIS LETTER credibly documents the applicant's duties and meets IRCC's employment-letter requirements for the target NOC. You are NOT assessing program eligibility. Foreign (non-Canadian) work experience is fully valid for the Federal Skilled Worker Program and counts toward Express Entry. NEVER treat work performed outside Canada as a risk, a gap, or a disqualifier, and NEVER state that the experience "does not qualify", "will not count", or "cannot support the application" because of where it took place. The applicant's location of experience is neutral metadata only.
+    return f"""You are an advanced AI system acting as a STRICT, SKEPTICAL, and FAIR Canadian Immigration Officer auditing employment letters under Express Entry - Canadian Experience Class (CEC).
 
 **IMPORTANT: Today's date is {datetime.date.today().strftime('%B %d, %Y')}. Use this as the current date for any date-related analysis. Do NOT hallucinate or guess a different date.**
 
@@ -350,8 +282,7 @@ CHECK 5 - DUTIES QUALITY (SOFT_FAIL):
 - If duties appear copy-pasted VERBATIM from the NOC website, flag as high-severity risk.
 
 CHECK 6 - HEAVY REDACTION (SOFT_FAIL):
-- If the APPLICANT redacted significant portions (e.g. blacked-out salary or duties), add a warning noting which elements could not be verified.
-- CRITICAL EXCEPTION: our system automatically removes/masks any NOC code numbers the employer wrote in the letter (to stop those numbers biasing your NOC selection). This removal is intentional and expected. NEVER flag a missing, removed, blanked, or "redacted" NOC code/reference as redaction, tampering, or an authenticity concern — it is our doing, not the applicant's.
+- If significant portions are redacted, add a warning noting which elements could not be verified.
 
 === REJECTION OUTPUT FORMAT ===
 If ANY of Checks 1-3 result in HARD_FAIL:
@@ -371,11 +302,11 @@ If all checks pass (or only SOFT_FAIL), proceed with the full analysis.
 
 === TASK 2 - DUTY EVIDENCE MAPPING (CRITICAL - This drives the decision) ===
 
-You MUST include an entry in `duties_match` for EVERY official main duty of the selected NOC listed
-in the database below — never omit a duty. Include it even if it seems unrelated or belongs to a
-different sub-occupation packed under the same code. Completeness is mandatory: if the target NOC
-lists 13 main duties, `duties_match` must contain 13 entries. (The platform handles sub-occupation
-scoping afterward — that is not your job.)
+You MUST map every APPLICABLE main duty from the selected NOC against the letter's content:
+
+For `duties_match`, include all main duties from the NOC database - not just the ones that match.
+EXCEPTION (multi-title NOC groups): include only the duties of the applicant's sub-occupation;
+omit the duties belonging to the other occupations packed under the same code (see TASK 1).
 For each duty, set `match_strength`:
   - "strong" - clear semantic alignment, specific evidence quoted from the letter
   - "partial" - related language but vague or incomplete
@@ -383,7 +314,7 @@ For each duty, set `match_strength`:
   - "missing" - no evidence in the letter at all
 
 For `missing_critical_duties`, list every NOC duty that received "missing" or "weak" match_strength.
-Do NOT compute or state a coverage percentage anywhere — the platform computes the exact figure.
+For `duty_coverage_percentage`, calculate: (count of "strong" + "partial") / (total NOC main duties) x 100
 
 For `lead_statement_*`:
   - Quote the official lead statement from the NOC database
@@ -406,23 +337,11 @@ MANDATORY ELEMENTS (populate `mandatory_requirements` booleans - set TRUE only i
 7. SALARY / COMPENSATION - Any format acceptable (hourly, weekly, monthly, annual)
 8. SIGNATORY - Name, title, and signature of supervisor OR HR officer (both valid)
 
-HOW TO JUDGE ELEMENTS 1, 3 AND 8 (letterhead / contact information / signatory):
-- Use BOTH the page images (when provided) and the extracted text. A header or footer block with
-  the company name, logo, address, phone, email or website IS official letterhead.
-- Word documents and plain-text extractions often reach you WITHOUT page images, and PDF text
-  extraction frequently loses header/footer formatting. Judge from textual cues (company block,
-  signature block with name and title). NEVER mark these elements false merely because no image
-  was provided or because formatting was lost in extraction.
-- Contact information counts wherever it appears: header, footer, signature block, or body.
-- Mark FALSE only when the element is affirmatively absent from BOTH the text and the images.
-
 For `compliance.score`: (count of true mandatory_requirements / 8) x 100
 For `compliance.missing_elements`: List mandatory elements completely absent.
 For `compliance.warnings`: List elements present but insufficient/ambiguous.
 
 === DO NOT FLAG (IMPORTANT - These are NOT issues) ===
-- Work experience gained OUTSIDE Canada — foreign experience is valid for Express Entry (FSW etc.). Location is NEVER a risk or disqualifier.
-- A removed / masked / "redacted" NOC code or reference — our system did that on purpose to prevent bias. Not an authenticity concern.
 - Letter dated AFTER employment end date (normal for reference letters)
 - Salary in any format (hourly, monthly, biweekly - all acceptable)
 - HR signatory instead of supervisor (both valid per IRCC)
@@ -468,7 +387,6 @@ Write `officer_narrative` in a realistic IRCC officer tone:
 - Formal, concise, evidence-based, slightly skeptical
 - 3-5 sentences referencing specific duties and gaps
 - Example: "The duties described are insufficiently detailed to establish alignment with the claimed NOC. While the applicant references supervisory responsibilities, the letter lacks specificity regarding..."
-- NEVER state, estimate, or cite a duty-coverage PERCENTAGE or fraction (e.g. "60%", "4 of 7 duties") anywhere in the narrative, action plan, risks, or refusal reasons. The platform computes and displays the exact coverage figure separately, and any number you invent would contradict it. Describe coverage only in words — "most core duties are clearly demonstrated", "several key duties are missing", etc.
 
 ---
 
@@ -479,10 +397,9 @@ Write `officer_narrative` in a realistic IRCC officer tone:
 
 ---
 
-=== TASK 8 - LOCATION OF EXPERIENCE (neutral metadata — NOT a risk) ===
+=== TASK 8 - LOCATION OF EXPERIENCE ===
 
-Classify the company address / geographic references for our records ONLY. This never affects the
-decision, risk, or narrative, and outside-Canada experience is NOT a problem (see SCOPE above):
+Analyze the company address, letterhead, and geographic references:
 - Canadian address/postal code/province -> "canada"
 - Non-Canadian address -> "outside_canada"
 - Cannot determine -> "unknown"
@@ -776,12 +693,11 @@ Output your analysis strictly conforming to the requested JSON schema.
 """
 
 
-def ocr_from_page_images(page_images: list[tuple[bytes, str]], max_pages: int = 5) -> str:
+def ocr_from_page_images(page_images: list[tuple[bytes, str]], max_pages: int = 2) -> str:
     """Use GPT-4o-mini vision to OCR text from scanned PDF page images.
-
-    This is a fallback for scanned PDFs where pdfminer returns no text. The cap matches
-    pdf_pages_to_images (5): a 3+ page scanned letter must not be silently truncated —
-    the audit would otherwise judge duties/signatures it never read.
+    
+    This is a lightweight fallback for scanned PDFs where pdfminer returns no text.
+    We only OCR the first few pages to keep costs low — just enough for the RAG search.
     """
     if not openai_client or not page_images:
         return ""
@@ -837,77 +753,8 @@ def extract_document_content(doc_bytes: bytes, ext: str, is_image: bool) -> tupl
         user_content = f"=== EXTRACTED WORD TEXT ===\n{extract_text_from_docx(doc_bytes)}"
     else:
         user_content = f"=== EXTRACTED TEXT ===\n{doc_bytes.decode('utf-8', errors='replace')}"
-
-    # French letters are valid IRCC documents, but the NOC index + embeddings are English:
-    # translate once here so every downstream consumer (Finder, Auditor, re-evals via the
-    # persisted text) works at full accuracy without ever re-paying for translation.
-    user_content = translate_to_english_if_french(user_content)
-
+    
     return user_content, page_images
-
-
-def page_images_only(doc_bytes: bytes, ext: str, is_image: bool) -> list:
-    """Render page images WITHOUT any text extraction or OCR. Used by re-evaluations that
-    already have the persisted extracted text but still need the visual pages (letterhead /
-    signature checks). Returns [] when the file bytes are unavailable (re-eval still proceeds
-    on the persisted text)."""
-    if not doc_bytes:
-        return []
-    if is_image:
-        return [(doc_bytes, IMAGE_MIME_TYPES.get(ext, 'image/jpeg'))]
-    if ext == '.pdf':
-        return pdf_pages_to_images(doc_bytes)
-    return []
-
-
-# ── French letter support ───────────────────────────────────────────────────────
-# IRCC accepts documents in both official languages; our NOC index and embeddings are
-# English-only, so French letters are translated once at extraction time.
-_FRENCH_MARKERS = (
-    " le ", " la ", " les ", " des ", " une ", " être ", " été ", " avec ", " pour ",
-    " dans ", " nous ", " vous ", " ainsi ", " tâches", " fonctions", " emploi ",
-    " travail ", " entreprise ", " monsieur ", " madame ", " attestation ", " poste ",
-    " responsabilités", " salaire ", " heures ", " semaine ", " depuis ", " chez ",
-)
-_ENGLISH_MARKERS = (
-    " the ", " and ", " with ", " for ", " duties ", " responsibilities ", " employment ",
-    " letter ", " company ", " salary ", " hours ", " week ", " since ", " position ",
-)
-
-
-def _looks_french(text: str) -> bool:
-    """Cheap heuristic so English letters never pay for a language-detection LLM call."""
-    t = f" {(text or '').lower()} "
-    fr = sum(t.count(m) for m in _FRENCH_MARKERS)
-    en = sum(t.count(m) for m in _ENGLISH_MARKERS)
-    return fr >= 5 and fr > en * 1.5
-
-
-def translate_to_english_if_french(text: str) -> str:
-    """Translate a French document to English (one gpt-4o-mini call), preserving structure.
-    Returns the text unchanged when it doesn't look French or translation is unavailable.
-    The translated text is marked so the auditor knows the original was French (valid for IRCC)."""
-    if not text or not openai_client or not _looks_french(text):
-        return text
-    try:
-        resp = openai_client.chat.completions.create(
-            model="gpt-4o-mini",
-            messages=[
-                {"role": "system", "content": (
-                    "Translate this French employment document to English. Preserve the structure, "
-                    "line breaks, names, dates, numbers and job titles exactly. Return ONLY the translation.")},
-                {"role": "user", "content": text},
-            ],
-            temperature=0.0,
-        )
-        translated = (resp.choices[0].message.content or "").strip()
-        if translated:
-            print(f"[French] Letter detected as French — translated to English ({len(translated)} chars)")
-            return ("=== TRANSLATED FROM FRENCH (original letter is in French — a valid IRCC language; "
-                    "any French page images correspond to this English translation) ===\n" + translated)
-    except Exception as e:
-        print(f"[French] Translation failed (continuing with original text): {e}")
-    return text
 
 
 def preprocess_duties_for_embedding(user_text: str) -> str:
@@ -1349,33 +1196,18 @@ def scoped_duty_coverage(applicant_duties: list, code: str, llm_duties_match: li
         nd = (m.get("noc_duty", "") or "").strip().lower()
         if nd:
             lookup[nd] = m.get("match_strength", "")
-    pairs = []
+    covered = 0
     for i, dt in enumerate(gd):
         strength = lookup.get(dt.strip().lower())
-        if strength in ("strong", "partial", "weak", "missing"):
-            pairs.append((dt, strength))
+        if strength in ("strong", "partial"):
+            covered += 1
+        elif strength in ("weak", "missing"):
+            pass                                # LLM saw it and it's not evidenced
         elif float(sim_app[i]) >= STRONG_DUTY_SIM:
-            pairs.append((dt, "strong"))        # no LLM entry to match by text — strong semantic match
-        else:
-            pairs.append((dt, "missing"))
-    # A duty the applicant CLEARLY demonstrates must never be dropped just because it belongs to a
-    # different sub-title of a multi-title NOC (e.g. a procurement officer's "respond to customer
-    # inquiries" duty). Add any such evidenced official duty from the OTHER sub-groups to the applicable
-    # set so it stays in the table and the coverage %. (Non-evidenced other-sub-title duties are still
-    # excluded — that is the whole point of scoping.)
-    gd_lower = {d.strip().lower() for d in gd}
-    for g in groups:
-        for d in g.get("duties", []):
-            dl = (d or "").strip().lower()
-            if dl and dl not in gd_lower and lookup.get(dl) in ("strong", "partial"):
-                pairs.append((d, lookup[dl]))
-                gd_lower.add(dl)
-    coverage = coverage_pct(pairs)
-    essential = [(d, s) for (d, s) in pairs if _is_essential_duty(d)] or pairs
-    covered = sum(1 for (_d, s) in essential if s in ("strong", "partial"))
+            covered += 1                        # no LLM entry to match by text — semantic fallback
+    coverage = int(round(100 * covered / len(gd)))
     return {"coverage": coverage, "sub_title": best["sub_title"],
-            "group_size": len(essential), "covered": covered,
-            "applicable_duties": [d for (d, _s) in pairs]}
+            "group_size": len(gd), "covered": covered, "applicable_duties": gd}
 
 
 def _duty_stems(text):
@@ -1474,7 +1306,7 @@ def finder_noc_analysis(applicant_duties: list, code: str, role_hint: str = "") 
         else:
             key_gaps.append(nd)
         breakdown.append({"noc_duty": nd, "letter_evidence": appd[j] if m != "missing" else "", "match": m})
-    coverage = coverage_pct([(b["noc_duty"], b["match"]) for b in breakdown]) if total else 0
+    coverage = int(round(100 * covered / total)) if total else 0
 
     return {"coverage": coverage, "sub_title": sub_title, "covered": covered, "total": total,
             "set_duties": set_duties, "duties_breakdown": breakdown, "key_gaps": key_gaps}
@@ -1549,12 +1381,9 @@ def pop_finder_audit(file_id: str, code: str) -> dict | None:
     return _FINDER_AUDIT_CACHE.pop((file_id, str(code)), None)
 
 
-def audit_duty_coverage(letter_text: str, code: str, page_images: list = None,
-                        model_tier: str = "standard") -> dict | None:
+def audit_duty_coverage(letter_text: str, code: str) -> dict | None:
     """Run the FULL Employment Letter Auditor against a fixed NOC code and return its duty coverage +
     breakdown — the EXACT same computation/prompt the Auditor uses, so the Finder converges with it.
-    page_images: when provided (document uploads), the audit sees the pages too — making the result
-    byte-identical in kind to a direct /analyze audit, so it can be REUSED as the real audit.
     Returns {coverage, sub_title, duties_breakdown:[{noc_duty,letter_evidence,match}], key_gaps} or None
     (None when there is no model, the code is unknown, or the Auditor rejects the input as not a letter)."""
     if not openai_client or not letter_text or not code or code not in NOC_CODE_TO_ENTRY:
@@ -1566,8 +1395,7 @@ def audit_duty_coverage(letter_text: str, code: str, page_images: list = None,
     top[code] = NOC_CODE_TO_ENTRY[code]                       # ensure the locked code is in the reference
     system = _build_prompt_text(json.dumps(top, ensure_ascii=False), code)
     try:
-        res = audit_document_with_openai(system, letter_text, page_images, auto_detected_noc=code,
-                                         model_tier=model_tier)
+        res = audit_document_with_openai(system, letter_text, None, auto_detected_noc=code)
     except Exception as e:
         print(f"[audit_duty_coverage] auditor failed: {e}")
         return None
@@ -1588,7 +1416,7 @@ def audit_duty_coverage(letter_text: str, code: str, page_images: list = None,
         return None
     cov = na.get("duty_coverage_percentage")
     if cov is None:
-        cov = coverage_pct([(b["noc_duty"], b["match"]) for b in breakdown])
+        cov = round(100 * sum(1 for b in breakdown if b["match"] in ("strong", "partial")) / len(breakdown))
     gaps = na.get("missing_critical_duties") or [b["noc_duty"] for b in breakdown if b["match"] in ("weak", "missing")]
     return {"coverage": int(round(cov)), "sub_title": na.get("coverage_subtitle", "") or "",
             "duties_breakdown": breakdown, "key_gaps": [g for g in gaps if g],
@@ -1700,26 +1528,17 @@ def find_noc_with_openai(system_prompt: str, user_content: str, page_images: lis
     return result
 
 
-def auto_detect_noc(user_content: str, page_images: list[tuple[bytes, str]] = None,
-                    from_document: bool = False, model_tier: str = "standard",
-                    content_key: str = None) -> str | None:
+def auto_detect_noc(user_content: str, page_images: list[tuple[bytes, str]] = None) -> str | None:
     """Run the NOC Finder (v2) to auto-detect the best NOC code for a document.
 
     Returns the detected NOC code string, or None if detection fails.
-    Side effects: caches the full v2 confidence on `auto_detect_noc.last_confidence` so the Auditor
-    can display the SAME NOC-match confidence the Finder would, for free; and stashes the complete
-    internal audit (when v2 ran one — document path) on `auto_detect_noc.last_audit` so /analyze can
-    REUSE it instead of paying for a second identical audit.
-    content_key: stable source hash so the Auditor and the NOC Finder share one cached v2 result for
-    the same letter (identical NOC/coverage/alternatives/flags across both tools).
+    Side effect: caches the full v2 confidence on `auto_detect_noc.last_confidence` so the Auditor
+    can display the SAME NOC-match confidence the Finder would, for free (no recomputation).
     """
     auto_detect_noc.last_confidence = None
-    auto_detect_noc.last_audit = None
     try:
         import noc_finder_v2
-        result = noc_finder_v2.run_noc_finder_v2(user_content, page_images,
-                                                 from_document=from_document, model_tier=model_tier,
-                                                 content_key=content_key)
+        result = noc_finder_v2.run_noc_finder_v2(user_content, page_images)
 
         rec = result.get("recommended_noc", {})
         detected_code = rec.get("code")
@@ -1729,10 +1548,6 @@ def auto_detect_noc(user_content: str, page_images: list[tuple[bytes, str]] = No
         if detected_code and detected_code != "00000":
             print(f"[Auto-Detect NOC] Detected: {detected_code} ({detected_title}) — {confidence}% confidence")
             auto_detect_noc.last_confidence = confidence
-            audit = result.get("_audit_full")
-            if isinstance(audit, dict):
-                import copy as _copy
-                auto_detect_noc.last_audit = _copy.deepcopy(audit)
             return detected_code
         else:
             print("[Auto-Detect NOC] Failed to detect NOC code from result")
@@ -1742,134 +1557,7 @@ def auto_detect_noc(user_content: str, page_images: list[tuple[bytes, str]] = No
         return None
 
 
-def _call_claude_structured(system_prompt: str, user_content: str, page_images: list[tuple[bytes, str]],
-                            response_format, label: str = "AI",
-                            model: str = "claude-haiku-4-5-20251001") -> dict:
-    """Claude structured-output call mirroring _call_openai_structured: the schema is enforced by
-    forcing a single tool call whose input_schema is the Pydantic model's JSON schema. Raises on
-    any failure so callers can fall back to the OpenAI path."""
-    import noc_agents
-    client = noc_agents._get_anthropic_client()
-    if client is None:
-        raise ValueError("ANTHROPIC_API_KEY not configured")
-
-    content = []
-    if user_content:
-        content.append({"type": "text", "text": user_content})
-    for img_bytes, mime_type in (page_images or []):
-        content.append({
-            "type": "image",
-            "source": {"type": "base64", "media_type": mime_type,
-                       "data": base64.b64encode(img_bytes).decode("utf-8")},
-        })
-
-    print(f"Calling Claude {model} for {label}...")
-    resp = noc_agents._anthropic_create(
-        client,
-        model=model,
-        max_tokens=8000,   # AnalysisResponse with a full duty-by-duty table is large
-        temperature=0.0,   # dropped automatically for models that deprecate it (e.g. Sonnet 5)
-        system=system_prompt,
-        messages=[{"role": "user", "content": content}],
-        tools=[{
-            "name": "emit_analysis",
-            "description": ("Emit the complete analysis strictly conforming to the schema. "
-                            "Include EVERY field — use empty arrays/strings for fields with nothing to report."),
-            "input_schema": response_format.model_json_schema(),
-        }],
-        tool_choice={"type": "tool", "name": "emit_analysis"},
-    )
-    tool_input = next((b.input for b in resp.content if getattr(b, "type", "") == "tool_use"), None)
-    if tool_input is None:
-        raise ValueError("Claude returned no tool_use block")
-    _backfill_empty_fields(tool_input, response_format)
-    result = response_format.model_validate(tool_input).model_dump()
-    return _sanitize_noc_response(result)
-
-
-def _backfill_empty_fields(data: dict, response_format) -> None:
-    """Claude's tool-use omits required-but-empty container fields at ANY depth (e.g. top-level
-    refusal_reasons: [] or nested noc_analysis.alternative_nocs: []). Recursively backfill missing
-    list/dict fields with empties so Pydantic validation passes; anything else still missing fails
-    validation and triggers the model fallback."""
-    from typing import get_origin, get_args
-    from pydantic import BaseModel
-    if not isinstance(data, dict) or not hasattr(response_format, "model_fields"):
-        return
-    for name, field in response_format.model_fields.items():
-        ann = field.annotation
-        # Unwrap Optional[...] / Union[..., None] to the first concrete arg.
-        args = [a for a in get_args(ann) if a is not type(None)]
-        core = args[0] if (get_origin(ann) is not None and args and get_origin(ann) is not list
-                           and get_origin(ann) is not dict) else ann
-        origin = get_origin(core) or core
-        if name not in data:
-            if origin is list:
-                data[name] = []
-            elif origin is dict:
-                data[name] = {}
-        elif isinstance(core, type) and issubclass(core, BaseModel) and isinstance(data.get(name), dict):
-            _backfill_empty_fields(data[name], core)  # recurse into nested models (e.g. noc_analysis)
-
-
-# Objective contact-coordinate patterns. A hit is unambiguous evidence, so it can only ADD a present
-# element, never remove one.
-_EMAIL_RE = re.compile(r"[A-Za-z0-9._%+\-]+@[A-Za-z0-9.\-]+\.[A-Za-z]{2,}")
-_PHONE_RE = re.compile(r"(?:\+?\d[\d\s().\-]{7,}\d)")
-_URL_RE = re.compile(r"(?:https?://|www\.)[A-Za-z0-9.\-]+\.[A-Za-z]{2,}", re.I)
-
-
-def _apply_contact_backstop(result: dict, text: str) -> None:
-    """False->True only, using objective evidence, for the presence elements the model misjudges.
-
-    - contact_information: an email OR a phone number OR a website is, by definition, contact info.
-    - company_letterhead: a reference letter that embeds the employer's own email / phone / website
-      is in practice printed on letterhead (that header block IS the letterhead). We treat the same
-      objective coordinates as letterhead evidence — this only ever corrects a false negative on a
-      real company header, and reference letters that are genuinely letterhead-less almost never carry
-      an embedded employer email/phone.
-    Keeps compliance.missing_element lists honest by dropping anything we just flipped to present.
-    """
-    mr = result.get("mandatory_requirements")
-    if not isinstance(mr, dict) or not text:
-        return
-    has_email = bool(_EMAIL_RE.search(text))
-    has_phone = bool(_PHONE_RE.search(text))
-    has_url = bool(_URL_RE.search(text))
-    has_contact_coord = has_email or has_phone or has_url
-
-    flipped = []
-    if has_contact_coord and mr.get("contact_information") is not True:
-        mr["contact_information"] = True
-        flipped.append(("contact_information", "contact"))
-    if has_contact_coord and mr.get("company_letterhead") is not True:
-        mr["company_letterhead"] = True
-        flipped.append(("company_letterhead", "letterhead"))
-
-    if flipped:
-        kinds = "+".join(k for _, k in flipped)
-        print(f"[Auditor] Contact backstop: found email={has_email} phone={has_phone} url={has_url} "
-              f"-> forced {kinds} = True")
-        # Scrub the flipped elements from any 'missing' list so the narrative doesn't contradict the flags.
-        comp = result.get("compliance")
-        if isinstance(comp, dict):
-            for key in ("missing_elements", "missing"):
-                lst = comp.get(key)
-                if isinstance(lst, list):
-                    comp[key] = [m for m in lst if not _mentions_flipped(m, flipped)]
-
-
-def _mentions_flipped(text: str, flipped) -> bool:
-    low = (text or "").lower()
-    for _, kind in flipped:
-        if kind == "contact" and ("contact" in low or "email" in low or "phone" in low or "telephone" in low):
-            return True
-        if kind == "letterhead" and "letterhead" in low:
-            return True
-    return False
-
-
-def audit_document_with_openai(system_prompt: str, user_content: str, page_images: list[tuple[bytes, str]] = None, auto_detected_noc: str = None, forced_noc: str = None, model_tier: str = "standard") -> dict:
+def audit_document_with_openai(system_prompt: str, user_content: str, page_images: list[tuple[bytes, str]] = None, auto_detected_noc: str = None, forced_noc: str = None) -> dict:
     """Employment Auditor: returns AnalysisResponse.
 
     Args:
@@ -1881,14 +1569,6 @@ def audit_document_with_openai(system_prompt: str, user_content: str, page_image
             Like auto_detected_noc, employer NOC references are stripped and the result's
             detected_code is hard-locked to this code — but the NOC-match confidence is
             computed fresh (we did not run auto-detection, so there is no cached score).
-        model_tier: which model grades the audit. gpt-4o-mini is NOT used here — it systematically
-            under-grades duty coverage (measured: 57% where the accurate answer is 85%) AND is
-            non-deterministic, which broke Finder<->Auditor consistency. Both tiers use a strong,
-            stable model so the shared numbers (coverage, flags, alternatives) are accurate and
-            identical for every user:
-              "standard" -> Claude Haiku 4.5 (accurate + deterministic)
-              "premium"  -> Claude Sonnet 4.6 (our most capable model; paid tiers/credits)
-            Chain falls back standard<-premium<-gpt-4o-mini so an audit always returns something.
     """
     # The NOC the result must end up locked to (explicit user request wins over auto-detection).
     target_noc = forced_noc or auto_detected_noc
@@ -1901,23 +1581,7 @@ def audit_document_with_openai(system_prompt: str, user_content: str, page_image
         user_content = cleaned_content
 
     from models import AnalysisResponse
-    result = None
-    # Every letter is graded on Claude Haiku 4.5 — accurate and deterministic. (Sonnet was dropped:
-    # it added cost/latency for paid users without an accuracy gain over Haiku on this task.)
-    attempts = [(AUDIT_STANDARD_MODEL, "haiku-4-5")]
-    for model_id, tag in attempts:
-        try:
-            result = _call_claude_structured(system_prompt, user_content, page_images, AnalysisResponse,
-                                             f"Auditor ({tag})", model=model_id)
-            result["_audit_model"] = tag
-            break
-        except Exception as e:
-            print(f"[Auditor] {tag} call failed: {e}")
-            result = None
-    if result is None:
-        print("[Auditor] All Claude audits failed — falling back to gpt-4o-mini (accuracy-degraded).")
-        result = _call_openai_structured(system_prompt, user_content, page_images, AnalysisResponse, "Auditor")
-        result["_audit_model"] = "gpt-4o-mini"
+    result = _call_openai_structured(system_prompt, user_content, page_images, AnalysisResponse, "Auditor")
 
     # Post-process: if a target NOC was determined (auto-detected OR explicitly requested) but the
     # model returned a different detected_code (e.g. the employer's NOC claim leaked via page images,
@@ -1953,21 +1617,10 @@ def audit_document_with_openai(system_prompt: str, user_content: str, page_image
         
         result["noc_analysis"] = noc_analysis
     
-    # Deterministic backstop for the three "presence" mandatory elements the model judges least
-    # reliably (letterhead / contact info / signatory). OCR and PDF extraction routinely drop or
-    # reorder header blocks, so gpt-4o-mini sometimes marks an obvious letterhead absent. Objective
-    # textual evidence (a real email, phone, or website) can only turn these False->True — never the
-    # reverse — so it removes false negatives without risking false positives.
-    _apply_contact_backstop(result, user_content)
-
-    # Completeness safety net: if the model still omitted any official main duty of the target NOC,
-    # add it so the duty-by-duty table and coverage denominator are never silently short a duty.
-    _backfill_official_duties(result, target_noc or result.get("noc_analysis", {}).get("detected_code"))
-
     # Post-process: Fix math errors from the LLM
     # LLMs are notoriously bad at math (e.g., outputting 8 instead of 100 for 8/8 requirements).
     # We recalculate these percentages natively to ensure 100% accuracy.
-
+    
     # 1. Compliance Score (out of 8 mandatory requirements)
     if "mandatory_requirements" in result and "compliance" in result:
         mand_reqs = result.get("mandatory_requirements", {})
@@ -1979,14 +1632,11 @@ def audit_document_with_openai(system_prompt: str, user_content: str, page_image
     if "noc_analysis" in result and "duties_match" in result["noc_analysis"]:
         duties = result["noc_analysis"].get("duties_match", [])
         if duties:
-            pairs = [(d.get("noc_duty"), d.get("match_strength")) for d in duties]
-            new_pct = coverage_pct(pairs)  # binary, essential duties only ("May …" excluded)
-            n_ess = len([1 for (dd, _s) in pairs if _is_essential_duty(dd)]) or len(pairs)
-            covered = sum(1 for (dd, s) in pairs if _is_essential_duty(dd) and s in ("strong", "partial"))
+            covered = sum(1 for d in duties if d.get("match_strength") in ["strong", "partial"])
+            new_pct = int((covered / len(duties)) * 100)
             old_pct = result["noc_analysis"].get("duty_coverage_percentage")
             if new_pct != old_pct:
-                print(f"[Auditor] Duty coverage {old_pct}% -> {new_pct}% "
-                      f"({covered}/{n_ess} essential duties evidenced)")
+                print(f"[Auditor] Math Fix: Corrected duty coverage from {old_pct}% to {new_pct}% ({covered}/{len(duties)})")
             result["noc_analysis"]["duty_coverage_percentage"] = new_pct
 
     # ── NOC-match confidence: keep it IDENTICAL to what the NOC Finder shows ──
