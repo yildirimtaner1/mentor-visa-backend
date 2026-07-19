@@ -1679,10 +1679,11 @@ def _call_claude_structured(system_prompt: str, user_content: str, page_images: 
         })
 
     print(f"Calling Claude {model} for {label}...")
-    resp = client.messages.create(
+    resp = noc_agents._anthropic_create(
+        client,
         model=model,
         max_tokens=8000,   # AnalysisResponse with a full duty-by-duty table is large
-        temperature=0.0,
+        temperature=0.0,   # dropped automatically for models that deprecate it (e.g. Sonnet 5)
         system=system_prompt,
         messages=[{"role": "user", "content": content}],
         tools=[{
@@ -1817,7 +1818,7 @@ def audit_document_with_openai(system_prompt: str, user_content: str, page_image
     from models import AnalysisResponse
     result = None
     # Try, in order: the tier's model, then Haiku, then gpt-4o-mini (last resort — accuracy-degraded).
-    attempts = ([("claude-sonnet-4-6", "sonnet"), (AUDIT_STANDARD_MODEL, "haiku-4-5")]
+    attempts = ([("claude-sonnet-4-6", "sonnet-4-6"), (AUDIT_STANDARD_MODEL, "haiku-4-5")]
                 if model_tier == "premium" else [(AUDIT_STANDARD_MODEL, "haiku-4-5")])
     for model_id, tag in attempts:
         try:
