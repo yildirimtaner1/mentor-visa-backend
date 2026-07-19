@@ -33,19 +33,24 @@ openai_client = OpenAI(api_key=_openai_api_key) if _openai_api_key else None
 # Auditor. Haiku 4.5 is accurate and stable (85%/85%); paid tiers escalate to Sonnet 4.6.
 AUDIT_STANDARD_MODEL = "claude-haiku-4-5-20251001"
 
-# Duty coverage weighting: a strong match is a fully demonstrated duty (1.0), a partial match is
-# worth half (0.5), weak/missing count for nothing. Coverage % = sum of weights / TOTAL official
-# NOC duties considered — so a letter that partially touches many duties scores below one that
-# clearly demonstrates fewer.
-DUTY_WEIGHTS = {"strong": 1.0, "partial": 0.5, "weak": 0.0, "missing": 0.0}
+# Duty coverage: a strong OR partial match counts as a demonstrated duty (1), weak/missing count
+# for nothing. Coverage % = demonstrated / total ESSENTIAL official duties. Non-essential duties
+# (the ones the NOC lists as "May …" — occasional/optional) are excluded from the denominator so a
+# letter isn't penalised for not showing duties that aren't core to the occupation.
+def _is_essential_duty(duty_text: str) -> bool:
+    return not str(duty_text or "").strip().lower().startswith("may ")
 
-def coverage_pct(strengths) -> int:
-    """Weighted duty-coverage percentage from a list of match strengths."""
-    total = len(strengths)
+def coverage_pct(pairs) -> int:
+    """pairs = iterable of (duty_text, match_strength). Binary coverage over essential duties."""
+    pairs = list(pairs)
+    essential = [(d, s) for (d, s) in pairs if _is_essential_duty(d)]
+    if not essential:                      # every duty was "May …" — fall back to all of them
+        essential = pairs
+    total = len(essential)
     if not total:
         return 0
-    score = sum(DUTY_WEIGHTS.get(str(s or "").lower(), 0.0) for s in strengths)
-    return int(round(100 * score / total))
+    covered = sum(1 for (_d, s) in essential if str(s or "").lower() in ("strong", "partial"))
+    return int(round(100 * covered / total))
 
 # Load the NOC index once at startup
 _noc_index_path = os.path.join(os.path.dirname(__file__), "noc_index.json")
@@ -235,7 +240,9 @@ surface keywords or the job title (a frequent industry/product/setting word is n
 {multi_title_rule}
 """
 
-    return f"""You are an advanced AI system acting as a STRICT, SKEPTICAL, and FAIR Canadian Immigration Officer auditing employment letters under Express Entry - Canadian Experience Class (CEC).
+    return f"""You are an advanced AI system acting as a STRICT, SKEPTICAL, and FAIR Canadian Immigration Officer auditing employment letters for Express Entry (which includes the Canadian Experience Class, the Federal Skilled Worker Program, the Federal Skilled Trades Program, and Provincial Nominee streams).
+
+SCOPE — READ CAREFULLY: Your ONLY job is to assess whether THIS LETTER credibly documents the applicant's duties and meets IRCC's employment-letter requirements for the target NOC. You are NOT assessing program eligibility. Foreign (non-Canadian) work experience is fully valid for the Federal Skilled Worker Program and counts toward Express Entry. NEVER treat work performed outside Canada as a risk, a gap, or a disqualifier, and NEVER state that the experience "does not qualify", "will not count", or "cannot support the application" because of where it took place. The applicant's location of experience is neutral metadata only.
 
 **IMPORTANT: Today's date is {datetime.date.today().strftime('%B %d, %Y')}. Use this as the current date for any date-related analysis. Do NOT hallucinate or guess a different date.**
 
@@ -302,7 +309,8 @@ CHECK 5 - DUTIES QUALITY (SOFT_FAIL):
 - If duties appear copy-pasted VERBATIM from the NOC website, flag as high-severity risk.
 
 CHECK 6 - HEAVY REDACTION (SOFT_FAIL):
-- If significant portions are redacted, add a warning noting which elements could not be verified.
+- If the APPLICANT redacted significant portions (e.g. blacked-out salary or duties), add a warning noting which elements could not be verified.
+- CRITICAL EXCEPTION: our system automatically removes/masks any NOC code numbers the employer wrote in the letter (to stop those numbers biasing your NOC selection). This removal is intentional and expected. NEVER flag a missing, removed, blanked, or "redacted" NOC code/reference as redaction, tampering, or an authenticity concern — it is our doing, not the applicant's.
 
 === REJECTION OUTPUT FORMAT ===
 If ANY of Checks 1-3 result in HARD_FAIL:
@@ -372,6 +380,8 @@ For `compliance.missing_elements`: List mandatory elements completely absent.
 For `compliance.warnings`: List elements present but insufficient/ambiguous.
 
 === DO NOT FLAG (IMPORTANT - These are NOT issues) ===
+- Work experience gained OUTSIDE Canada — foreign experience is valid for Express Entry (FSW etc.). Location is NEVER a risk or disqualifier.
+- A removed / masked / "redacted" NOC code or reference — our system did that on purpose to prevent bias. Not an authenticity concern.
 - Letter dated AFTER employment end date (normal for reference letters)
 - Salary in any format (hourly, monthly, biweekly - all acceptable)
 - HR signatory instead of supervisor (both valid per IRCC)
@@ -417,6 +427,7 @@ Write `officer_narrative` in a realistic IRCC officer tone:
 - Formal, concise, evidence-based, slightly skeptical
 - 3-5 sentences referencing specific duties and gaps
 - Example: "The duties described are insufficiently detailed to establish alignment with the claimed NOC. While the applicant references supervisory responsibilities, the letter lacks specificity regarding..."
+- NEVER state, estimate, or cite a duty-coverage PERCENTAGE or fraction (e.g. "60%", "4 of 7 duties") anywhere in the narrative, action plan, risks, or refusal reasons. The platform computes and displays the exact coverage figure separately, and any number you invent would contradict it. Describe coverage only in words — "most core duties are clearly demonstrated", "several key duties are missing", etc.
 
 ---
 
@@ -427,9 +438,10 @@ Write `officer_narrative` in a realistic IRCC officer tone:
 
 ---
 
-=== TASK 8 - LOCATION OF EXPERIENCE ===
+=== TASK 8 - LOCATION OF EXPERIENCE (neutral metadata — NOT a risk) ===
 
-Analyze the company address, letterhead, and geographic references:
+Classify the company address / geographic references for our records ONLY. This never affects the
+decision, risk, or narrative, and outside-Canada experience is NOT a problem (see SCOPE above):
 - Canadian address/postal code/province -> "canada"
 - Non-Canadian address -> "outside_canada"
 - Cannot determine -> "unknown"
@@ -1293,20 +1305,20 @@ def scoped_duty_coverage(applicant_duties: list, code: str, llm_duties_match: li
         nd = (m.get("noc_duty", "") or "").strip().lower()
         if nd:
             lookup[nd] = m.get("match_strength", "")
-    covered = 0        # count of demonstrated duties (for the "N of M" display)
-    score = 0.0        # weighted score (strong=1, partial=0.5) for the coverage %
+    pairs = []
     for i, dt in enumerate(gd):
         strength = lookup.get(dt.strip().lower())
-        if strength in DUTY_WEIGHTS:
-            score += DUTY_WEIGHTS[strength]
-            if strength in ("strong", "partial"):
-                covered += 1
+        if strength in ("strong", "partial", "weak", "missing"):
+            pairs.append((dt, strength))
         elif float(sim_app[i]) >= STRONG_DUTY_SIM:
-            score += 1.0                        # no LLM entry to match by text — strong semantic match
-            covered += 1
-    coverage = int(round(100 * score / len(gd)))
+            pairs.append((dt, "strong"))        # no LLM entry to match by text — strong semantic match
+        else:
+            pairs.append((dt, "missing"))
+    coverage = coverage_pct(pairs)
+    essential = [(d, s) for (d, s) in pairs if _is_essential_duty(d)] or pairs
+    covered = sum(1 for (_d, s) in essential if s in ("strong", "partial"))
     return {"coverage": coverage, "sub_title": best["sub_title"],
-            "group_size": len(gd), "covered": covered, "applicable_duties": gd}
+            "group_size": len(essential), "covered": covered, "applicable_duties": gd}
 
 
 def _duty_stems(text):
@@ -1405,7 +1417,7 @@ def finder_noc_analysis(applicant_duties: list, code: str, role_hint: str = "") 
         else:
             key_gaps.append(nd)
         breakdown.append({"noc_duty": nd, "letter_evidence": appd[j] if m != "missing" else "", "match": m})
-    coverage = coverage_pct([b["match"] for b in breakdown]) if total else 0
+    coverage = coverage_pct([(b["noc_duty"], b["match"]) for b in breakdown]) if total else 0
 
     return {"coverage": coverage, "sub_title": sub_title, "covered": covered, "total": total,
             "set_duties": set_duties, "duties_breakdown": breakdown, "key_gaps": key_gaps}
@@ -1519,7 +1531,7 @@ def audit_duty_coverage(letter_text: str, code: str, page_images: list = None,
         return None
     cov = na.get("duty_coverage_percentage")
     if cov is None:
-        cov = coverage_pct([b["match"] for b in breakdown])
+        cov = coverage_pct([(b["noc_duty"], b["match"]) for b in breakdown])
     gaps = na.get("missing_critical_duties") or [b["noc_duty"] for b in breakdown if b["match"] in ("weak", "missing")]
     return {"coverage": int(round(cov)), "sub_title": na.get("coverage_subtitle", "") or "",
             "duties_breakdown": breakdown, "key_gaps": [g for g in gaps if g],
@@ -1833,9 +1845,9 @@ def audit_document_with_openai(system_prompt: str, user_content: str, page_image
 
     from models import AnalysisResponse
     result = None
-    # Try, in order: the tier's model, then Haiku, then gpt-4o-mini (last resort — accuracy-degraded).
-    attempts = ([("claude-sonnet-4-6", "sonnet-4-6"), (AUDIT_STANDARD_MODEL, "haiku-4-5")]
-                if model_tier == "premium" else [(AUDIT_STANDARD_MODEL, "haiku-4-5")])
+    # Every letter is graded on Claude Haiku 4.5 — accurate and deterministic. (Sonnet was dropped:
+    # it added cost/latency for paid users without an accuracy gain over Haiku on this task.)
+    attempts = [(AUDIT_STANDARD_MODEL, "haiku-4-5")]
     for model_id, tag in attempts:
         try:
             result = _call_claude_structured(system_prompt, user_content, page_images, AnalysisResponse,
@@ -1906,13 +1918,14 @@ def audit_document_with_openai(system_prompt: str, user_content: str, page_image
     if "noc_analysis" in result and "duties_match" in result["noc_analysis"]:
         duties = result["noc_analysis"].get("duties_match", [])
         if duties:
-            strengths = [d.get("match_strength") for d in duties]
-            new_pct = coverage_pct(strengths)  # strong=1, partial=0.5, weak/missing=0 over total duties
-            covered = sum(1 for s in strengths if s in ("strong", "partial"))
+            pairs = [(d.get("noc_duty"), d.get("match_strength")) for d in duties]
+            new_pct = coverage_pct(pairs)  # binary, essential duties only ("May …" excluded)
+            n_ess = len([1 for (dd, _s) in pairs if _is_essential_duty(dd)]) or len(pairs)
+            covered = sum(1 for (dd, s) in pairs if _is_essential_duty(dd) and s in ("strong", "partial"))
             old_pct = result["noc_analysis"].get("duty_coverage_percentage")
             if new_pct != old_pct:
-                print(f"[Auditor] Math Fix: weighted duty coverage {old_pct}% -> {new_pct}% "
-                      f"({covered}/{len(duties)} duties evidenced)")
+                print(f"[Auditor] Duty coverage {old_pct}% -> {new_pct}% "
+                      f"({covered}/{n_ess} essential duties evidenced)")
             result["noc_analysis"]["duty_coverage_percentage"] = new_pct
 
     # ── NOC-match confidence: keep it IDENTICAL to what the NOC Finder shows ──
