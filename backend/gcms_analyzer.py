@@ -84,10 +84,19 @@ class GCMSAnalysisResponse(BaseModel):
     glossary: list[GlossaryItem] = Field(description="Only acronyms/terms that actually appear in these notes")
 
 
+# GCMS/ATIP releases are almost always scanned IMAGES (no embedded text), so image OCR is the norm,
+# not the exception. To cover every page cost-effectively we render at a modest DPI and extract the
+# structured digest DIRECTLY from the page images (combined OCR+extraction in one vision pass, batched)
+# — cheaper and more accurate than OCR-to-text-then-extract.
+OCR_DPI = 150
+PAGES_PER_VISION_BATCH = 4
+CHUNKS_HARD_CAP = 40  # generous ceiling so long releases are fully covered (was 12)
+
+
 # ── Extraction ────────────────────────────────────────────────────────────────
 def extract_notes_text(doc_bytes: bytes) -> tuple[str, int]:
-    """Full text of the ATIP PDF with page markers. Returns (text, page_count).
-    Raises ValueError for scans/empty files (we refuse rather than run 50+ pages of OCR)."""
+    """Embedded text of the ATIP PDF with page markers (empty string if the PDF is scanned images).
+    Returns (text, page_count). Never raises — a scanned PDF returns "" and the caller OCRs it."""
     doc = fitz.open(stream=doc_bytes, filetype="pdf")
     n_pages = min(len(doc), MAX_PAGES)
     parts = []
@@ -96,13 +105,18 @@ def extract_notes_text(doc_bytes: bytes) -> tuple[str, int]:
         if t:
             parts.append(f"[Page {i + 1}]\n{t}")
     doc.close()
-    text = "\n\n".join(parts)
-    if len(text) < MIN_TEXT_CHARS:
-        raise ValueError(
-            "This PDF contains no extractable text — it looks like a scanned copy. "
-            "Please upload the original digital PDF you received from IRCC/ATIP (it is text-based)."
-        )
-    return text, n_pages
+    return "\n\n".join(parts), n_pages
+
+
+def _render_page_pngs(doc_bytes: bytes) -> list:
+    """Render each page to a PNG at OCR_DPI. Returns [(png_bytes, page_index)]."""
+    doc = fitz.open(stream=doc_bytes, filetype="pdf")
+    out = []
+    for i in range(min(len(doc), MAX_PAGES)):
+        pix = doc[i].get_pixmap(dpi=OCR_DPI)
+        out.append((pix.tobytes("png"), i + 1))
+    doc.close()
+    return out
 
 
 def _chunk(text: str) -> list[str]:
@@ -118,7 +132,7 @@ def _chunk(text: str) -> list[str]:
             cur += piece
     if cur:
         chunks.append(cur)
-    return chunks[:MAX_CHUNKS]
+    return chunks[:CHUNKS_HARD_CAP]  # cover the whole document, not just the first 12 chunks
 
 
 _EXTRACT_SYSTEM = """You are digesting one chunk of a Canadian GCMS/ATIP notes release (IRCC's internal case system).
@@ -148,6 +162,43 @@ def _digest_chunks(chunks: list[str], openai_client) -> list[dict]:
             print(f"[GCMS-Analyzer] Chunk {i + 1}/{len(chunks)} digested")
         except Exception as e:
             print(f"[GCMS-Analyzer] Chunk {i + 1} extraction failed (skipping): {e}")
+    return digests
+
+
+def _digest_page_images(page_pngs: list, openai_client) -> list[dict]:
+    """Combined OCR + extraction for scanned notes: read the structured digest DIRECTLY from batches
+    of page images via gpt-4o-mini vision. Batching (PAGES_PER_VISION_BATCH) keeps every page covered
+    at a low cost. Runs batches concurrently so an 80-page release finishes in a couple of minutes."""
+    import base64
+    from concurrent.futures import ThreadPoolExecutor
+
+    batches = [page_pngs[i:i + PAGES_PER_VISION_BATCH]
+               for i in range(0, len(page_pngs), PAGES_PER_VISION_BATCH)][:CHUNKS_HARD_CAP]
+
+    def run(batch):
+        first, last = batch[0][1], batch[-1][1]
+        content = [{"type": "text", "text": _EXTRACT_SYSTEM +
+                    f"\n\nThese are pages {first}-{last} of a scanned GCMS/ATIP release. "
+                    "Read them and emit the digest."}]
+        for png, _pg in batch:
+            content.append({"type": "image_url", "image_url": {
+                "url": f"data:image/png;base64,{base64.b64encode(png).decode()}", "detail": "auto"}})
+        completion = openai_client.beta.chat.completions.parse(
+            model=EXTRACT_MODEL,
+            messages=[{"role": "user", "content": content}],
+            response_format=ChunkDigest, temperature=0.0, seed=42,
+        )
+        return json.loads(completion.choices[0].message.content)
+
+    digests = []
+    with ThreadPoolExecutor(max_workers=6) as ex:
+        futures = [ex.submit(run, b) for b in batches]
+        for i, f in enumerate(futures):
+            try:
+                digests.append(f.result())
+                print(f"[GCMS-Analyzer] Vision batch {i + 1}/{len(batches)} digested")
+            except Exception as e:
+                print(f"[GCMS-Analyzer] Vision batch {i + 1} failed (skipping): {e}")
     return digests
 
 
@@ -212,12 +263,20 @@ def _synthesize(digests: list[dict], n_pages: int, openai_client) -> tuple[dict,
 
 
 def run_gcms_analysis(doc_bytes: bytes, openai_client) -> dict:
-    """Full pipeline. Raises ValueError with a user-facing message for scans/empty PDFs.
-    The returned dict includes document_valid — callers only consume a credit when True."""
+    """Full pipeline. Handles BOTH text-based and scanned (image) GCMS PDFs — the latter via page-image
+    OCR+extraction. Raises ValueError only when the file can't be read at all. The returned dict
+    includes document_valid — callers only consume a credit when True."""
     text, n_pages = extract_notes_text(doc_bytes)
-    chunks = _chunk(text)
-    print(f"[GCMS-Analyzer] {n_pages} pages -> {len(chunks)} chunk(s), {len(text)} chars")
-    digests = _digest_chunks(chunks, openai_client)
+    if len(text) >= MIN_TEXT_CHARS:
+        # Text-based PDF — cheapest path.
+        chunks = _chunk(text)
+        print(f"[GCMS-Analyzer] {n_pages} pages -> {len(chunks)} text chunk(s), {len(text)} chars")
+        digests = _digest_chunks(chunks, openai_client)
+    else:
+        # Scanned/image PDF (the common case) — OCR + extract every page directly from the images.
+        page_pngs = _render_page_pngs(doc_bytes)
+        print(f"[GCMS-Analyzer] {n_pages} pages (scanned) -> {len(page_pngs)} page images, vision OCR")
+        digests = _digest_page_images(page_pngs, openai_client)
     if not digests:
         raise ValueError("We could not read this document. Please try again or contact support.")
     # If every chunk says this isn't GCMS notes, reject without burning the synthesis call.

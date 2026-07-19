@@ -40,6 +40,47 @@ AUDIT_STANDARD_MODEL = "claude-haiku-4-5-20251001"
 def _is_essential_duty(duty_text: str) -> bool:
     return not str(duty_text or "").strip().lower().startswith("may ")
 
+def _backfill_official_duties(result: dict, code: str) -> None:
+    """Guarantee the duty-by-duty table covers EVERY official main duty of the NOC. Any duty the model
+    omitted is graded semantically against the applicant's demonstrated evidence (so a genuinely-shown
+    duty the model forgot is still credited) and appended; if it can't be graded, it's added as
+    'missing' so the table is at least complete. Sub-occupation scoping happens later."""
+    na = result.get("noc_analysis")
+    if not isinstance(na, dict) or not code:
+        return
+    dm = na.get("duties_match") or []
+    ent = NOC_CODE_TO_ENTRY.get(code) or {}
+    official = [d for d in (ent.get("duties_flat") or ent.get("duties") or []) if d and d.strip()]
+    if not official:
+        return
+    present = {(m.get("noc_duty", "") or "").strip().lower() for m in dm}
+    missing = [d for d in official if d.strip().lower() not in present]
+    if not missing:
+        return
+    # Grade the omitted duties against what the letter already evidenced (the model's matched quotes).
+    profile = [(m.get("letter_evidence") or "").strip() for m in dm
+               if m.get("match_strength") in ("strong", "partial") and (m.get("letter_evidence") or "").strip()]
+    graded = {}
+    if profile and openai_client:
+        try:
+            rp = openai_client.embeddings.create(model="text-embedding-3-small", input=profile)
+            rd = openai_client.embeddings.create(model="text-embedding-3-small", input=missing)
+            P = np.array([x.embedding for x in rp.data], dtype=np.float32)
+            P /= (np.linalg.norm(P, axis=1, keepdims=True) + 1e-9)
+            D = np.array([x.embedding for x in rd.data], dtype=np.float32)
+            D /= (np.linalg.norm(D, axis=1, keepdims=True) + 1e-9)
+            sims = (D @ P.T).max(axis=1)
+            for d, s in zip(missing, sims):
+                graded[d] = "strong" if s >= STRONG_DUTY_SIM else ("partial" if s >= 0.30 else "missing")
+        except Exception as e:
+            print(f"[Auditor] duty backfill grading failed: {e}")
+    for d in missing:
+        dm.append({"noc_duty": d, "letter_evidence": "", "match_strength": graded.get(d, "missing")})
+    na["duties_match"] = dm
+    print(f"[Auditor] Backfilled {len(missing)} official dut(ies) the model omitted "
+          f"({sum(1 for d in missing if graded.get(d) in ('strong','partial'))} evidenced).")
+
+
 def coverage_pct(pairs) -> int:
     """pairs = iterable of (duty_text, match_strength). Binary coverage over essential duties."""
     pairs = list(pairs)
@@ -330,11 +371,11 @@ If all checks pass (or only SOFT_FAIL), proceed with the full analysis.
 
 === TASK 2 - DUTY EVIDENCE MAPPING (CRITICAL - This drives the decision) ===
 
-You MUST map every APPLICABLE main duty from the selected NOC against the letter's content:
-
-For `duties_match`, include all main duties from the NOC database - not just the ones that match.
-EXCEPTION (multi-title NOC groups): include only the duties of the applicant's sub-occupation;
-omit the duties belonging to the other occupations packed under the same code (see TASK 1).
+You MUST include an entry in `duties_match` for EVERY official main duty of the selected NOC listed
+in the database below — never omit a duty. Include it even if it seems unrelated or belongs to a
+different sub-occupation packed under the same code. Completeness is mandatory: if the target NOC
+lists 13 main duties, `duties_match` must contain 13 entries. (The platform handles sub-occupation
+scoping afterward — that is not your job.)
 For each duty, set `match_strength`:
   - "strong" - clear semantic alignment, specific evidence quoted from the letter
   - "partial" - related language but vague or incomplete
@@ -342,7 +383,7 @@ For each duty, set `match_strength`:
   - "missing" - no evidence in the letter at all
 
 For `missing_critical_duties`, list every NOC duty that received "missing" or "weak" match_strength.
-For `duty_coverage_percentage`, calculate: (count of "strong" + "partial") / (total NOC main duties) x 100
+Do NOT compute or state a coverage percentage anywhere — the platform computes the exact figure.
 
 For `lead_statement_*`:
   - Quote the official lead statement from the NOC database
@@ -808,7 +849,10 @@ def extract_document_content(doc_bytes: bytes, ext: str, is_image: bool) -> tupl
 def page_images_only(doc_bytes: bytes, ext: str, is_image: bool) -> list:
     """Render page images WITHOUT any text extraction or OCR. Used by re-evaluations that
     already have the persisted extracted text but still need the visual pages (letterhead /
-    signature checks)."""
+    signature checks). Returns [] when the file bytes are unavailable (re-eval still proceeds
+    on the persisted text)."""
+    if not doc_bytes:
+        return []
     if is_image:
         return [(doc_bytes, IMAGE_MIME_TYPES.get(ext, 'image/jpeg'))]
     if ext == '.pdf':
@@ -1314,11 +1358,24 @@ def scoped_duty_coverage(applicant_duties: list, code: str, llm_duties_match: li
             pairs.append((dt, "strong"))        # no LLM entry to match by text — strong semantic match
         else:
             pairs.append((dt, "missing"))
+    # A duty the applicant CLEARLY demonstrates must never be dropped just because it belongs to a
+    # different sub-title of a multi-title NOC (e.g. a procurement officer's "respond to customer
+    # inquiries" duty). Add any such evidenced official duty from the OTHER sub-groups to the applicable
+    # set so it stays in the table and the coverage %. (Non-evidenced other-sub-title duties are still
+    # excluded — that is the whole point of scoping.)
+    gd_lower = {d.strip().lower() for d in gd}
+    for g in groups:
+        for d in g.get("duties", []):
+            dl = (d or "").strip().lower()
+            if dl and dl not in gd_lower and lookup.get(dl) in ("strong", "partial"):
+                pairs.append((d, lookup[dl]))
+                gd_lower.add(dl)
     coverage = coverage_pct(pairs)
     essential = [(d, s) for (d, s) in pairs if _is_essential_duty(d)] or pairs
     covered = sum(1 for (_d, s) in essential if s in ("strong", "partial"))
     return {"coverage": coverage, "sub_title": best["sub_title"],
-            "group_size": len(essential), "covered": covered, "applicable_duties": gd}
+            "group_size": len(essential), "covered": covered,
+            "applicable_duties": [d for (d, _s) in pairs]}
 
 
 def _duty_stems(text):
@@ -1902,6 +1959,10 @@ def audit_document_with_openai(system_prompt: str, user_content: str, page_image
     # textual evidence (a real email, phone, or website) can only turn these False->True — never the
     # reverse — so it removes false negatives without risking false positives.
     _apply_contact_backstop(result, user_content)
+
+    # Completeness safety net: if the model still omitted any official main duty of the target NOC,
+    # add it so the duty-by-duty table and coverage denominator are never silently short a duty.
+    _backfill_official_duties(result, target_noc or result.get("noc_analysis", {}).get("detected_code"))
 
     # Post-process: Fix math errors from the LLM
     # LLMs are notoriously bad at math (e.g., outputting 8 instead of 100 for 8/8 requirements).
