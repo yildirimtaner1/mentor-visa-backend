@@ -49,6 +49,9 @@ V2_MODELS = {
     "tiebreak":       "claude-sonnet-4-6",           # resolves auditor vs cross-check disagreement
 }
 
+# Minimum confidence for a runner-up NOC to be worth showing. Below this, an "alternative" is noise.
+ALT_MIN_CONFIDENCE = 50
+
 # How many embedding-retrieval candidates to union in as a recall safety-net.
 # These are OPTIONS for the auditor, never a constraint on the choice.
 EMBED_RECALL_K = 6
@@ -539,11 +542,14 @@ def _build_v2_response(winning_code: str, auditor: dict | None,
         alt_code = next((c for c in candidate_codes if c != winning_code), "")
     if alt_code and alt_code in ai_service.NOC_LOOKUP:
         alt_conf = min(noc_agents._alt_confidence(extraction, alt_code, {}), max(confidence - 1, 0))
-        alternatives.append({
-            "code": alt_code,
-            "title": ai_service.NOC_LOOKUP.get(alt_code, ""),
-            "confidence": alt_conf,
-        })
+        # Only surface a genuinely plausible alternative. Weak/irrelevant suggestions (e.g. NOC 14101
+        # Receptionists shown for an interpreter) are more misleading than helpful, so we drop them.
+        if alt_conf >= ALT_MIN_CONFIDENCE:
+            alternatives.append({
+                "code": alt_code,
+                "title": ai_service.NOC_LOOKUP.get(alt_code, ""),
+                "confidence": alt_conf,
+            })
 
     if confidence >= 70:
         result_type, level = "STRONG_MATCH", "high"
@@ -586,7 +592,7 @@ def _build_v2_response(winning_code: str, auditor: dict | None,
             graded = ai_service.grade_scoped_duties_llm(letter_text or "; ".join(applicant_duties), set_duties)
             if graded and set_duties and len(graded) == len(set_duties):
                 covered = sum(1 for g in graded if g["match"] in ("strong", "partial"))
-                duty_cov = ai_service.coverage_pct([g["match"] for g in graded])
+                duty_cov = ai_service.coverage_pct([(g["noc_duty"], g["match"]) for g in graded])
                 breakdown = graded
                 scoped_gaps = [g["noc_duty"] for g in graded if g["match"] in ("weak", "missing")]
                 disp_matched, disp_total = covered, len(set_duties)
@@ -614,15 +620,15 @@ def _build_v2_response(winning_code: str, auditor: dict | None,
         if disp_total else f"Evaluated against NOC {winning_code} — {official_title}."
     )
 
-    # Consistency: the Employment Letter Auditor reuses full_audit_result, so make its alternative_nocs
+    # Consistency: the Employment Letter Auditor reuses full_audit_result, so its alternative_nocs must
     # match the Finder's ranked alternatives (the Auditor's own single-call suggestions were unreliable
-    # and often empty — a user must never see the Finder suggest NOC X while the Auditor suggests none).
-    if full_audit_result and isinstance(full_audit_result.get("noc_analysis"), dict) and alternatives:
+    # — e.g. it once offered Receptionists for an interpreter). ALWAYS overwrite (even with an empty
+    # list) so the auditor never shows a weak alternative the Finder already filtered out.
+    if full_audit_result and isinstance(full_audit_result.get("noc_analysis"), dict):
         full_audit_result["noc_analysis"]["alternative_nocs"] = [
             {"noc_code": a["code"], "noc_title": a.get("title", ""),
-             "fit_assessment": ("strong" if a.get("confidence", 0) >= 75
-                                else "moderate" if a.get("confidence", 0) >= 50 else "weak"),
-             "reason": f"Ranked by the NOC Finder as a {a.get('confidence', 0)}% alternative match to your duties."}
+             "fit_assessment": "moderate",  # strength intentionally NOT surfaced to the user
+             "reason": "A possible secondary match for your duties — worth double-checking."}
             for a in alternatives
         ]
 
