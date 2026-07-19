@@ -262,11 +262,11 @@ export const GCMSAnalyzerPage: FC = () => {
             plain-English report in minutes: what stage you're really at, what the officer wrote, and what happens next.
           </p>
           <div style={{ display: 'flex', gap: '12px', justifyContent: 'center', flexWrap: 'wrap' }}>
-            <a href="/how-to-read-gcms-notes" className="btn btn-lg" style={{ background: 'white', color: '#1E3A8A', fontWeight: 700, textDecoration: 'none', display: 'inline-block' }}>
-              New to GCMS notes? Read the guide →
-            </a>
-            <a href="/order-gcms-notes" className="btn btn-lg btn-outline" style={{ borderColor: 'rgba(255,255,255,0.6)', color: 'white', textDecoration: 'none', display: 'inline-block' }}>
+            <a href="/order-gcms-notes" className="btn btn-primary btn-lg" style={{ textDecoration: 'none', display: 'inline-block' }}>
               Don't have your notes? Order them →
+            </a>
+            <a href="/how-to-read-gcms-notes" className="btn btn-outline btn-lg" style={{ textDecoration: 'none', display: 'inline-block' }}>
+              New to GCMS notes? Read the guide →
             </a>
           </div>
         </div>

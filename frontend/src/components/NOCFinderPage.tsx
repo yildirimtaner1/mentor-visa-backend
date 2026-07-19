@@ -128,6 +128,16 @@ export const NOCFinderPage: FC<NOCFinderPageProps> = ({ onNavigate }) => {
   }, [isSignedIn, getToken]);
   // True when a signed-in free user has exhausted their free reports → gate before running anything.
   const outOfCredits = !!isSignedIn && !isPaidTier && finderCredits !== null && finderCredits <= 0;
+  // Clear a STALE payment gate: if a "buy a pack / upgrade" paywall is showing from a previous visit
+  // (persisted in sessionStorage) but the user now actually has finder credits or a paid tier, drop it
+  // so they see the tool instead of a dead CTA — this survives a hard refresh too.
+  useEffect(() => {
+    const hasAccess = isPaidTier || (finderCredits ?? 0) > 0;
+    if (hasAccess && result && (result.requires_payment || result.gate_reason === 'upgrade')) {
+      sessionStorage.removeItem('nocFinderResult');
+      setResult(null);
+    }
+  }, [finderCredits, isPaidTier, result]);
   // Code -> official title map (from the public NOC directory) for the manual re-eval auto-populate.
   const [nocTitles, setNocTitles] = useState<Record<string, string>>({});
   useEffect(() => {
@@ -1003,28 +1013,19 @@ export const NOCFinderPage: FC<NOCFinderPageProps> = ({ onNavigate }) => {
                         <h4 style={{ fontSize: '0.95rem', fontWeight: 700, marginBottom: '12px' }}>Other Potential Matches:</h4>
                         <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginBottom: '16px' }}>Not sure about the primary match? Click any code below to re-evaluate against that NOC.</p>
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                          {result.alternatives.map((alt, i) => {
-                            // Best-guess match strength (no percentage shown), same thresholds as the primary badge.
-                            const altBadge = getMatchBadge(
-                              alt.confidence >= 70 ? 'STRONG_MATCH' : alt.confidence >= 45 ? 'MODERATE_MATCH' : 'NO_MATCH'
-                            );
-                            return (
-                            <div 
-                              key={i} 
+                          {result.alternatives.map((alt, i) => (
+                            <div
+                              key={i}
                               onClick={() => processInput(file, jobTitle, duties, alt.code)}
                               className="alternative-noc-card"
                               style={{ background: '#F8FAFC', padding: '16px', borderRadius: '8px', border: '1px solid var(--border-color)', cursor: 'pointer' }}
                             >
-                              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '10px', flexWrap: 'wrap', marginBottom: '4px' }}>
+                              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
                                 <div style={{ fontWeight: 600, fontSize: '0.95rem' }}>NOC {alt.code} — {alt.title}</div>
-                                <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                                  <span style={{ fontWeight: 700, color: altBadge.color, fontSize: '0.85rem', whiteSpace: 'nowrap' }}>{altBadge.icon} {altBadge.label}</span>
-                                  <span style={{ fontSize: '0.8rem', color: 'var(--primary-color)', fontWeight: 600 }} className="target-btn">Re-evaluate →</span>
-                                </div>
+                                <span style={{ fontSize: '0.8rem', color: 'var(--primary-color)', fontWeight: 600 }} className="target-btn">Re-evaluate →</span>
                               </div>
                             </div>
-                            );
-                          })}
+                          ))}
                         </div>
                       </div>
                     )}

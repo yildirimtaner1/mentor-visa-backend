@@ -158,7 +158,7 @@ export const GCMSNotesGuidePage: FC = () => {
             <Link to="/order-gcms-notes" className="btn btn-primary btn-lg" style={{ textDecoration: 'none', display: 'inline-block' }}>
               Don't have your notes yet? Order them — $19.90 →
             </Link>
-            <Link to="/gcms-notes-analyzer" className="btn btn-lg" style={{ background: 'white', color: '#1E3A8A', fontWeight: 700, textDecoration: 'none', display: 'inline-block' }}>
+            <Link to="/gcms-notes-analyzer" className="btn btn-outline btn-lg" style={{ textDecoration: 'none', display: 'inline-block' }}>
               Have them already? Let AI decode them →
             </Link>
           </div>

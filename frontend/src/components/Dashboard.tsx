@@ -877,11 +877,7 @@ export const Dashboard: FC<DashboardProps> = ({ data, onReset, onUpdate }) => {
                   <div style={{ marginBottom: '20px' }}>
                     <h4 style={{ fontSize: '0.85rem', fontWeight: 700, marginBottom: '12px' }}>Suggested alternatives</h4>
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                      {data.noc_analysis.alternative_nocs.map((alt, i) => {
-                        const label = alt.match_score >= 75 ? 'Strong Match' : alt.match_score >= 50 ? 'Moderate' : 'Weak';
-                        const labelColor = alt.match_score >= 75 ? '#059669' : alt.match_score >= 50 ? '#D97706' : '#9CA3AF';
-                        const labelBg = alt.match_score >= 75 ? '#ECFDF5' : alt.match_score >= 50 ? '#FFFBEB' : '#F9FAFB';
-                        return (
+                      {data.noc_analysis.alternative_nocs.map((alt, i) => (
                           <div
                             key={i}
                             onClick={() => handleReevaluate(alt.noc_code)}
@@ -890,17 +886,13 @@ export const Dashboard: FC<DashboardProps> = ({ data, onReset, onUpdate }) => {
                           >
                             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '10px', flexWrap: 'wrap', marginBottom: alt.explanation ? '8px' : '0' }}>
                               <div style={{ fontWeight: 600, fontSize: '0.95rem' }}>NOC {alt.noc_code} — {alt.noc_title}</div>
-                              <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                                <span style={{ fontWeight: 600, color: labelColor, fontSize: '0.8rem', background: labelBg, padding: '4px 10px', borderRadius: '6px' }}>{label} ({alt.match_score}%)</span>
-                                <span style={{ fontSize: '0.8rem', color: 'var(--primary-color)', fontWeight: 600 }} className="target-btn">Re-evaluate →</span>
-                              </div>
+                              <span style={{ fontSize: '0.8rem', color: 'var(--primary-color)', fontWeight: 600 }} className="target-btn">Re-evaluate →</span>
                             </div>
                             {alt.explanation && (
                               <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', lineHeight: 1.5, margin: 0 }}>{alt.explanation}</p>
                             )}
                           </div>
-                        );
-                      })}
+                      ))}
                     </div>
                   </div>
                 )}
