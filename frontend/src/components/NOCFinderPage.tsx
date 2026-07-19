@@ -477,6 +477,9 @@ export const NOCFinderPage: FC<NOCFinderPageProps> = ({ onNavigate }) => {
         const mapped = mapApiResponse(rawData);
         mapped.stored_file_id = rawData.stored_file_id || fileId;
         mapped.is_signed_in = !!rawData.is_signed_in || !!result?.is_signed_in;
+        // A re-evaluation is always on a stored document — preserve from_file so the "Audit my letter"
+        // CTA still auto-runs the auditor afterward (otherwise it opens a blank upload page). Fixes #3.
+        mapped.from_file = result?.from_file ?? true;
         setResult(mapped);
         // Update journey store with re-evaluated NOC
         setNoc({
