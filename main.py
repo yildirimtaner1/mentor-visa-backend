@@ -1533,8 +1533,8 @@ def create_checkout_session(
         amount = 1990
         name = "GCMS Notes Order — Full IRCC File Request"
     elif req.pass_type == 'gcms_analyzer':
-        # 19.90 CAD — AI analysis of an already-obtained GCMS notes PDF (free with our orders)
-        amount = 1990
+        # 14.90 CAD — AI analysis of an already-obtained GCMS notes PDF (free with our orders)
+        amount = 1490
         name = "GCMS Notes AI Analysis (1 Report)"
     elif req.pass_type == 'starter':
         # 49.00 CAD — Optimize tier
@@ -2169,7 +2169,7 @@ def download_gcms_consent_form(
 
 # ── GCMS Notes AI Analyzer ─────────────────────────────────────────────────────
 # Pay-first: the analysis endpoint refuses to touch the PDF until the user holds a
-# gcms_analyzer_credit (granted by a $19.90 purchase, or included with every GCMS order).
+# gcms_analyzer_credit (granted by a $14.90 purchase, or included with every GCMS order).
 
 @app.get("/api/v1/gcms-analysis/status")
 def gcms_analysis_status(

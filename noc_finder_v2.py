@@ -586,7 +586,7 @@ def _build_v2_response(winning_code: str, auditor: dict | None,
             graded = ai_service.grade_scoped_duties_llm(letter_text or "; ".join(applicant_duties), set_duties)
             if graded and set_duties and len(graded) == len(set_duties):
                 covered = sum(1 for g in graded if g["match"] in ("strong", "partial"))
-                duty_cov = int(round(100 * covered / len(set_duties)))
+                duty_cov = ai_service.coverage_pct([g["match"] for g in graded])
                 breakdown = graded
                 scoped_gaps = [g["noc_duty"] for g in graded if g["match"] in ("weak", "missing")]
                 disp_matched, disp_total = covered, len(set_duties)
