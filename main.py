@@ -727,7 +727,11 @@ def reevaluate_document(
     
     # Check if this was a text-only input (no file was uploaded)
     is_text_only = record.original_filename in (None, "", "Text Input")
-    
+    # We persist the extracted text on every document run. If it's here, a re-evaluation can proceed
+    # even when the original file blob is unretrievable (missing/slow storage) — so a re-eval never
+    # dies with "document not found" just because the file couldn't be fetched.
+    _persisted_text = (record.payload or {}).get("_extracted_text") if isinstance(record.payload, dict) else None
+
     if is_text_only:
         # No file to download — the user typed their input manually.
         # The original text is stored in the record's payload.
@@ -735,17 +739,17 @@ def reevaluate_document(
     elif supabase:
         stored_filename = f"{actual_file_id}{ext}"
         try:
-            res = supabase.storage.from_("documents").download(stored_filename)
-            doc_bytes = res
+            doc_bytes = supabase.storage.from_("documents").download(stored_filename)
         except Exception as e:
-            raise HTTPException(status_code=404, detail=f"Failed to fetch original file from cloud: {e}")
+            print(f"[reevaluate] Cloud file fetch failed for {stored_filename}: {e}")
+            doc_bytes = None
     else:
         file_path = UPLOADS_DIR / f"{actual_file_id}{ext}"
         if file_path.exists():
             with open(file_path, "rb") as f:
                 doc_bytes = f.read()
-    
-    if not doc_bytes and not is_text_only:
+
+    if not doc_bytes and not is_text_only and not _persisted_text:
         raise HTTPException(status_code=404, detail="Original file content could not be found.")
         
     try:
