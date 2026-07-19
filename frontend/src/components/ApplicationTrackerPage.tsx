@@ -62,7 +62,7 @@ const OPTIMIZE_FEATURES = [
   'Unlimited CRS Point Simulator (What-If Scenarios)',
   '20 Question Credits — Express Entry AI Assistant',
   'Personalized Document Checklist & Expiry Tracker',
-  '1 Free GCMS Notes Order + AI Analysis ($39.80 value)',
+  '1 Free GCMS Notes Order + AI Analysis ($34.80 value)',
 ];
 
 // ─── Milestone config ──────────────────────────────────────────────────────────

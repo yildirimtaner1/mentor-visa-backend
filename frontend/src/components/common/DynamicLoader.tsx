@@ -87,6 +87,20 @@ export const DynamicLoader: FC<DynamicLoaderProps> = ({ tool, targetNoc }) => {
       borderRadius: '16px',
       border: '1px solid rgba(37, 99, 235, 0.08)',
     }}>
+      {/* Patience note — placed ABOVE the spinner so the user reads it before watching the loader */}
+      <div style={{
+        maxWidth: '440px', marginBottom: '28px',
+        padding: '12px 18px', borderRadius: '12px',
+        background: '#FEF3C7', border: '1px solid #FDE68A',
+        textAlign: 'center',
+      }}>
+        <span style={{ fontSize: '0.9rem', color: '#92400E', fontWeight: 600, lineHeight: 1.5 }}>
+          Hang tight — great analysis takes a moment. 🌱<br />
+          Please keep this page open and don't refresh; your results will appear here automatically.
+          Thank you for your patience!
+        </span>
+      </div>
+
       {/* Modern Spinner */}
       <div style={{ position: 'relative', width: '64px', height: '64px', marginBottom: '24px' }}>
         {/* Outer ring */}
@@ -186,21 +200,10 @@ export const DynamicLoader: FC<DynamicLoaderProps> = ({ tool, targetNoc }) => {
 
       <p style={{
         fontSize: '0.8rem', color: '#9CA3AF', lineHeight: 1.5,
-        maxWidth: '340px', marginTop: '20px', marginBottom: 0
+        maxWidth: '360px', marginTop: '20px', marginBottom: 0
       }}>
-        Deep analysis against official IRCC standards takes <strong style={{ color: '#6B7280' }}>15–45 seconds</strong>.
+        Deep analysis against official IRCC standards usually takes <strong style={{ color: '#6B7280' }}>30–90 seconds</strong>, and up to a couple of minutes for longer documents.
       </p>
-      <div style={{
-        marginTop: '12px', maxWidth: '360px',
-        display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px',
-        padding: '10px 14px', borderRadius: '10px',
-        background: '#FEF3C7', border: '1px solid #FDE68A',
-      }}>
-        <span style={{ fontSize: '1rem' }}>⏳</span>
-        <span style={{ fontSize: '0.82rem', color: '#92400E', fontWeight: 600, lineHeight: 1.4 }}>
-          Please keep this page open and don't refresh — your results will appear here automatically.
-        </span>
-      </div>
 
       <style>{`
         @keyframes spinSmooth {

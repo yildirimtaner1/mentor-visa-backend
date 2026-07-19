@@ -828,7 +828,7 @@ export const Dashboard: FC<DashboardProps> = ({ data, onReset, onUpdate }) => {
                                 <Feature included>Unlimited CRS Point Simulator (What-If Scenarios)</Feature>
                                 <Feature included>20 Question Credits — Express Entry AI Assistant</Feature>
                                 <Feature included>Personalized Document Checklist &amp; Expiry Tracker</Feature>
-                                <Feature included highlight>1 Free GCMS Notes Order + AI Analysis ($39.80 value)</Feature>
+                                <Feature included highlight>1 Free GCMS Notes Order + AI Analysis ($34.80 value)</Feature>
                               </>
                             )}
                           </ul>

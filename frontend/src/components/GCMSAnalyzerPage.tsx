@@ -4,7 +4,7 @@ import { SEO } from './common/SEO';
 import { getGCMSAnalysisStatus, analyzeGCMSNotes, createCheckoutSession, friendlyError } from '../services/api';
 import ReactGA from 'react-ga4';
 
-const PRICE = 19.90;
+const PRICE = 14.90;
 
 interface StageStatus { name: string; status: string; detail: string; }
 interface OfficerRemark { date: string; plain_english: string; original_snippet: string; }
@@ -47,7 +47,7 @@ const analyzerSchema = JSON.stringify({
   name: 'Mentor Visa GCMS Notes AI Analyzer',
   operatingSystem: 'Web',
   applicationCategory: 'WebApplication',
-  offers: { '@type': 'Offer', price: '19.90', priceCurrency: 'CAD' },
+  offers: { '@type': 'Offer', price: '14.90', priceCurrency: 'CAD' },
   description: 'Upload your GCMS or CBSA notes PDF and get a plain-English report: stage-by-stage status, officer remarks explained, red flags, and likely next steps.',
 });
 
@@ -244,22 +244,36 @@ export const GCMSAnalyzerPage: FC = () => {
   const hasCredit = (credits ?? 0) > 0;
 
   return (
-    <>
+    <div>
       <SEO
         title="GCMS Notes AI Analyzer | Understand Your IRCC File in Minutes"
-        description="Upload your GCMS or CBSA notes PDF and get a plain-English report: stage-by-stage status, officer remarks explained, red flags, and likely next steps. $19.90 — free with every Mentor Visa GCMS order."
+        description="Upload your GCMS or CBSA notes PDF and get a plain-English report: stage-by-stage status, officer remarks explained, red flags, and likely next steps. $14.90 — free with every Mentor Visa GCMS order."
         keywords="GCMS notes analysis, read GCMS notes, GCMS notes explained, IRCC file analysis, ATIP notes"
         canonical="/gcms-notes-analyzer"
         schema={analyzerSchema}
       />
-      <section className="page-section" style={{ maxWidth: '860px', margin: '0 auto' }}>
-        <div style={{ textAlign: 'center', marginBottom: '28px' }}>
-          <h1 style={{ fontSize: '2rem', fontWeight: 800, marginBottom: '10px' }}>🔍 GCMS Notes AI Analyzer</h1>
-          <p style={{ fontSize: '1.05rem', color: 'var(--text-muted)', maxWidth: '640px', margin: '0 auto' }}>
+
+      <section className="page-hero">
+        <div className="page-hero-content">
+          <div className="page-hero-badge">🔍 AI-Powered Analysis</div>
+          <h1>GCMS Notes<br /><span className="hero-highlight" style={{ color: 'var(--primary-light)' }}>Decoded by AI.</span></h1>
+          <p style={{ maxWidth: '720px', margin: '0 auto 24px auto', fontSize: '1.1rem', lineHeight: '1.6' }}>
             Your GCMS notes are 30–80 pages of internal IRCC screens and acronyms. Upload the PDF and get a
             plain-English report in minutes: what stage you're really at, what the officer wrote, and what happens next.
           </p>
+          <div style={{ display: 'flex', gap: '12px', justifyContent: 'center', flexWrap: 'wrap' }}>
+            <a href="/how-to-read-gcms-notes" className="btn btn-lg" style={{ background: 'white', color: '#1E3A8A', fontWeight: 700, textDecoration: 'none', display: 'inline-block' }}>
+              New to GCMS notes? Read the guide →
+            </a>
+            <a href="/order-gcms-notes" className="btn btn-lg btn-outline" style={{ borderColor: 'rgba(255,255,255,0.6)', color: 'white', textDecoration: 'none', display: 'inline-block' }}>
+              Don't have your notes? Order them →
+            </a>
+          </div>
         </div>
+      </section>
+
+      <div className="page-container">
+        <section className="page-section" style={{ maxWidth: '860px', margin: '0 auto' }}>
 
         {report ? (
           <>
@@ -357,8 +371,9 @@ export const GCMSAnalyzerPage: FC = () => {
             </p>
           </>
         )}
-      </section>
-    </>
+        </section>
+      </div>
+    </div>
   );
 };
 

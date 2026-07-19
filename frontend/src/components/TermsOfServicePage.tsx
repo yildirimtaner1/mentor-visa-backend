@@ -92,7 +92,16 @@ export const TermsOfServicePage: FC = () => (
       <h2 style={{ fontSize: '1.3rem', fontWeight: 700, margin: '32px 0 12px', color: 'var(--primary-dark)' }}>12. Changes to These Terms</h2>
       <p>We reserve the right to modify these Terms at any time. We will provide notice of material changes by updating the "Last updated" date. Your continued use of the Service after changes constitutes acceptance of the revised Terms.</p>
 
-      <h2 style={{ fontSize: '1.3rem', fontWeight: 700, margin: '32px 0 12px', color: 'var(--primary-dark)' }}>13. Contact Us</h2>
+      <h2 style={{ fontSize: '1.3rem', fontWeight: 700, margin: '32px 0 12px', color: 'var(--primary-dark)' }}>13. Acceptable Use and Anti-Abuse</h2>
+      <p>The Service is provided for your own personal, non-commercial permanent-residence journey. You agree not to exploit it as a commercial service to third parties.</p>
+      <ul style={{ paddingLeft: '24px', marginBottom: '16px' }}>
+        <li>You must not use Mentor Visa to provide paid or unpaid services to other people — for example, running our tools on an unreasonable number of different applicants' materials (such as employment letters, NOC assessments, or GCMS notes) on their behalf.</li>
+        <li>Processing a volume of distinct applicants' documents that is inconsistent with normal personal use (including that of your own immediate family) is prohibited.</li>
+        <li>You must not resell, sublicense, or otherwise commercialise access to the Service or its outputs.</li>
+      </ul>
+      <p>We continuously monitor for this kind of abuse. Where we detect it — at our sole discretion, based on usage patterns and volume — we may, without notice or refund, throttle, suspend, or <strong>permanently ban</strong> the account(s) involved and any related accounts, and void any remaining credits. Licensed immigration consultants or businesses wishing to use Mentor Visa with multiple clients must contact us in advance at <a href="mailto:info@mentorvisa.com" style={{ color: 'var(--primary-color)' }}>info@mentorvisa.com</a> to arrange appropriate access.</p>
+
+      <h2 style={{ fontSize: '1.3rem', fontWeight: 700, margin: '32px 0 12px', color: 'var(--primary-dark)' }}>14. Contact Us</h2>
       <p>If you have any questions about these Terms, please contact us:</p>
       <p style={{ marginTop: '8px' }}>
         <strong>Mentor Visa</strong><br />

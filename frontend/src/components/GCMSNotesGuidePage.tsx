@@ -326,7 +326,7 @@ export const GCMSNotesGuidePage: FC = () => {
                 Order my GCMS notes — $19.90 CAD →
               </Link>
               <Link to="/gcms-notes-analyzer" className="btn btn-lg" style={{ background: 'transparent', border: '2px solid rgba(255,255,255,0.6)', color: 'white', fontWeight: 700, textDecoration: 'none', display: 'inline-block' }}>
-                Already have notes? AI analysis — $19.90 →
+                Already have notes? AI analysis — $14.90 →
               </Link>
             </div>
             <p style={{ fontSize: '0.75rem', opacity: 0.6, marginTop: '14px', marginBottom: 0 }}>

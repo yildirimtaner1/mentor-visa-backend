@@ -331,7 +331,7 @@ export const LandingPage: FC<LandingPageProps> = ({ onNavigate }) => {
               <li className="pricing-feature highlight"><CheckCircle2 size={16} className="feature-check" /><span>20 Question Credits - Express Entry AI Assistant</span></li>
               <li className="pricing-feature highlight"><CheckCircle2 size={16} className="feature-check" /><span>Personalized Document Checklist</span></li>
               <li className="pricing-feature highlight"><CheckCircle2 size={16} className="feature-check" /><span>Document Expiry Tracker</span></li>
-              <li className="pricing-feature highlight"><CheckCircle2 size={16} className="feature-check" /><span>1 Free GCMS Notes Order + AI Analysis ($39.80 value)</span></li>
+              <li className="pricing-feature highlight"><CheckCircle2 size={16} className="feature-check" /><span>1 Free GCMS Notes Order + AI Analysis ($34.80 value)</span></li>
             </ul>
             <div className="pricing-card-footer">
               <button className="pricing-btn primary" onClick={() => onNavigate('pricing')}>Get Optimize — $49</button>

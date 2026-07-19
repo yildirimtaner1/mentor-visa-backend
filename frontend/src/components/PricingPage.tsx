@@ -156,7 +156,7 @@ export function PricingPage() {
             <Feature included highlight>20 Question Credits - Express Entry AI Assistant</Feature>
             <Feature included highlight>Personalized Document Checklist</Feature>
             <Feature included highlight>Document Expiry Tracker</Feature>
-            <Feature included highlight>1 Free GCMS Notes Order + AI Analysis ($39.80 value)</Feature>
+            <Feature included highlight>1 Free GCMS Notes Order + AI Analysis ($34.80 value)</Feature>
           </ul>
           <div className="pricing-card-footer">
             {!isSignedIn ? (
