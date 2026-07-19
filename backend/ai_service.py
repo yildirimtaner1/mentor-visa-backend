@@ -33,6 +33,20 @@ openai_client = OpenAI(api_key=_openai_api_key) if _openai_api_key else None
 # Auditor. Haiku 4.5 is accurate and stable (85%/85%); paid tiers escalate to Sonnet 4.6.
 AUDIT_STANDARD_MODEL = "claude-haiku-4-5-20251001"
 
+# Duty coverage weighting: a strong match is a fully demonstrated duty (1.0), a partial match is
+# worth half (0.5), weak/missing count for nothing. Coverage % = sum of weights / TOTAL official
+# NOC duties considered — so a letter that partially touches many duties scores below one that
+# clearly demonstrates fewer.
+DUTY_WEIGHTS = {"strong": 1.0, "partial": 0.5, "weak": 0.0, "missing": 0.0}
+
+def coverage_pct(strengths) -> int:
+    """Weighted duty-coverage percentage from a list of match strengths."""
+    total = len(strengths)
+    if not total:
+        return 0
+    score = sum(DUTY_WEIGHTS.get(str(s or "").lower(), 0.0) for s in strengths)
+    return int(round(100 * score / total))
+
 # Load the NOC index once at startup
 _noc_index_path = os.path.join(os.path.dirname(__file__), "noc_index.json")
 with open(_noc_index_path, "r", encoding="utf-8") as f:
@@ -1279,16 +1293,18 @@ def scoped_duty_coverage(applicant_duties: list, code: str, llm_duties_match: li
         nd = (m.get("noc_duty", "") or "").strip().lower()
         if nd:
             lookup[nd] = m.get("match_strength", "")
-    covered = 0
+    covered = 0        # count of demonstrated duties (for the "N of M" display)
+    score = 0.0        # weighted score (strong=1, partial=0.5) for the coverage %
     for i, dt in enumerate(gd):
         strength = lookup.get(dt.strip().lower())
-        if strength in ("strong", "partial"):
-            covered += 1
-        elif strength in ("weak", "missing"):
-            pass                                # LLM saw it and it's not evidenced
+        if strength in DUTY_WEIGHTS:
+            score += DUTY_WEIGHTS[strength]
+            if strength in ("strong", "partial"):
+                covered += 1
         elif float(sim_app[i]) >= STRONG_DUTY_SIM:
-            covered += 1                        # no LLM entry to match by text — semantic fallback
-    coverage = int(round(100 * covered / len(gd)))
+            score += 1.0                        # no LLM entry to match by text — strong semantic match
+            covered += 1
+    coverage = int(round(100 * score / len(gd)))
     return {"coverage": coverage, "sub_title": best["sub_title"],
             "group_size": len(gd), "covered": covered, "applicable_duties": gd}
 
@@ -1389,7 +1405,7 @@ def finder_noc_analysis(applicant_duties: list, code: str, role_hint: str = "") 
         else:
             key_gaps.append(nd)
         breakdown.append({"noc_duty": nd, "letter_evidence": appd[j] if m != "missing" else "", "match": m})
-    coverage = int(round(100 * covered / total)) if total else 0
+    coverage = coverage_pct([b["match"] for b in breakdown]) if total else 0
 
     return {"coverage": coverage, "sub_title": sub_title, "covered": covered, "total": total,
             "set_duties": set_duties, "duties_breakdown": breakdown, "key_gaps": key_gaps}
@@ -1503,7 +1519,7 @@ def audit_duty_coverage(letter_text: str, code: str, page_images: list = None,
         return None
     cov = na.get("duty_coverage_percentage")
     if cov is None:
-        cov = round(100 * sum(1 for b in breakdown if b["match"] in ("strong", "partial")) / len(breakdown))
+        cov = coverage_pct([b["match"] for b in breakdown])
     gaps = na.get("missing_critical_duties") or [b["noc_duty"] for b in breakdown if b["match"] in ("weak", "missing")]
     return {"coverage": int(round(cov)), "sub_title": na.get("coverage_subtitle", "") or "",
             "duties_breakdown": breakdown, "key_gaps": [g for g in gaps if g],
@@ -1890,11 +1906,13 @@ def audit_document_with_openai(system_prompt: str, user_content: str, page_image
     if "noc_analysis" in result and "duties_match" in result["noc_analysis"]:
         duties = result["noc_analysis"].get("duties_match", [])
         if duties:
-            covered = sum(1 for d in duties if d.get("match_strength") in ["strong", "partial"])
-            new_pct = int((covered / len(duties)) * 100)
+            strengths = [d.get("match_strength") for d in duties]
+            new_pct = coverage_pct(strengths)  # strong=1, partial=0.5, weak/missing=0 over total duties
+            covered = sum(1 for s in strengths if s in ("strong", "partial"))
             old_pct = result["noc_analysis"].get("duty_coverage_percentage")
             if new_pct != old_pct:
-                print(f"[Auditor] Math Fix: Corrected duty coverage from {old_pct}% to {new_pct}% ({covered}/{len(duties)})")
+                print(f"[Auditor] Math Fix: weighted duty coverage {old_pct}% -> {new_pct}% "
+                      f"({covered}/{len(duties)} duties evidenced)")
             result["noc_analysis"]["duty_coverage_percentage"] = new_pct
 
     # ── NOC-match confidence: keep it IDENTICAL to what the NOC Finder shows ──

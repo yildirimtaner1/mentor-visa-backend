@@ -1,4 +1,4 @@
-"""GCMS Notes AI Analyzer — pay-first product ($19.90 / 1 credit, free with every GCMS order).
+"""GCMS Notes AI Analyzer — pay-first product ($14.90 / 1 credit, free with every GCMS order).
 
 Turns a raw ATIP release PDF (typically 30-80 dense pages of GCMS screens) into a
 plain-English report: overall status, stage-by-stage progress, officer remarks explained,
