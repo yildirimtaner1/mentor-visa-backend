@@ -27,6 +27,12 @@ gemini_client = genai.Client()
 _openai_api_key = os.getenv("OPENAI_API_KEY", "")
 openai_client = OpenAI(api_key=_openai_api_key) if _openai_api_key else None
 
+# The Employment Letter Auditor grades every letter on a strong, deterministic model. gpt-4o-mini was
+# retired from this path: it under-grades duty coverage and is non-deterministic (57%/57%/57%/71% on a
+# letter whose accurate coverage is 85%), which showed users different numbers on the Finder vs the
+# Auditor. Haiku 4.5 is accurate and stable (85%/85%); paid tiers escalate to Sonnet 4.6.
+AUDIT_STANDARD_MODEL = "claude-haiku-4-5-20251001"
+
 # Load the NOC index once at startup
 _noc_index_path = os.path.join(os.path.dirname(__file__), "noc_index.json")
 with open(_noc_index_path, "r", encoding="utf-8") as f:
@@ -1696,19 +1702,28 @@ def _call_claude_structured(system_prompt: str, user_content: str, page_images: 
 
 
 def _backfill_empty_fields(data: dict, response_format) -> None:
-    """Claude's tool-use omits required-but-empty container fields (e.g. refusal_reasons: []).
-    Backfill list/dict fields with empties so Pydantic validation passes; anything else still
-    missing fails validation and triggers the gpt-4o-mini fallback."""
-    from typing import get_origin
+    """Claude's tool-use omits required-but-empty container fields at ANY depth (e.g. top-level
+    refusal_reasons: [] or nested noc_analysis.alternative_nocs: []). Recursively backfill missing
+    list/dict fields with empties so Pydantic validation passes; anything else still missing fails
+    validation and triggers the model fallback."""
+    from typing import get_origin, get_args
+    from pydantic import BaseModel
+    if not isinstance(data, dict) or not hasattr(response_format, "model_fields"):
+        return
     for name, field in response_format.model_fields.items():
-        if name in data:
-            continue
         ann = field.annotation
-        origin = get_origin(ann) or ann
-        if origin is list:
-            data[name] = []
-        elif origin is dict:
-            data[name] = {}
+        # Unwrap Optional[...] / Union[..., None] to the first concrete arg.
+        args = [a for a in get_args(ann) if a is not type(None)]
+        core = args[0] if (get_origin(ann) is not None and args and get_origin(ann) is not list
+                           and get_origin(ann) is not dict) else ann
+        origin = get_origin(core) or core
+        if name not in data:
+            if origin is list:
+                data[name] = []
+            elif origin is dict:
+                data[name] = {}
+        elif isinstance(core, type) and issubclass(core, BaseModel) and isinstance(data.get(name), dict):
+            _backfill_empty_fields(data[name], core)  # recurse into nested models (e.g. noc_analysis)
 
 
 # Objective contact-coordinate patterns. A hit is unambiguous evidence, so it can only ADD a present
@@ -1780,9 +1795,14 @@ def audit_document_with_openai(system_prompt: str, user_content: str, page_image
             Like auto_detected_noc, employer NOC references are stripped and the result's
             detected_code is hard-locked to this code — but the NOC-match confidence is
             computed fresh (we did not run auto-detection, so there is no cached score).
-        model_tier: "premium" = the requesting user's audit will be unlocked (paid tier /
-            credit holder) — judged by Claude Haiku 4.5, a stronger model than the free
-            preliminary's gpt-4o-mini. Falls back to gpt-4o-mini on any Claude failure.
+        model_tier: which model grades the audit. gpt-4o-mini is NOT used here — it systematically
+            under-grades duty coverage (measured: 57% where the accurate answer is 85%) AND is
+            non-deterministic, which broke Finder<->Auditor consistency. Both tiers use a strong,
+            stable model so the shared numbers (coverage, flags, alternatives) are accurate and
+            identical for every user:
+              "standard" -> Claude Haiku 4.5 (accurate + deterministic)
+              "premium"  -> Claude Sonnet 4.6 (our most capable model; paid tiers/credits)
+            Chain falls back standard<-premium<-gpt-4o-mini so an audit always returns something.
     """
     # The NOC the result must end up locked to (explicit user request wins over auto-detection).
     target_noc = forced_noc or auto_detected_noc
@@ -1796,15 +1816,22 @@ def audit_document_with_openai(system_prompt: str, user_content: str, page_image
 
     from models import AnalysisResponse
     result = None
-    if model_tier == "premium":
+    # Try, in order: the tier's model, then Haiku, then gpt-4o-mini (last resort — accuracy-degraded).
+    attempts = ([("claude-sonnet-4-6", "sonnet"), (AUDIT_STANDARD_MODEL, "haiku-4-5")]
+                if model_tier == "premium" else [(AUDIT_STANDARD_MODEL, "haiku-4-5")])
+    for model_id, tag in attempts:
         try:
-            result = _call_claude_structured(system_prompt, user_content, page_images, AnalysisResponse, "Auditor (premium)")
-            result["_audit_model"] = "claude-haiku-4-5"
+            result = _call_claude_structured(system_prompt, user_content, page_images, AnalysisResponse,
+                                             f"Auditor ({tag})", model=model_id)
+            result["_audit_model"] = tag
+            break
         except Exception as e:
-            print(f"[Auditor] Premium Claude call failed, falling back to gpt-4o-mini: {e}")
+            print(f"[Auditor] {tag} call failed: {e}")
             result = None
     if result is None:
+        print("[Auditor] All Claude audits failed — falling back to gpt-4o-mini (accuracy-degraded).")
         result = _call_openai_structured(system_prompt, user_content, page_images, AnalysisResponse, "Auditor")
+        result["_audit_model"] = "gpt-4o-mini"
 
     # Post-process: if a target NOC was determined (auto-detected OR explicitly requested) but the
     # model returned a different detected_code (e.g. the employer's NOC claim leaked via page images,
