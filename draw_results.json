@@ -1,5 +1,25 @@
 [
   {
+    "date": "2026-10-28",
+    "drawType": "Transport",
+    "crsScore": 477,
+    "itasIssued": 150,
+    "notes": "Second Transport round of 2026 - 7 points above the Aug 7 round but half the invitations."
+  },
+  {
+    "date": "2026-10-27",
+    "drawType": "French",
+    "crsScore": 407,
+    "itasIssued": 5000,
+    "notes": "French cut-off fell 28 points in 11 days after the Oct 16 round."
+  },
+  {
+    "date": "2026-10-26",
+    "drawType": "PNP",
+    "crsScore": 761,
+    "itasIssued": 792
+  },
+  {
     "date": "2026-10-16",
     "drawType": "French",
     "crsScore": 435,
